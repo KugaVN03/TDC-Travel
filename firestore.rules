@@ -1,0 +1,333 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes the following data structures:
+//
+// Collection: users
+// Document ID: {userId} (matches request.auth.uid)
+// Fields:
+//   - uid: string (required, immutable, matches userId) - User ID
+//   - name: string (required, 1..50 chars) - Display name
+//   - mssv: string (required, 1..20 chars) - Student ID
+//   - email: string (required, valid email, max 100 chars) - Private student email
+//   - facultyId: string (required, enum of faculties) - Faculty ID
+//   - role: string (required, 'student' | 'admin') - RBAC role (cannot self-escalate)
+//   - avatar: number (required, 0..5) - Avatar index
+//   - points: number (required, >= 0, <= 1000000) - Total points
+//   - stars: number (required, >= 0, <= 100000) - Collected stars
+//   - quizOk: number (required, >= 0, <= 10000) - Correct quizzes
+//   - photos: number (required, >= 0, <= 10000) - Photos taken
+//   - done: map (required, max 50 keys) - Unlocked stations map
+//   - bonus: map (required, max 50 keys) - Completed quests map
+//   - partyId: string (optional, max 12 chars) - Active party room code
+//   - updatedAt: number (required, >= 0) - Epoch timestamp ms
+//
+// Collection: users_public
+// Document ID: {userId} (matches request.auth.uid)
+// Fields:
+//   - uid: string (required, immutable, matches userId) - User ID
+//   - name: string (required, 1..50 chars) - Display name (non-PII)
+//   - mssv: string (required, 1..20 chars) - Student ID
+//   - facultyId: string (required, enum of faculties) - Faculty ID
+//   - avatar: number (required, 0..5) - Avatar index
+//   - points: number (required, >= 0, <= 1000000) - Total points
+//   - unlockedCount: number (required, >= 0, <= 50) - Number of unlocked stations
+//   - partyId: string (optional, max 12 chars) - Active party code
+//   - updatedAt: number (required, >= 0) - Epoch timestamp ms
+//
+// Collection: stations
+// Document ID: {stationId}
+// Fields:
+//   - id: string (required, 1..30 chars)
+//   - name: string (required, 1..80 chars)
+//   - sub: string (required, 1..120 chars)
+//   - facultyId: string (required, 1..30 chars)
+//   - x: number (required, -500..500)
+//   - z: number (required, -500..500)
+//   - fogRadius: number (required, 5..120)
+//   - col: string (required, 4..16 chars)
+//   - type: string (required, enum)
+//   - pts: number (required, 10..2000)
+//   - badge: string (required, 1..60 chars)
+//   - info: string (required, 1..600 chars)
+//   - funFact: string (required, 1..600 chars)
+//   - directions: string (required, 1..400 chars)
+//   - qrSecretToken: string (required, 4..64 chars)
+//   - riddle: map (optional)
+//   - questions: list (optional, max 20 items)
+//   - active: bool (required)
+//
+// Collection: parties
+// Document ID: {partyCode}
+// Fields:
+//   - code: string (required, immutable, 6 chars)
+//   - hostUid: string (required, immutable, 1..64 chars)
+//   - name: string (required, 1..60 chars)
+//   - memberUids: list (required, 1..4 items)
+//   - members: list (required, 1..4 items)
+//   - isCrossFaculty: bool (required)
+//   - bonusMultiplier: number (required, 1..3)
+//   - totalPoints: number (required, >= 0, <= 4000000)
+//   - createdAt: number (required, immutable)
+//
+// Collection: events
+// Document ID: {eventId}
+// Fields:
+//   - id: string (required, 1..40 chars)
+//   - title: string (required, 1..100 chars)
+//   - description: string (required, 1..500 chars)
+//   - startDate: string (required, 1..30 chars)
+//   - endDate: string (required, 1..30 chars)
+//   - active: bool (required)
+//   - bonusMultiplier: number (required, 1..5)
+//
+// Collection: checkins
+// Document ID: {checkinId}
+// Fields:
+//   - uid: string (required, immutable, matches request.auth.uid)
+//   - userName: string (required, 1..50 chars)
+//   - stationId: string (required, 1..30 chars)
+//   - facultyId: string (required, 1..30 chars)
+//   - method: string (required, 'qr' | 'riddle' | 'demo')
+//   - pts: number (required, 0..5000)
+//   - timestamp: number (required, > 0)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) ||
+        request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) ||
+        request.resource.data.uid == resource.data.uid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+        (request.resource.data[field] is string &&
+         request.resource.data[field].size() >= minLen &&
+         request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.size() <= 100 &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidFaculty(facultyId) {
+      return facultyId in ['cntt', 'dien_dt', 'co_khi_oto', 'co_khi_ctm', 'kinh_te', 'ngoai_ngu', 'du_lich', 'khac'];
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUserPrivate(data) {
+      return hasRequiredFields(['uid', 'name', 'mssv', 'email', 'facultyId', 'role', 'avatar', 'points', 'stars', 'quizOk', 'photos', 'done', 'bonus', 'updatedAt']) &&
+        hasOnlyAllowedFields(['uid', 'name', 'mssv', 'email', 'facultyId', 'role', 'avatar', 'points', 'stars', 'quizOk', 'photos', 'done', 'bonus', 'partyId', 'updatedAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 64 &&
+        validStringLength('name', 1, 50) &&
+        validStringLength('mssv', 1, 20) &&
+        isValidEmail(data.email) &&
+        isValidFaculty(data.facultyId) &&
+        data.role in ['student', 'admin'] &&
+        data.avatar is number && data.avatar >= 0 && data.avatar <= 5 &&
+        data.points is number && data.points >= 0 && data.points <= 1000000 &&
+        data.stars is number && data.stars >= 0 && data.stars <= 100000 &&
+        data.quizOk is number && data.quizOk >= 0 && data.quizOk <= 10000 &&
+        data.photos is number && data.photos >= 0 && data.photos <= 10000 &&
+        data.done is map && data.done.size() <= 50 &&
+        data.bonus is map && data.bonus.size() <= 50 &&
+        isValidOptionalString('partyId', 0, 12) &&
+        data.updatedAt is number && data.updatedAt >= 0;
+    }
+
+    function isValidUserPublic(data) {
+      return hasRequiredFields(['uid', 'name', 'mssv', 'facultyId', 'avatar', 'points', 'unlockedCount', 'updatedAt']) &&
+        hasOnlyAllowedFields(['uid', 'name', 'mssv', 'facultyId', 'avatar', 'points', 'unlockedCount', 'partyId', 'updatedAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 64 &&
+        validStringLength('name', 1, 50) &&
+        validStringLength('mssv', 1, 20) &&
+        isValidFaculty(data.facultyId) &&
+        data.avatar is number && data.avatar >= 0 && data.avatar <= 5 &&
+        data.points is number && data.points >= 0 && data.points <= 1000000 &&
+        data.unlockedCount is number && data.unlockedCount >= 0 && data.unlockedCount <= 50 &&
+        isValidOptionalString('partyId', 0, 12) &&
+        data.updatedAt is number && data.updatedAt >= 0;
+    }
+
+    function isValidStation(data) {
+      return hasRequiredFields(['id', 'name', 'sub', 'facultyId', 'x', 'z', 'fogRadius', 'col', 'type', 'pts', 'badge', 'info', 'funFact', 'directions', 'qrSecretToken', 'active']) &&
+        hasOnlyAllowedFields(['id', 'name', 'sub', 'facultyId', 'x', 'z', 'fogRadius', 'col', 'type', 'pts', 'badge', 'info', 'funFact', 'directions', 'qrSecretToken', 'riddle', 'questions', 'active']) &&
+        validStringLength('id', 1, 30) &&
+        validStringLength('name', 1, 80) &&
+        validStringLength('sub', 1, 120) &&
+        validStringLength('facultyId', 1, 30) &&
+        data.x is number && data.x >= -500 && data.x <= 500 &&
+        data.z is number && data.z >= -500 && data.z <= 500 &&
+        data.fogRadius is number && data.fogRadius >= 5 && data.fogRadius <= 120 &&
+        validStringLength('col', 4, 16) &&
+        data.type in ['checkin', 'photo', 'quiz', 'kick', 'it_debug', 'electric_circuit', 'auto_engine'] &&
+        data.pts is number && data.pts >= 10 && data.pts <= 2000 &&
+        validStringLength('badge', 1, 60) &&
+        validStringLength('info', 1, 600) &&
+        validStringLength('funFact', 1, 600) &&
+        validStringLength('directions', 1, 400) &&
+        validStringLength('qrSecretToken', 4, 64) &&
+        (!('riddle' in data) || (data.riddle is map && data.riddle.keys().hasOnly(['prompt', 'answer', 'hint']))) &&
+        (!('questions' in data) || (data.questions is list && data.questions.size() <= 20)) &&
+        data.active is bool;
+    }
+
+    function isValidParty(data) {
+      return hasRequiredFields(['code', 'hostUid', 'name', 'memberUids', 'members', 'isCrossFaculty', 'bonusMultiplier', 'totalPoints', 'createdAt']) &&
+        hasOnlyAllowedFields(['code', 'hostUid', 'name', 'memberUids', 'members', 'isCrossFaculty', 'bonusMultiplier', 'totalPoints', 'createdAt']) &&
+        validStringLength('code', 6, 6) &&
+        validStringLength('hostUid', 1, 64) &&
+        validStringLength('name', 1, 60) &&
+        data.memberUids is list && data.memberUids.size() >= 1 && data.memberUids.size() <= 4 &&
+        data.members is list && data.members.size() >= 1 && data.members.size() <= 4 &&
+        data.isCrossFaculty is bool &&
+        data.bonusMultiplier is number && data.bonusMultiplier >= 1 && data.bonusMultiplier <= 3 &&
+        data.totalPoints is number && data.totalPoints >= 0 && data.totalPoints <= 4000000 &&
+        data.createdAt is number && data.createdAt >= 0;
+    }
+
+    function isValidEvent(data) {
+      return hasRequiredFields(['id', 'title', 'description', 'startDate', 'endDate', 'active', 'bonusMultiplier']) &&
+        hasOnlyAllowedFields(['id', 'title', 'description', 'startDate', 'endDate', 'active', 'bonusMultiplier']) &&
+        validStringLength('id', 1, 40) &&
+        validStringLength('title', 1, 100) &&
+        validStringLength('description', 1, 500) &&
+        validStringLength('startDate', 1, 30) &&
+        validStringLength('endDate', 1, 30) &&
+        data.active is bool &&
+        data.bonusMultiplier is number && data.bonusMultiplier >= 1 && data.bonusMultiplier <= 5;
+    }
+
+    function isValidCheckin(data) {
+      return hasRequiredFields(['uid', 'userName', 'stationId', 'facultyId', 'method', 'pts', 'timestamp']) &&
+        hasOnlyAllowedFields(['uid', 'userName', 'stationId', 'facultyId', 'method', 'pts', 'timestamp']) &&
+        data.uid == request.auth.uid &&
+        validStringLength('userName', 1, 50) &&
+        validStringLength('stationId', 1, 30) &&
+        isValidFaculty(data.facultyId) &&
+        data.method in ['qr', 'riddle', 'demo'] &&
+        data.pts is number && data.pts >= 0 && data.pts <= 5000 &&
+        data.timestamp is number && data.timestamp > 0;
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // Private User Profile (contains PII email) -> strictly owner or admin
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() &&
+        isValidUserPrivate(request.resource.data) &&
+        uidUnchanged() &&
+        ((isOwner(userId) && request.resource.data.role == 'student') || isAdmin());
+      allow update: if isAuthenticated() &&
+        isValidUserPrivate(request.resource.data) &&
+        uidNotModified() &&
+        ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Public Leaderboard Profile (No PII) -> readable by authenticated players
+    match /users_public/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) &&
+        uidUnchanged() &&
+        isValidUserPublic(request.resource.data);
+      allow update: if (isOwner(userId) || isAdmin()) &&
+        uidNotModified() &&
+        isValidUserPublic(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Campus 3D Stations -> readable by authenticated users, writable by admins only
+    match /stations/{stationId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidStation(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Co-op Party Rooms (2-4 students)
+    match /parties/{partyCode} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.hostUid == request.auth.uid &&
+        request.auth.uid in request.resource.data.memberUids &&
+        isValidParty(request.resource.data);
+      allow update: if isAuthenticated() &&
+        isValidParty(request.resource.data) &&
+        request.resource.data.code == resource.data.code &&
+        request.resource.data.hostUid == resource.data.hostUid &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        (request.auth.uid in resource.data.memberUids || request.auth.uid in request.resource.data.memberUids || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.hostUid == request.auth.uid || isAdmin());
+    }
+
+    // Campaign Events
+    match /events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidEvent(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // O2O Check-in Logs (Anti-cheat & Analytics)
+    match /checkins/{checkinId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidCheckin(request.resource.data);
+      allow update: if false; // Check-in logs are immutable
+      allow delete: if isAdmin();
+    }
+  }
+}
