@@ -29,6 +29,7 @@ import {
   saveLocalProfile,
 } from './services/authService';
 import {
+  checkAntiCheatCooldown,
   recordStarPickup,
   recordStationUnlock,
   verifyStationQrPayload,
@@ -314,6 +315,17 @@ export const App: React.FC = () => {
   };
 
   const handleQrDetected = (rawCode: string) => {
+    if (profile) {
+      const cooldown = checkAntiCheatCooldown(profile, 'qr');
+      if (!cooldown.allowed) {
+        audioSfx.play('bad');
+        pushToast(
+          `Chống gian lận (Anti-cheat): Bạn di chuyển giữa 2 trạm quá nhanh! Vui lòng đợi ${cooldown.waitSeconds}s.`
+        );
+        return;
+      }
+    }
+
     const target =
       activeModal?.type === 'qr' && activeModal.targetStation
         ? activeModal.targetStation

@@ -142,10 +142,13 @@ export function calculateStationRewardPoints(params: {
   basePoints: number;
   party: PartyRoom | null;
   method: VerificationMethod;
+  eventMultiplier?: number;
 }): {
   finalPoints: number;
   crossFacultyBonus: number;
   qrBonus: number;
+  eventBonus: number;
+  activeEventTitle?: string;
 } {
   const qrBonus = params.method === 'qr' ? 15 : params.method === 'riddle' ? 10 : 0;
   const crossMultiplier =
@@ -153,11 +156,21 @@ export function calculateStationRewardPoints(params: {
   const crossFacultyBonus =
     crossMultiplier > 1 ? Math.round(params.basePoints * (crossMultiplier - 1)) : 0;
 
-  const finalPoints = params.basePoints + qrBonus + crossFacultyBonus;
+  const activeEvt =
+    params.eventMultiplier !== undefined
+      ? { event: null, multiplier: params.eventMultiplier }
+      : getActiveEventMultiplier();
+  const evtMult = activeEvt.multiplier > 1 ? activeEvt.multiplier : 1.0;
+  const eventBonus =
+    evtMult > 1 ? Math.round(params.basePoints * (evtMult - 1)) : 0;
+
+  const finalPoints = params.basePoints + qrBonus + crossFacultyBonus + eventBonus;
   return {
     finalPoints,
     crossFacultyBonus,
     qrBonus,
+    eventBonus,
+    activeEventTitle: activeEvt.event?.title,
   };
 }
 

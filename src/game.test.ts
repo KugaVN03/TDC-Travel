@@ -1,5 +1,28 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_STATIONS } from './data/stations';
+
+const memoryStore = new Map<string, string>();
+if (typeof globalThis.localStorage === 'undefined') {
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: {
+      getItem: (k: string) => (memoryStore.has(k) ? memoryStore.get(k)! : null),
+      setItem: (k: string, v: string) => {
+        memoryStore.set(k, String(v));
+      },
+      removeItem: (k: string) => {
+        memoryStore.delete(k);
+      },
+      clear: () => {
+        memoryStore.clear();
+      },
+    },
+    configurable: true,
+  });
+}
+
+beforeEach(() => {
+  memoryStore.clear();
+});
 import {
   buildStationQrPayload,
   generateAnalyticsCsv,
@@ -13,7 +36,13 @@ import {
   verifyStationQrPayload,
   verifyStationRiddle,
 } from './services/gameService';
-import { evaluateCrossFacultyBonus } from './services/partyService';
+import {
+  createPartyRoom,
+  evaluateCrossFacultyBonus,
+  getPartyByCode,
+  joinPartyRoom,
+  leavePartyRoom,
+} from './services/partyService';
 import { PartyMember, PartyRoom, UserProfile } from './types/game';
 
 describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
@@ -101,7 +130,7 @@ describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
     expect(crossEval.bonusMultiplier).toBe(1.2);
   });
 
-  it('6. Calculates total station reward points with O2O QR bonus and Cross-Faculty bonus', () => {
+  it('6. Calculates total station reward points with O2O QR bonus, Cross-Faculty bonus, and Campaign Event multiplier', () => {
     const crossParty: PartyRoom = {
       code: 'TDC123',
       hostUid: '1',
@@ -114,15 +143,26 @@ describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
       createdAt: Date.now(),
     };
 
-    const reward = calculateStationRewardPoints({
+    const rewardNoEvent = calculateStationRewardPoints({
       basePoints: 100,
       party: crossParty,
       method: 'qr',
+      eventMultiplier: 1.0,
     });
 
-    expect(reward.qrBonus).toBe(15);
-    expect(reward.crossFacultyBonus).toBe(20);
-    expect(reward.finalPoints).toBe(135);
+    expect(rewardNoEvent.qrBonus).toBe(15);
+    expect(rewardNoEvent.crossFacultyBonus).toBe(20);
+    expect(rewardNoEvent.eventBonus).toBe(0);
+    expect(rewardNoEvent.finalPoints).toBe(135);
+
+    const rewardWithEvent = calculateStationRewardPoints({
+      basePoints: 100,
+      party: crossParty,
+      method: 'qr',
+      eventMultiplier: 1.5,
+    });
+    expect(rewardWithEvent.eventBonus).toBe(50);
+    expect(rewardWithEvent.finalPoints).toBe(185);
   });
 
   it('7. Generates Admin Analytics and valid CSV report', () => {
@@ -133,5 +173,45 @@ describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
     const csv = generateAnalyticsCsv(summary);
     expect(csv).toContain('BAO CAO THONG KE HE THONG TDC GO');
     expect(csv).toContain('Tòa D (11 tầng) & Cổng 2');
+  });
+
+  it('8. Removes departing member and recalculates party totalPoints & cross-faculty status on leavePartyRoom', async () => {
+    const host: UserProfile = {
+      uid: 'u_host',
+      name: 'Host CNTT',
+      mssv: '26211TT0010',
+      email: 'host@mail.tdc.edu.vn',
+      facultyId: 'cntt',
+      role: 'student',
+      avatar: 0,
+      points: 200,
+      stars: 0,
+      quizOk: 0,
+      photos: 0,
+      done: {},
+      bonus: {},
+      updatedAt: Date.now(),
+    };
+    const guest: UserProfile = {
+      ...host,
+      uid: 'u_guest',
+      name: 'Guest Điện',
+      mssv: '26211DD0020',
+      facultyId: 'dien_dt',
+      points: 300,
+    };
+
+    const { room } = await createPartyRoom(host, 'Test Co-op Room');
+    const joined = await joinPartyRoom(guest, room.code);
+    expect(joined.room.members.length).toBe(2);
+    expect(joined.room.isCrossFaculty).toBe(true);
+    expect(joined.room.totalPoints).toBe(500);
+
+    await leavePartyRoom(joined.updatedProfile);
+    const afterLeave = await getPartyByCode(room.code);
+    expect(afterLeave).not.toBeNull();
+    expect(afterLeave!.members.length).toBe(1);
+    expect(afterLeave!.isCrossFaculty).toBe(false);
+    expect(afterLeave!.totalPoints).toBe(200);
   });
 });

@@ -333,6 +333,44 @@ export async function syncMemberPointsInParty(profile: UserProfile): Promise<Par
 }
 
 export async function leavePartyRoom(profile: UserProfile): Promise<UserProfile> {
+  if (profile.partyId) {
+    const code = profile.partyId.trim().toUpperCase();
+    const room = await getPartyByCode(code);
+    if (room) {
+      const nextMembers = room.members.filter((m) => m.uid !== profile.uid);
+      const nextUids = nextMembers.map((m) => m.uid);
+      const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
+      const updatedRoom: PartyRoom = {
+        ...room,
+        hostUid: nextMembers[0]?.uid || room.hostUid,
+        memberUids: nextUids,
+        members: nextMembers,
+        isCrossFaculty,
+        bonusMultiplier,
+        totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
+      };
+
+      if (isFirebaseConfigured && db && nextMembers.length > 0) {
+        try {
+          await setDoc(doc(db, 'parties', room.code), updatedRoom);
+        } catch {
+          // Ignore
+        }
+      }
+
+      const parties = loadLocalParties();
+      const idx = parties.findIndex((p) => p.code === room.code);
+      if (idx >= 0) {
+        if (nextMembers.length > 0) {
+          parties[idx] = updatedRoom;
+        } else {
+          parties.splice(idx, 1);
+        }
+        saveLocalParties(parties);
+      }
+    }
+  }
+
   const updated: UserProfile = {
     ...profile,
     partyId: undefined,

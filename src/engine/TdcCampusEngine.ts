@@ -126,6 +126,8 @@ export class TdcCampusEngine {
   private rafId = 0;
   private resizeObs: ResizeObserver;
 
+  private cleanupWindowListeners?: () => void;
+
   private animateNatureAndTrain?: (dt: number, t: number) => void;
   private animateNpcs?: (dt: number, t: number) => void;
 
@@ -346,11 +348,18 @@ export class TdcCampusEngine {
     stations: Station[],
     unlocked: Record<string, UnlockedStationRecord>
   ): void {
-    const countChanged = stations.length !== this.stations.length;
+    const prevKey = this.stations
+      .map((s) => `${s.id}:${s.x}:${s.z}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`)
+      .join('|');
+    const nextKey = stations
+      .map((s) => `${s.id}:${s.x}:${s.z}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`)
+      .join('|');
+    const structureChanged = prevKey !== nextKey;
+
     this.stations = stations;
     this.unlockedMap = unlocked;
 
-    if (countChanged) {
+    if (structureChanged) {
       this.rebuildStations3D();
     } else {
       this.stations.forEach((st) => this.applyStationVisualState(st));
@@ -577,6 +586,11 @@ export class TdcCampusEngine {
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
+    this.cleanupWindowListeners = () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
 
     const cv = this.renderer.domElement;
     const ptrs = new Map<number, { x: number; y: number }>();
@@ -1011,6 +1025,7 @@ export class TdcCampusEngine {
   public dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.rafId);
+    this.cleanupWindowListeners?.();
     this.resizeObs.disconnect();
     this.renderer.dispose();
     if (this.renderer.domElement.parentNode === this.container) {

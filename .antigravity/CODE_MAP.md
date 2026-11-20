@@ -6062,6 +6062,8 @@ export class TdcCampusEngine {
   private rafId = 0;
   private resizeObs: ResizeObserver;
 
+  private cleanupWindowListeners?: () => void;
+
   private animateNatureAndTrain?: (dt: number, t: number) => void;
   private animateNpcs?: (dt: number, t: number) => void;
 
@@ -6282,11 +6284,18 @@ export class TdcCampusEngine {
     stations: Station[],
     unlocked: Record<string, UnlockedStationRecord>
   ): void {
-    const countChanged = stations.length !== this.stations.length;
+    const prevKey = this.stations
+      .map((s) => `${s.id}:${s.x}:${s.z}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`)
+      .join('|');
+    const nextKey = stations
+      .map((s) => `${s.id}:${s.x}:${s.z}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`)
+      .join('|');
+    const structureChanged = prevKey !== nextKey;
+
     this.stations = stations;
     this.unlockedMap = unlocked;
 
-    if (countChanged) {
+    if (structureChanged) {
       this.rebuildStations3D();
     } else {
       this.stations.forEach((st) => this.applyStationVisualState(st));
@@ -6513,6 +6522,11 @@ export class TdcCampusEngine {
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', onBlur);
+    this.cleanupWindowListeners = () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
 
     const cv = this.renderer.domElement;
     const ptrs = new Map<number, { x: number; y: number }>();
@@ -6947,6 +6961,7 @@ export class TdcCampusEngine {
   public dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.rafId);
+    this.cleanupWindowListeners?.();
     this.resizeObs.disconnect();
     this.renderer.dispose();
     if (this.renderer.domElement.parentNode === this.container) {
@@ -8899,10 +8914,13 @@ export function calculateStationRewardPoints(params: {
   basePoints: number;
   party: PartyRoom | null;
   method: VerificationMethod;
+  eventMultiplier?: number;
 }): {
   finalPoints: number;
   crossFacultyBonus: number;
   qrBonus: number;
+  eventBonus: number;
+  activeEventTitle?: string;
 } {
   const qrBonus = params.method === 'qr' ? 15 : params.method === 'riddle' ? 10 : 0;
   const crossMultiplier =
@@ -8910,11 +8928,21 @@ export function calculateStationRewardPoints(params: {
   const crossFacultyBonus =
     crossMultiplier > 1 ? Math.round(params.basePoints * (crossMultiplier - 1)) : 0;
 
-  const finalPoints = params.basePoints + qrBonus + crossFacultyBonus;
+  const activeEvt =
+    params.eventMultiplier !== undefined
+      ? { event: null, multiplier: params.eventMultiplier }
+      : getActiveEventMultiplier();
+  const evtMult = activeEvt.multiplier > 1 ? activeEvt.multiplier : 1.0;
+  const eventBonus =
+    evtMult > 1 ? Math.round(params.basePoints * (evtMult - 1)) : 0;
+
+  const finalPoints = params.basePoints + qrBonus + crossFacultyBonus + eventBonus;
   return {
     finalPoints,
     crossFacultyBonus,
     qrBonus,
+    eventBonus,
+    activeEventTitle: activeEvt.event?.title,
   };
 }
 
@@ -9444,6 +9472,44 @@ export async function syncMemberPointsInParty(profile: UserProfile): Promise<Par
 }
 
 export async function leavePartyRoom(profile: UserProfile): Promise<UserProfile> {
+  if (profile.partyId) {
+    const code = profile.partyId.trim().toUpperCase();
+    const room = await getPartyByCode(code);
+    if (room) {
+      const nextMembers = room.members.filter((m) => m.uid !== profile.uid);
+      const nextUids = nextMembers.map((m) => m.uid);
+      const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
+      const updatedRoom: PartyRoom = {
+        ...room,
+        hostUid: nextMembers[0]?.uid || room.hostUid,
+        memberUids: nextUids,
+        members: nextMembers,
+        isCrossFaculty,
+        bonusMultiplier,
+        totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
+      };
+
+      if (isFirebaseConfigured && db && nextMembers.length > 0) {
+        try {
+          await setDoc(doc(db, 'parties', room.code), updatedRoom);
+        } catch {
+          // Ignore
+        }
+      }
+
+      const parties = loadLocalParties();
+      const idx = parties.findIndex((p) => p.code === room.code);
+      if (idx >= 0) {
+        if (nextMembers.length > 0) {
+          parties[idx] = updatedRoom;
+        } else {
+          parties.splice(idx, 1);
+        }
+        saveLocalParties(parties);
+      }
+    }
+  }
+
   const updated: UserProfile = {
     ...profile,
     partyId: undefined,
@@ -9643,6 +9709,7 @@ import {
   saveLocalProfile,
 } from './services/authService';
 import {
+  checkAntiCheatCooldown,
   recordStarPickup,
   recordStationUnlock,
   verifyStationQrPayload,
@@ -9928,6 +9995,17 @@ export const App: React.FC = () => {
   };
 
   const handleQrDetected = (rawCode: string) => {
+    if (profile) {
+      const cooldown = checkAntiCheatCooldown(profile, 'qr');
+      if (!cooldown.allowed) {
+        audioSfx.play('bad');
+        pushToast(
+          `Chống gian lận (Anti-cheat): Bạn di chuyển giữa 2 trạm quá nhanh! Vui lòng đợi ${cooldown.waitSeconds}s.`
+        );
+        return;
+      }
+    }
+
     const target =
       activeModal?.type === 'qr' && activeModal.targetStation
         ? activeModal.targetStation
@@ -10167,8 +10245,31 @@ export const App: React.FC = () => {
 </file>
 
 <file path="src/game.test.ts">
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_STATIONS } from './data/stations';
+
+const memoryStore = new Map<string, string>();
+if (typeof globalThis.localStorage === 'undefined') {
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: {
+      getItem: (k: string) => (memoryStore.has(k) ? memoryStore.get(k)! : null),
+      setItem: (k: string, v: string) => {
+        memoryStore.set(k, String(v));
+      },
+      removeItem: (k: string) => {
+        memoryStore.delete(k);
+      },
+      clear: () => {
+        memoryStore.clear();
+      },
+    },
+    configurable: true,
+  });
+}
+
+beforeEach(() => {
+  memoryStore.clear();
+});
 import {
   buildStationQrPayload,
   generateAnalyticsCsv,
@@ -10182,7 +10283,13 @@ import {
   verifyStationQrPayload,
   verifyStationRiddle,
 } from './services/gameService';
-import { evaluateCrossFacultyBonus } from './services/partyService';
+import {
+  createPartyRoom,
+  evaluateCrossFacultyBonus,
+  getPartyByCode,
+  joinPartyRoom,
+  leavePartyRoom,
+} from './services/partyService';
 import { PartyMember, PartyRoom, UserProfile } from './types/game';
 
 describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
@@ -10270,7 +10377,7 @@ describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
     expect(crossEval.bonusMultiplier).toBe(1.2);
   });
 
-  it('6. Calculates total station reward points with O2O QR bonus and Cross-Faculty bonus', () => {
+  it('6. Calculates total station reward points with O2O QR bonus, Cross-Faculty bonus, and Campaign Event multiplier', () => {
     const crossParty: PartyRoom = {
       code: 'TDC123',
       hostUid: '1',
@@ -10283,15 +10390,26 @@ describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
       createdAt: Date.now(),
     };
 
-    const reward = calculateStationRewardPoints({
+    const rewardNoEvent = calculateStationRewardPoints({
       basePoints: 100,
       party: crossParty,
       method: 'qr',
+      eventMultiplier: 1.0,
     });
 
-    expect(reward.qrBonus).toBe(15);
-    expect(reward.crossFacultyBonus).toBe(20);
-    expect(reward.finalPoints).toBe(135);
+    expect(rewardNoEvent.qrBonus).toBe(15);
+    expect(rewardNoEvent.crossFacultyBonus).toBe(20);
+    expect(rewardNoEvent.eventBonus).toBe(0);
+    expect(rewardNoEvent.finalPoints).toBe(135);
+
+    const rewardWithEvent = calculateStationRewardPoints({
+      basePoints: 100,
+      party: crossParty,
+      method: 'qr',
+      eventMultiplier: 1.5,
+    });
+    expect(rewardWithEvent.eventBonus).toBe(50);
+    expect(rewardWithEvent.finalPoints).toBe(185);
   });
 
   it('7. Generates Admin Analytics and valid CSV report', () => {
@@ -10302,6 +10420,46 @@ describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
     const csv = generateAnalyticsCsv(summary);
     expect(csv).toContain('BAO CAO THONG KE HE THONG TDC GO');
     expect(csv).toContain('Tòa D (11 tầng) & Cổng 2');
+  });
+
+  it('8. Removes departing member and recalculates party totalPoints & cross-faculty status on leavePartyRoom', async () => {
+    const host: UserProfile = {
+      uid: 'u_host',
+      name: 'Host CNTT',
+      mssv: '26211TT0010',
+      email: 'host@mail.tdc.edu.vn',
+      facultyId: 'cntt',
+      role: 'student',
+      avatar: 0,
+      points: 200,
+      stars: 0,
+      quizOk: 0,
+      photos: 0,
+      done: {},
+      bonus: {},
+      updatedAt: Date.now(),
+    };
+    const guest: UserProfile = {
+      ...host,
+      uid: 'u_guest',
+      name: 'Guest Điện',
+      mssv: '26211DD0020',
+      facultyId: 'dien_dt',
+      points: 300,
+    };
+
+    const { room } = await createPartyRoom(host, 'Test Co-op Room');
+    const joined = await joinPartyRoom(guest, room.code);
+    expect(joined.room.members.length).toBe(2);
+    expect(joined.room.isCrossFaculty).toBe(true);
+    expect(joined.room.totalPoints).toBe(500);
+
+    await leavePartyRoom(joined.updatedProfile);
+    const afterLeave = await getPartyByCode(room.code);
+    expect(afterLeave).not.toBeNull();
+    expect(afterLeave!.members.length).toBe(1);
+    expect(afterLeave!.isCrossFaculty).toBe(false);
+    expect(afterLeave!.totalPoints).toBe(200);
   });
 });
 </file>
