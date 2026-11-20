@@ -1,5 +1,17 @@
 {
+  "auth": {
+    "providers": {
+      "anonymous": true,
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "TDC GO",
+        "supportEmail": "kuganagia@gmail.com"
+      }
+    }
+  },
   "firestore": {
+    "database": "(default)",
+    "location": "asia-southeast1",
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },

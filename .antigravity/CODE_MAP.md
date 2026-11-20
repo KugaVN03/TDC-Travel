@@ -89,6 +89,7 @@ src/
   main.tsx
   vite-env.d.ts
 .env.example
+.firebaserc
 .gitignore
 firebase.json
 firestore.indexes.json
@@ -103,6 +104,14 @@ vite.config.ts
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path=".firebaserc">
+{
+  "projects": {
+    "default": "tdc-go-2026"
+  }
+}
+</file>
 
 <file path="src/components/minigames/AutoEngineGame.tsx">
 import React, { useState } from 'react';
@@ -5933,1044 +5942,6 @@ export function buildNatureAndTrain(ctx: {
 }
 </file>
 
-<file path="src/engine/TdcCampusEngine.ts">
-import * as THREE from 'three';
-import { AVATARS, CAMP, PATHS } from '../data/campusLayout';
-import { Station, UnlockedStationRecord } from '../types/game';
-import { audioSfx } from './audioSfx';
-import { buildCampusEnvironment } from './campusBuilder';
-import { animChibi, buildPathGraphAndNpcs, makeChibi } from './chibiBuilder';
-import { FogOfWarSystem } from './fogOfWar';
-import { buildNatureAndTrain } from './natureAndTrain';
-import {
-  AABB,
-  canvasTex,
-  clamp,
-  coinTex,
-  createMaterialCache,
-  createRng,
-  ell,
-  lerpAngle,
-  mesh,
-  pill,
-} from './threeHelpers';
-
-export interface FloatingTextItem {
-  id: number;
-  text: string;
-  x: number;
-  y: number;
-  opacity: number;
-  scale: number;
-  color?: string;
-}
-
-export interface GuideState {
-  station: Station | null;
-  distance: number;
-  angleRad: number;
-  allDone: boolean;
-}
-
-export interface MinimapSnapshot {
-  playerX: number;
-  playerZ: number;
-  playerRotY: number;
-  camYaw: number;
-  col: AABB[];
-}
-
-export interface EngineCallbacks {
-  onNearStationChange: (st: Station | null) => void;
-  onOpenStationRequest: (st: Station) => void;
-  onStarCollected: () => void;
-  onPlayerMoveSave: (pos: [number, number]) => void;
-  onFloatingTextsUpdate: (items: FloatingTextItem[]) => void;
-  onGuideUpdate: (guide: GuideState) => void;
-  onMinimapUpdate: (snap: MinimapSnapshot) => void;
-}
-
-interface StarObject {
-  m: THREE.Mesh;
-  alive: boolean;
-  timer: number;
-  ph: number;
-}
-
-interface Station3DNode {
-  g: THREE.Group;
-  ring: THREE.Mesh;
-  disc: THREE.Mesh;
-  beam: THREE.Mesh;
-  icon: THREE.Sprite;
-  lab: THREE.Sprite;
-}
-
-export class TdcCampusEngine {
-  private container: HTMLElement;
-  private callbacks: EngineCallbacks;
-  private renderer: THREE.WebGLRenderer;
-  private scene: THREE.Scene;
-  private camera: THREE.PerspectiveCamera;
-  private sun: THREE.DirectionalLight;
-  private col: AABB[] = [];
-  private mat = createMaterialCache();
-  private rng = createRng(20261021);
-  private fogOfWar: FogOfWarSystem;
-
-  private stations: Station[] = [];
-  private unlockedMap: Record<string, UnlockedStationRecord> = {};
-  private st3d: Record<string, Station3DNode> = {};
-  private stars: StarObject[] = [];
-  private parts: { m: THREE.Mesh; v: THREE.Vector3; life: number }[] = [];
-  private fxList: {
-    id: number;
-    text: string;
-    p: THREE.Vector3;
-    life: number;
-    color?: string;
-  }[] = [];
-  private fxSeq = 1;
-
-  private player = {
-    obj: null as THREE.Group | null,
-    pos: new THREE.Vector3(-66, 0, 100),
-    ph: 0,
-    tag: null as THREE.Sprite | null,
-  };
-
-  private cam = {
-    yaw: 0.25,
-    pitch: 0.92,
-    dist: 40,
-    curD: null as number | null,
-    curP: null as number | null,
-    tgt: new THREE.Vector3(-5, 0, -5),
-  };
-
-  private running = false;
-  private paused = false;
-  private photoStation: Station | null = null;
-  private nearStation: Station | null = null;
-  private moveTarget: THREE.Vector3 | null = null;
-  private tMark: THREE.Mesh | null = null;
-  private flagMesh: THREE.Mesh | null = null;
-
-  private keys = new Set<string>();
-  private joy = { x: 0, y: 0 };
-  private disposed = false;
-  private rafId = 0;
-  private resizeObs: ResizeObserver;
-
-  private cleanupWindowListeners?: () => void;
-
-  private animateNatureAndTrain?: (dt: number, t: number) => void;
-  private animateNpcs?: (dt: number, t: number) => void;
-
-  constructor(
-    container: HTMLElement,
-    initialStations: Station[],
-    initialUnlocked: Record<string, UnlockedStationRecord>,
-    callbacks: EngineCallbacks
-  ) {
-    this.container = container;
-    this.stations = initialStations;
-    this.unlockedMap = initialUnlocked;
-    this.callbacks = callbacks;
-
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.container.appendChild(this.renderer.domElement);
-
-    this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0xd3eedf, 380, 1100);
-    this.camera = new THREE.PerspectiveCamera(42, 1, 0.5, 2600);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8dbf73, 0.74));
-
-    this.sun = new THREE.DirectionalLight(0xfff2d8, 0.8);
-    this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
-    Object.assign(this.sun.shadow.camera, {
-      left: -150,
-      right: 150,
-      top: 150,
-      bottom: -150,
-      near: 10,
-      far: 500,
-    });
-    this.sun.shadow.bias = -0.0006;
-    this.sun.shadow.normalBias = 0.03;
-    this.scene.add(this.sun, this.sun.target);
-
-    this.fogOfWar = new FogOfWarSystem(this.scene);
-
-    this.resizeObs = new ResizeObserver(() => this.resize());
-    this.resizeObs.observe(this.container);
-    this.resize();
-
-    this.initWorld();
-    this.bindEvents();
-    this.startLoop();
-  }
-
-  private initWorld(): void {
-    const { flag } = buildCampusEnvironment({
-      scene: this.scene,
-      col: this.col,
-      mat: this.mat,
-      rng: this.rng,
-    });
-    this.flagMesh = flag;
-
-    const nat = buildNatureAndTrain({
-      scene: this.scene,
-      col: this.col,
-      stations: this.stations,
-      mat: this.mat,
-      rng: this.rng,
-    });
-    this.animateNatureAndTrain = nat.animate;
-
-    const npcState = buildPathGraphAndNpcs({
-      scene: this.scene,
-      mat: this.mat,
-      rng: this.rng,
-    });
-    this.animateNpcs = npcState.animateNpcs;
-
-    // Stars
-    const sh = new THREE.Shape();
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
-      const r = i % 2 ? 0.45 : 1;
-      if (i) sh.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-      else sh.moveTo(Math.cos(a) * r, Math.sin(a) * r);
-    }
-    const sg = new THREE.ExtrudeGeometry(sh, {
-      depth: 0.32,
-      bevelEnabled: true,
-      bevelSize: 0.1,
-      bevelThickness: 0.1,
-      bevelSegments: 1,
-    });
-    sg.center();
-    const sm = new THREE.MeshPhongMaterial({
-      color: '#FFD23F',
-      emissive: '#7A5200',
-      shininess: 60,
-      flatShading: true,
-    });
-    for (let i = 0; i < 34; i++) {
-      const m = mesh(sg, sm, 0, 1.7, 0);
-      this.scene.add(m);
-      const s: StarObject = { m, alive: true, timer: 0, ph: this.rng() * 6 };
-      this.placeStar(s);
-      this.stars.push(s);
-    }
-
-    // Build 3D station markers & Fog of War
-    this.rebuildStations3D();
-
-    // Ground tap marker & particles
-    this.tMark = new THREE.Mesh(
-      new THREE.RingGeometry(0.9, 1.3, 28).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: '#FFFFFF', transparent: true, opacity: 0.9 })
-    );
-    this.tMark.visible = false;
-    this.scene.add(this.tMark);
-
-    const pg = new THREE.OctahedronGeometry(0.28, 0);
-    for (let i = 0; i < 60; i++) {
-      const m = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ color: '#FFD23F' }));
-      m.visible = false;
-      this.scene.add(m);
-      this.parts.push({ m, v: new THREE.Vector3(), life: 0 });
-    }
-  }
-
-  public rebuildStations3D(): void {
-    Object.values(this.st3d).forEach((node) => {
-      this.scene.remove(node.g);
-    });
-    this.st3d = {};
-
-    const beamT = canvasTex(
-      4,
-      128,
-      (g, W, H) => {
-        const gr = g.createLinearGradient(0, 0, 0, H);
-        gr.addColorStop(0, 'rgba(255,255,255,0)');
-        gr.addColorStop(1, 'rgba(255,255,255,.75)');
-        g.fillStyle = gr;
-        g.fillRect(0, 0, W, H);
-      },
-      false
-    );
-
-    this.stations
-      .filter((st) => st.active !== false)
-      .forEach((st) => {
-        const g = new THREE.Group();
-        g.position.set(st.x, 0, st.z);
-        this.scene.add(g);
-
-        const ring = new THREE.Mesh(
-          new THREE.RingGeometry(2.6, 3.3, 40).rotateX(-Math.PI / 2),
-          new THREE.MeshBasicMaterial({ color: st.col, transparent: true, opacity: 0.9 })
-        );
-        ring.position.y = 0.16;
-        g.add(ring);
-
-        const disc = new THREE.Mesh(
-          new THREE.CircleGeometry(2.6, 40).rotateX(-Math.PI / 2),
-          new THREE.MeshBasicMaterial({ color: st.col, transparent: true, opacity: 0.22 })
-        );
-        disc.position.y = 0.15;
-        g.add(disc);
-
-        const beam = new THREE.Mesh(
-          new THREE.CylinderGeometry(1.4, 2.2, 22, 20, 1, true),
-          new THREE.MeshBasicMaterial({
-            color: st.col,
-            map: beamT,
-            transparent: true,
-            depthWrite: false,
-            side: THREE.DoubleSide,
-            opacity: 0.55,
-          })
-        );
-        beam.position.y = 11;
-        g.add(beam);
-
-        const ped = mesh(new THREE.CylinderGeometry(0.9, 1.2, 0.8, 12), this.mat('#FFFFFF'), 0, 0.4, 0);
-        g.add(ped);
-
-        const isDone = this.unlockedMap[st.id] != null;
-        const icon = new THREE.Sprite(
-          new THREE.SpriteMaterial({ map: coinTex(st, isDone), transparent: true })
-        );
-        icon.scale.setScalar(4.6);
-        icon.position.y = 5.5;
-        g.add(icon);
-
-        const lab = pill(st.name, { h: 2.2, dot: st.col });
-        lab.position.y = 9;
-        g.add(lab);
-
-        this.st3d[st.id] = { g, ring, disc, beam, icon, lab };
-        this.applyStationVisualState(st);
-      });
-
-    this.fogOfWar.buildForStations(
-      this.stations.filter((s) => s.active !== false),
-      this.unlockedMap
-    );
-  }
-
-  private applyStationVisualState(st: Station): void {
-    const s = this.st3d[st.id];
-    if (!s) return;
-    const d = this.unlockedMap[st.id] != null;
-    s.icon.material.map = coinTex(st, d);
-    s.icon.material.needsUpdate = true;
-    s.beam.visible = !d;
-    (s.ring.material as THREE.MeshBasicMaterial).color.set(d ? '#3DAA5C' : st.col);
-    (s.disc.material as THREE.MeshBasicMaterial).color.set(d ? '#3DAA5C' : st.col);
-  }
-
-  public updateStationsAndProgress(
-    stations: Station[],
-    unlocked: Record<string, UnlockedStationRecord>
-  ): void {
-    const prevKey = this.stations
-      .map((s) => `${s.id}:${s.x}:${s.z}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`)
-      .join('|');
-    const nextKey = stations
-      .map((s) => `${s.id}:${s.x}:${s.z}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`)
-      .join('|');
-    const structureChanged = prevKey !== nextKey;
-
-    this.stations = stations;
-    this.unlockedMap = unlocked;
-
-    if (structureChanged) {
-      this.rebuildStations3D();
-    } else {
-      this.stations.forEach((st) => this.applyStationVisualState(st));
-      this.fogOfWar.syncUnlocked(this.unlockedMap);
-    }
-  }
-
-  public startPlayer(
-    name: string,
-    avatarIdx: number,
-    savedPos?: [number, number] | null,
-    hasProgress?: boolean
-  ): void {
-    audioSfx.init();
-    if (this.player.obj) {
-      this.scene.remove(this.player.obj);
-    }
-    const spec = AVATARS[avatarIdx] || AVATARS[0];
-    this.player.obj = makeChibi(spec, true, this.mat);
-    this.player.obj.traverse((m) => {
-      if ((m as THREE.Mesh).isMesh) m.castShadow = true;
-    });
-    this.player.tag = pill(name || 'Bạn', { h: 1.25, fs: 40, bg: '#1E3528', fg: '#FFFFFF' });
-    this.player.tag.position.y = 3.9;
-    this.player.obj.add(this.player.tag);
-    this.scene.add(this.player.obj);
-
-    if (savedPos && hasProgress) {
-      this.player.pos.set(savedPos[0], 0, savedPos[1]);
-    } else {
-      this.player.pos.set(-66, 0, 98);
-    }
-    this.player.obj.position.copy(this.player.pos);
-    this.player.obj.rotation.y = Math.PI;
-    this.cam.yaw = 0;
-    this.cam.tgt.set(this.player.pos.x, 1.6, this.player.pos.z);
-    this.running = true;
-    this.paused = false;
-  }
-
-  public setPaused(p: boolean): void {
-    this.paused = p;
-    if (p) {
-      this.keys.clear();
-      this.joy.x = 0;
-      this.joy.y = 0;
-    }
-  }
-
-  public setJoystick(x: number, y: number): void {
-    this.joy.x = x;
-    this.joy.y = y;
-  }
-
-  public enterPhotoMode(st: Station): void {
-    this.photoStation = st;
-    if (this.player.obj) {
-      this.player.obj.rotation.y = Math.atan2(
-        Math.sin(this.cam.yaw),
-        Math.cos(this.cam.yaw)
-      );
-    }
-  }
-
-  public exitPhotoMode(): void {
-    this.photoStation = null;
-  }
-
-  public rotatePhotoCamera(): void {
-    this.cam.yaw += 0.6;
-    if (this.player.obj) {
-      this.player.obj.rotation.y = Math.atan2(
-        Math.sin(this.cam.yaw),
-        Math.cos(this.cam.yaw)
-      );
-    }
-  }
-
-  public capturePhotoDataUrl(): string {
-    this.renderer.render(this.scene, this.camera);
-    try {
-      return this.renderer.domElement.toDataURL('image/jpeg', 0.85);
-    } catch {
-      return '';
-    }
-  }
-
-  public navigateToStation(st: Station): void {
-    if (!this.running) return;
-    this.moveTarget = new THREE.Vector3(
-      st.x,
-      0,
-      st.z + (st.z > this.player.pos.z ? -3 : 3)
-    );
-    if (this.tMark) {
-      this.tMark.position.set(this.moveTarget.x, 0.2, this.moveTarget.z);
-      this.tMark.visible = true;
-      this.tMark.scale.setScalar(1.6);
-    }
-  }
-
-  public celebrateStationUnlock(st: Station, ptsText: string): void {
-    this.burst(
-      new THREE.Vector3(st.x, 5, st.z),
-      ['#FFD23F', '#FF6F59', '#00AEEF', '#38B865', '#FF8FB1', '#9B6BFF'],
-      42
-    );
-    this.spawnFloatText(ptsText, new THREE.Vector3(st.x, 4, st.z));
-  }
-
-  public spawnFloatText(text: string, worldPos: THREE.Vector3, color?: string): void {
-    this.fxList.push({
-      id: this.fxSeq++,
-      text,
-      p: worldPos.clone().add(new THREE.Vector3(0, 2.5, 0)),
-      life: 1,
-      color,
-    });
-  }
-
-  public burst(pos: THREE.Vector3, colors: string[], n: number): void {
-    let k = 0;
-    for (const p of this.parts) {
-      if (p.life > 0) continue;
-      p.life = 1;
-      p.m.visible = true;
-      p.m.position.copy(pos);
-      (p.m.material as THREE.MeshBasicMaterial).color.set(colors[k % colors.length]);
-      p.v.set(
-        (Math.random() - 0.5) * 10,
-        6 + Math.random() * 7,
-        (Math.random() - 0.5) * 10
-      );
-      if (++k >= n) break;
-    }
-  }
-
-  private placeStar(s: StarObject): void {
-    for (let k = 0; k < 40; k++) {
-      const p = PATHS[Math.floor(this.rng() * PATHS.length)];
-      const t = this.rng();
-      const x = p[0] + (p[2] - p[0]) * t + (this.rng() - 0.5) * 1.6;
-      const z = p[1] + (p[3] - p[1]) * t + (this.rng() - 0.5) * 1.6;
-      if (this.stations.some((st) => Math.hypot(st.x - x, st.z - z) < 6)) continue;
-      if (
-        this.col.some((c) => x > c[0] - 1 && x < c[2] + 1 && z > c[1] - 1 && z < c[3] + 1)
-      )
-        continue;
-      if (
-        Math.hypot(x - this.player.pos.x, z - this.player.pos.z) < 10 &&
-        this.running
-      )
-        continue;
-      s.m.position.set(x, 1.7, z);
-      s.m.visible = true;
-      s.alive = true;
-      return;
-    }
-  }
-
-  private resolveCollision(p: THREE.Vector3): void {
-    const r = 0.7;
-    for (const c of this.col) {
-      if (p.x > c[0] - r && p.x < c[2] + r && p.z > c[1] - r && p.z < c[3] + r) {
-        const dl = p.x - (c[0] - r);
-        const dr = c[2] + r - p.x;
-        const dt = p.z - (c[1] - r);
-        const db = c[3] + r - p.z;
-        const m = Math.min(dl, dr, dt, db);
-        if (m === dl) p.x = c[0] - r;
-        else if (m === dr) p.x = c[2] + r;
-        else if (m === dt) p.z = c[1] - r;
-        else p.z = c[3] + r;
-      }
-    }
-    const d = ell(p.x, p.z);
-    if (d > 0.985) {
-      const k = 0.985 / d;
-      p.x = CAMP.cx + (p.x - CAMP.cx) * k;
-      p.z = CAMP.cz + (p.z - CAMP.cz) * k;
-    }
-  }
-
-  private bindEvents(): void {
-    const onKeyDown = (e: KeyboardEvent) => {
-      const tag = document.activeElement?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      if (!this.running || this.paused || this.photoStation) return;
-      const k = e.key.toLowerCase();
-      if ((k === 'enter' || k === ' ') && this.nearStation) {
-        e.preventDefault();
-        this.callbacks.onOpenStationRequest(this.nearStation);
-        return;
-      }
-      if (
-        [
-          'w',
-          'a',
-          's',
-          'd',
-          'q',
-          'e',
-          'arrowup',
-          'arrowdown',
-          'arrowleft',
-          'arrowright',
-        ].includes(k)
-      ) {
-        e.preventDefault();
-        this.keys.add(k);
-      }
-      if (k === '+' || k === '=') this.cam.dist = clamp(this.cam.dist * 0.85, 16, 130);
-      if (k === '-') this.cam.dist = clamp(this.cam.dist / 0.85, 16, 130);
-    };
-
-    const onKeyUp = (e: KeyboardEvent) => {
-      this.keys.delete(e.key.toLowerCase());
-    };
-
-    const onBlur = () => {
-      this.keys.clear();
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('blur', onBlur);
-    this.cleanupWindowListeners = () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('blur', onBlur);
-    };
-
-    const cv = this.renderer.domElement;
-    const ptrs = new Map<number, { x: number; y: number }>();
-    let drag: {
-      x: number;
-      y: number;
-      sx: number;
-      sy: number;
-      moved: boolean;
-    } | null = null;
-    let pinch: number | null = null;
-    const ray = new THREE.Raycaster();
-    const GROUND = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-
-    const tapMove = (e: PointerEvent) => {
-      const r = cv.getBoundingClientRect();
-      ray.setFromCamera(
-        new THREE.Vector2(
-          ((e.clientX - r.left) / r.width) * 2 - 1,
-          -((e.clientY - r.top) / r.height) * 2 + 1
-        ),
-        this.camera
-      );
-      const p = new THREE.Vector3();
-      if (!ray.ray.intersectPlane(GROUND, p)) return;
-      if (ell(p.x, p.z) > 0.985) return;
-      this.moveTarget = p;
-      if (this.tMark) {
-        this.tMark.position.set(p.x, 0.2, p.z);
-        this.tMark.visible = true;
-        this.tMark.scale.setScalar(1.6);
-      }
-      audioSfx.play('tap');
-    };
-
-    cv.addEventListener('pointerdown', (e) => {
-      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      try {
-        cv.setPointerCapture(e.pointerId);
-      } catch {
-        // Ignore capture error
-      }
-      if (ptrs.size === 1) {
-        drag = {
-          x: e.clientX,
-          y: e.clientY,
-          sx: e.clientX,
-          sy: e.clientY,
-          moved: false,
-        };
-      } else if (ptrs.size === 2) {
-        const [a, b] = [...ptrs.values()];
-        pinch = Math.hypot(a.x - b.x, a.y - b.y);
-        drag = null;
-      }
-    });
-
-    cv.addEventListener('pointermove', (e) => {
-      if (!ptrs.has(e.pointerId)) return;
-      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (!this.running) return;
-      if (pinch && ptrs.size === 2) {
-        const [a, b] = [...ptrs.values()];
-        const d = Math.hypot(a.x - b.x, a.y - b.y);
-        this.cam.dist = clamp((this.cam.dist * pinch) / d, 16, 130);
-        pinch = d;
-        return;
-      }
-      if (!drag) return;
-      const dx = e.clientX - drag.x;
-      const dy = e.clientY - drag.y;
-      drag.x = e.clientX;
-      drag.y = e.clientY;
-      if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 8) drag.moved = true;
-      if (drag.moved) {
-        this.cam.yaw -= dx * 0.006;
-        this.cam.pitch = clamp(this.cam.pitch + dy * 0.004, 0.32, 1.38);
-      }
-    });
-
-    const endPtr = (e: PointerEvent) => {
-      if (
-        drag &&
-        !drag.moved &&
-        ptrs.size === 1 &&
-        this.running &&
-        !this.paused &&
-        !this.photoStation
-      ) {
-        tapMove(e);
-      }
-      ptrs.delete(e.pointerId);
-      if (ptrs.size < 2) pinch = null;
-      if (!ptrs.size) drag = null;
-    };
-
-    cv.addEventListener('pointerup', endPtr);
-    cv.addEventListener('pointercancel', (e) => {
-      ptrs.delete(e.pointerId);
-      drag = null;
-      pinch = null;
-    });
-    cv.addEventListener(
-      'wheel',
-      (e) => {
-        if (!this.running) return;
-        e.preventDefault();
-        this.cam.dist = clamp(this.cam.dist * (1 + e.deltaY * 0.0012), 16, 130);
-      },
-      { passive: false }
-    );
-    cv.addEventListener('contextmenu', (e) => e.preventDefault());
-  }
-
-  private resize(): void {
-    const w = this.container.clientWidth;
-    const h = this.container.clientHeight;
-    if (!w || !h) return;
-    this.renderer.setSize(w, h, false);
-    this.renderer.domElement.style.width = `${w}px`;
-    this.renderer.domElement.style.height = `${h}px`;
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
-  }
-
-  private startLoop(): void {
-    let last = performance.now();
-    let T = 0;
-    let saveT = 0;
-    let hudSyncT = 0;
-    const tmpV = new THREE.Vector3();
-
-    const frame = (now: number) => {
-      if (this.disposed) return;
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      T += dt;
-
-      if (this.running && !this.paused && !this.photoStation) {
-        this.updatePlayer(dt, T);
-        saveT -= dt;
-        if (saveT <= 0) {
-          saveT = 2.0;
-          this.callbacks.onPlayerMoveSave([
-            +this.player.pos.x.toFixed(1),
-            +this.player.pos.z.toFixed(1),
-          ]);
-        }
-      } else if (this.running && this.player.obj) {
-        animChibi(this.player.obj, this.player.ph, 0, T);
-      }
-
-      // Camera update
-      let d: number;
-      let p: number;
-      if (this.running) {
-        this.cam.tgt.lerp(
-          tmpV.set(this.player.pos.x, 1.6, this.player.pos.z),
-          1 - Math.exp(-dt * 7)
-        );
-        d = this.photoStation ? 15 : this.cam.dist;
-        p = this.photoStation ? 0.38 : this.cam.pitch;
-      } else {
-        this.cam.yaw += dt * 0.035;
-        this.cam.tgt.lerp(tmpV.set(10, 0, -2), 1 - Math.exp(-dt * 2));
-        const a = this.camera.aspect || 1;
-        d = a < 1 ? (430 / Math.max(a, 0.5)) * 0.75 : 300;
-        p = 0.74;
-      }
-      this.cam.curD =
-        this.cam.curD == null
-          ? d
-          : this.cam.curD + (d - this.cam.curD) * (1 - Math.exp(-dt * 4));
-      this.cam.curP =
-        this.cam.curP == null
-          ? p
-          : this.cam.curP + (p - this.cam.curP) * (1 - Math.exp(-dt * 4));
-
-      this.camera.position.set(
-        this.cam.tgt.x + Math.sin(this.cam.yaw) * Math.cos(this.cam.curP) * this.cam.curD,
-        this.cam.tgt.y + Math.sin(this.cam.curP) * this.cam.curD,
-        this.cam.tgt.z + Math.cos(this.cam.yaw) * Math.cos(this.cam.curP) * this.cam.curD
-      );
-      this.camera.lookAt(this.cam.tgt);
-      this.sun.position.set(this.cam.tgt.x + 70, 150, this.cam.tgt.z + 55);
-      this.sun.target.position.copy(this.cam.tgt);
-
-      // Animate world
-      this.animateWorld(dt, T);
-      this.fogOfWar.animate(dt, T);
-
-      this.renderer.render(this.scene, this.camera);
-
-      if (this.running) {
-        this.updateFloatingTexts(dt, tmpV);
-        hudSyncT -= dt;
-        if (hudSyncT <= 0) {
-          hudSyncT = 0.08;
-          this.emitGuideAndMinimap();
-        }
-      }
-
-      this.rafId = requestAnimationFrame(frame);
-    };
-
-    this.rafId = requestAnimationFrame(frame);
-  }
-
-  private updatePlayer(dt: number, t: number): void {
-    let ix = 0;
-    let iy = 0;
-    if (this.keys.has('w') || this.keys.has('arrowup')) iy += 1;
-    if (this.keys.has('s') || this.keys.has('arrowdown')) iy -= 1;
-    if (this.keys.has('a') || this.keys.has('arrowleft')) ix -= 1;
-    if (this.keys.has('d') || this.keys.has('arrowright')) ix += 1;
-    if (this.keys.has('q')) this.cam.yaw += 1.7 * dt;
-    if (this.keys.has('e')) this.cam.yaw -= 1.7 * dt;
-    ix += this.joy.x;
-    iy += this.joy.y;
-
-    const fx = -Math.sin(this.cam.yaw);
-    const fz = -Math.cos(this.cam.yaw);
-    const rx = Math.cos(this.cam.yaw);
-    const rz = -Math.sin(this.cam.yaw);
-    let mx = fx * iy + rx * ix;
-    let mz = fz * iy + rz * ix;
-    let amt = Math.hypot(mx, mz);
-
-    if (amt > 0.08) {
-      this.moveTarget = null;
-      if (this.tMark) this.tMark.visible = false;
-      mx /= amt;
-      mz /= amt;
-      if (amt > 1) amt = 1;
-    } else if (this.moveTarget) {
-      mx = this.moveTarget.x - this.player.pos.x;
-      mz = this.moveTarget.z - this.player.pos.z;
-      const d = Math.hypot(mx, mz);
-      if (d < 0.7) {
-        this.moveTarget = null;
-        if (this.tMark) this.tMark.visible = false;
-        amt = 0;
-      } else {
-        mx /= d;
-        mz /= d;
-        amt = 1;
-      }
-    } else {
-      amt = 0;
-    }
-
-    const sp = 10 * amt;
-    if (amt > 0) {
-      const ox = this.player.pos.x;
-      const oz = this.player.pos.z;
-      this.player.pos.x += mx * sp * dt;
-      this.player.pos.z += mz * sp * dt;
-      this.resolveCollision(this.player.pos);
-      if (
-        this.moveTarget &&
-        Math.hypot(this.player.pos.x - ox, this.player.pos.z - oz) < sp * dt * 0.15
-      ) {
-        this.moveTarget = null;
-        if (this.tMark) this.tMark.visible = false;
-      }
-      if (this.player.obj) {
-        this.player.obj.rotation.y = lerpAngle(
-          this.player.obj.rotation.y,
-          Math.atan2(mx, mz),
-          1 - Math.exp(-dt * 12)
-        );
-      }
-      this.player.ph += dt * sp * 1.1;
-    }
-
-    if (this.player.obj) {
-      animChibi(this.player.obj, this.player.ph, amt, t);
-      this.player.obj.position.set(this.player.pos.x, 0, this.player.pos.z);
-    }
-
-    // Collect stars
-    for (const s of this.stars) {
-      if (!s.alive) continue;
-      if (
-        Math.hypot(
-          s.m.position.x - this.player.pos.x,
-          s.m.position.z - this.player.pos.z
-        ) < 2.4
-      ) {
-        s.alive = false;
-        s.m.visible = false;
-        s.timer = 45;
-        this.burst(s.m.position, ['#FFD23F', '#FFF3B0', '#FFAA1F'], 10);
-        this.spawnFloatText('+10', s.m.position);
-        audioSfx.play('coin');
-        this.callbacks.onStarCollected();
-      }
-    }
-
-    // Check near station
-    let near: Station | null = null;
-    let best = 6.8;
-    this.stations
-      .filter((st) => st.active !== false)
-      .forEach((st) => {
-        const d = Math.hypot(st.x - this.player.pos.x, st.z - this.player.pos.z);
-        if (d < best) {
-          best = d;
-          near = st;
-        }
-      });
-
-    if (near !== this.nearStation) {
-      this.nearStation = near;
-      this.callbacks.onNearStationChange(near);
-    }
-  }
-
-  private animateWorld(dt: number, t: number): void {
-    this.animateNatureAndTrain?.(dt, t);
-    this.animateNpcs?.(dt, t);
-
-    if (this.flagMesh) {
-      this.flagMesh.rotation.y = Math.sin(t * 3) * 0.25;
-    }
-
-    this.stars.forEach((s) => {
-      if (!s.alive) {
-        s.timer -= dt;
-        if (s.timer <= 0) this.placeStar(s);
-        return;
-      }
-      s.m.rotation.y = t * 2 + s.ph;
-      s.m.position.y = 1.7 + Math.sin(t * 2.4 + s.ph) * 0.3;
-    });
-
-    this.stations.forEach((st, i) => {
-      const s = this.st3d[st.id];
-      if (!s) return;
-      s.icon.position.y = 5.5 + Math.sin(t * 2 + i) * 0.45;
-      const k = 1 + ((t * 0.8 + i * 0.3) % 1) * 0.35;
-      s.ring.scale.set(k, 1, k);
-      (s.ring.material as THREE.MeshBasicMaterial).opacity =
-        0.95 - ((t * 0.8 + i * 0.3) % 1) * 0.6;
-    });
-
-    this.parts.forEach((p) => {
-      if (p.life <= 0) return;
-      p.life -= dt * 1.1;
-      p.v.y -= 22 * dt;
-      p.m.position.addScaledVector(p.v, dt);
-      p.m.rotation.x += dt * 6;
-      p.m.scale.setScalar(Math.max(0.05, p.life * 1.3));
-      if (p.life <= 0) p.m.visible = false;
-    });
-
-    if (this.tMark && this.tMark.visible) {
-      this.tMark.scale.multiplyScalar(1 - dt * 1.4);
-      if (this.tMark.scale.x < 0.9) this.tMark.scale.setScalar(1.6);
-    }
-  }
-
-  private updateFloatingTexts(dt: number, tmpV: THREE.Vector3): void {
-    if (this.fxList.length === 0) return;
-    const w = this.container.clientWidth;
-    const h = this.container.clientHeight;
-    const out: FloatingTextItem[] = [];
-
-    for (let i = this.fxList.length - 1; i >= 0; i--) {
-      const f = this.fxList[i];
-      f.life -= dt * 0.9;
-      f.p.y += dt * 3;
-      if (f.life <= 0) {
-        this.fxList.splice(i, 1);
-        continue;
-      }
-      tmpV.copy(f.p).project(this.camera);
-      out.push({
-        id: f.id,
-        text: f.text,
-        x: ((tmpV.x + 1) / 2) * w,
-        y: ((1 - tmpV.y) / 2) * h,
-        opacity: Math.min(1, f.life * 2),
-        scale: 0.8 + f.life * 0.4,
-        color: f.color,
-      });
-    }
-    this.callbacks.onFloatingTextsUpdate(out);
-  }
-
-  private emitGuideAndMinimap(): void {
-    let best: Station | null = null;
-    let bd = 1e9;
-    const activeStations = this.stations.filter((st) => st.active !== false);
-    activeStations.forEach((st) => {
-      if (this.unlockedMap[st.id] != null) return;
-      const d = Math.hypot(st.x - this.player.pos.x, st.z - this.player.pos.z);
-      if (d < bd) {
-        bd = d;
-        best = st;
-      }
-    });
-
-    let angleRad = 0;
-    if (best) {
-      const target = best as Station;
-      const vx = target.x - this.player.pos.x;
-      const vz = target.z - this.player.pos.z;
-      const fx = -Math.sin(this.cam.yaw);
-      const fz = -Math.cos(this.cam.yaw);
-      const rx = Math.cos(this.cam.yaw);
-      const rz = -Math.sin(this.cam.yaw);
-      angleRad = Math.atan2(vx * rx + vz * rz, vx * fx + vz * fz);
-    }
-
-    this.callbacks.onGuideUpdate({
-      station: best,
-      distance: best ? bd : 0,
-      angleRad,
-      allDone: best === null && activeStations.length > 0,
-    });
-
-    this.callbacks.onMinimapUpdate({
-      playerX: this.player.pos.x,
-      playerZ: this.player.pos.z,
-      playerRotY: this.player.obj ? this.player.obj.rotation.y : 0,
-      camYaw: this.cam.yaw,
-      col: this.col,
-    });
-  }
-
-  public dispose(): void {
-    this.disposed = true;
-    cancelAnimationFrame(this.rafId);
-    this.cleanupWindowListeners?.();
-    this.resizeObs.disconnect();
-    this.renderer.dispose();
-    if (this.renderer.domElement.parentNode === this.container) {
-      this.container.removeChild(this.renderer.domElement);
-    }
-  }
-}
-</file>
-
 <file path="src/engine/threeHelpers.ts">
 import * as THREE from 'three';
 import { CAMP, LAKE, ROADS } from '../data/campusLayout';
@@ -8769,757 +7740,6 @@ if (isFirebaseConfigured) {
 export { app, auth, db };
 </file>
 
-<file path="src/services/gameService.ts">
-import { addDoc, collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
-import { QUESTS } from '../data/campusLayout';
-import { DEFAULT_EVENTS } from '../data/stations';
-import {
-  CampaignEvent,
-  CheckinLog,
-  PartyRoom,
-  PublicLeaderboardUser,
-  Station,
-  UnlockedStationRecord,
-  UserProfile,
-  VerificationMethod,
-} from '../types/game';
-import { getLocalPublicUsers, syncProfileToCloud } from './authService';
-import { db, isFirebaseConfigured } from './firebase';
-import { loadLocalParties, syncMemberPointsInParty } from './partyService';
-
-const LOCAL_CHECKINS_KEY = 'tdc_go_checkins_v2';
-const LOCAL_EVENTS_KEY = 'tdc_go_events_v2';
-
-// Minimum cooldown in ms between real-world QR/Riddle check-ins to prevent automated replay
-export const ANTI_CHEAT_COOLDOWN_MS = 4000;
-
-export function normalizeVietnameseAnswer(text: string): string {
-  return text
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ');
-}
-
-export function verifyStationRiddle(station: Station, userInput: string): boolean {
-  if (!station.riddle) return true;
-  const expected = normalizeVietnameseAnswer(station.riddle.answer);
-  const actual = normalizeVietnameseAnswer(userInput);
-  if (!actual) return false;
-  return actual === expected || actual.includes(expected);
-}
-
-export function verifyStationQrPayload(
-  station: Station,
-  scannedCode: string
-): { valid: boolean; matchedStationId?: string; message: string } {
-  const clean = scannedCode.trim();
-  if (!clean) {
-    return { valid: false, message: 'Mã QR trống hoặc không hợp lệ.' };
-  }
-
-  // Support either JSON payload `{"app":"TDC_GO","stationId":"...","token":"..."}` or direct token string
-  try {
-    if (clean.startsWith('{')) {
-      const obj = JSON.parse(clean) as {
-        app?: string;
-        stationId?: string;
-        token?: string;
-      };
-      if (obj.token === station.qrSecretToken || obj.stationId === station.id) {
-        return {
-          valid: true,
-          matchedStationId: station.id,
-          message: `Xác thực QR thành công tại ${station.name}!`,
-        };
-      }
-      return {
-        valid: false,
-        matchedStationId: obj.stationId,
-        message: 'Mã QR này thuộc về một trạm khác trong khuôn viên.',
-      };
-    }
-  } catch {
-    // Plain string check below
-  }
-
-  if (
-    clean.toUpperCase() === station.qrSecretToken.toUpperCase() ||
-    clean.toLowerCase() === station.id.toLowerCase()
-  ) {
-    return {
-      valid: true,
-      matchedStationId: station.id,
-      message: `Xác thực mã định danh trạm ${station.name} thành công!`,
-    };
-  }
-
-  return {
-    valid: false,
-    message: 'Mã QR không khớp với trạm hiện tại. Hãy kiểm tra lại bảng QR tại trạm!',
-  };
-}
-
-export function checkAntiCheatCooldown(
-  profile: UserProfile,
-  method: VerificationMethod,
-  now = Date.now()
-): { allowed: boolean; waitSeconds: number } {
-  if (method === 'demo') return { allowed: true, waitSeconds: 0 };
-
-  const timestamps = Object.values(profile.done || {}).map((r) => r.unlockedAt || 0);
-  if (timestamps.length === 0) return { allowed: true, waitSeconds: 0 };
-
-  const lastUnlock = Math.max(...timestamps);
-  const elapsed = now - lastUnlock;
-  if (elapsed < ANTI_CHEAT_COOLDOWN_MS) {
-    return {
-      allowed: false,
-      waitSeconds: Math.ceil((ANTI_CHEAT_COOLDOWN_MS - elapsed) / 1000),
-    };
-  }
-  return { allowed: true, waitSeconds: 0 };
-}
-
-export function loadLocalEvents(): CampaignEvent[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_EVENTS_KEY);
-    if (!raw) {
-      localStorage.setItem(LOCAL_EVENTS_KEY, JSON.stringify(DEFAULT_EVENTS));
-      return [...DEFAULT_EVENTS];
-    }
-    const list = JSON.parse(raw) as CampaignEvent[];
-    return Array.isArray(list) ? list : [...DEFAULT_EVENTS];
-  } catch {
-    return [...DEFAULT_EVENTS];
-  }
-}
-
-export function getActiveEventMultiplier(): {
-  event: CampaignEvent | null;
-  multiplier: number;
-} {
-  const events = loadLocalEvents();
-  const active = events.find((e) => e.active);
-  return {
-    event: active || null,
-    multiplier: active ? active.bonusMultiplier : 1.0,
-  };
-}
-
-export function calculateStationRewardPoints(params: {
-  basePoints: number;
-  party: PartyRoom | null;
-  method: VerificationMethod;
-  eventMultiplier?: number;
-}): {
-  finalPoints: number;
-  crossFacultyBonus: number;
-  qrBonus: number;
-  eventBonus: number;
-  activeEventTitle?: string;
-} {
-  const qrBonus = params.method === 'qr' ? 15 : params.method === 'riddle' ? 10 : 0;
-  const crossMultiplier =
-    params.party && params.party.isCrossFaculty ? params.party.bonusMultiplier : 1.0;
-  const crossFacultyBonus =
-    crossMultiplier > 1 ? Math.round(params.basePoints * (crossMultiplier - 1)) : 0;
-
-  const activeEvt =
-    params.eventMultiplier !== undefined
-      ? { event: null, multiplier: params.eventMultiplier }
-      : getActiveEventMultiplier();
-  const evtMult = activeEvt.multiplier > 1 ? activeEvt.multiplier : 1.0;
-  const eventBonus =
-    evtMult > 1 ? Math.round(params.basePoints * (evtMult - 1)) : 0;
-
-  const finalPoints = params.basePoints + qrBonus + crossFacultyBonus + eventBonus;
-  return {
-    finalPoints,
-    crossFacultyBonus,
-    qrBonus,
-    eventBonus,
-    activeEventTitle: activeEvt.event?.title,
-  };
-}
-
-export function loadLocalCheckinLogs(): CheckinLog[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_CHECKINS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as CheckinLog[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-export async function recordStationUnlock(params: {
-  profile: UserProfile;
-  station: Station;
-  baseEarnedPoints: number;
-  method: VerificationMethod;
-  party: PartyRoom | null;
-  photoDataUrl?: string;
-  isQuizOrGameSuccess?: boolean;
-  totalStationsCount: number;
-}): Promise<{
-  updatedProfile: UserProfile;
-  finalPoints: number;
-  crossFacultyBonus: number;
-  qrBonus: number;
-  newlyCompletedQuests: { name: string; reward: number }[];
-}> {
-  const { finalPoints, crossFacultyBonus, qrBonus } = calculateStationRewardPoints({
-    basePoints: params.baseEarnedPoints,
-    party: params.party,
-    method: params.method,
-  });
-
-  const record: UnlockedStationRecord = {
-    pts: finalPoints,
-    unlockedAt: Date.now(),
-    method: params.method,
-    ...(params.photoDataUrl ? { photoDataUrl: params.photoDataUrl } : {}),
-  };
-
-  const nextDone = {
-    ...(params.profile.done || {}),
-    [params.station.id]: record,
-  };
-
-  let nextProfile: UserProfile = {
-    ...params.profile,
-    points: params.profile.points + finalPoints,
-    quizOk:
-      params.profile.quizOk + (params.isQuizOrGameSuccess ? 1 : 0),
-    photos:
-      params.profile.photos + (params.station.type === 'photo' ? 1 : 0),
-    done: nextDone,
-    updatedAt: Date.now(),
-  };
-
-  const newlyCompletedQuests: { name: string; reward: number }[] = [];
-  QUESTS.forEach((q) => {
-    if (!nextProfile.bonus[q.id] && q.getValue(nextProfile, params.totalStationsCount) >= q.need) {
-      nextProfile = {
-        ...nextProfile,
-        points: nextProfile.points + q.reward,
-        bonus: { ...nextProfile.bonus, [q.id]: true },
-      };
-      newlyCompletedQuests.push({ name: q.name, reward: q.reward });
-    }
-  });
-
-  // Save checkin log
-  const logEntry: CheckinLog = {
-    id: `chk_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-    uid: nextProfile.uid,
-    userName: nextProfile.name,
-    stationId: params.station.id,
-    facultyId: nextProfile.facultyId,
-    method: params.method,
-    pts: finalPoints,
-    timestamp: Date.now(),
-  };
-
-  try {
-    const logs = loadLocalCheckinLogs();
-    logs.unshift(logEntry);
-    localStorage.setItem(LOCAL_CHECKINS_KEY, JSON.stringify(logs.slice(0, 300)));
-  } catch {
-    // Ignore
-  }
-
-  if (isFirebaseConfigured && db) {
-    try {
-      await addDoc(collection(db, 'checkins'), {
-        uid: logEntry.uid,
-        userName: logEntry.userName,
-        stationId: logEntry.stationId,
-        facultyId: logEntry.facultyId,
-        method: logEntry.method,
-        pts: logEntry.pts,
-        timestamp: logEntry.timestamp,
-      });
-    } catch {
-      // Fallback local
-    }
-  }
-
-  await syncProfileToCloud(nextProfile);
-  await syncMemberPointsInParty(nextProfile);
-
-  return {
-    updatedProfile: nextProfile,
-    finalPoints,
-    crossFacultyBonus,
-    qrBonus,
-    newlyCompletedQuests,
-  };
-}
-
-export async function recordStarPickup(
-  profile: UserProfile,
-  totalStationsCount: number
-): Promise<{
-  updatedProfile: UserProfile;
-  newlyCompletedQuests: { name: string; reward: number }[];
-}> {
-  let nextProfile: UserProfile = {
-    ...profile,
-    stars: (profile.stars || 0) + 1,
-    points: profile.points + 10,
-    updatedAt: Date.now(),
-  };
-
-  const newlyCompletedQuests: { name: string; reward: number }[] = [];
-  QUESTS.forEach((q) => {
-    if (!nextProfile.bonus[q.id] && q.getValue(nextProfile, totalStationsCount) >= q.need) {
-      nextProfile = {
-        ...nextProfile,
-        points: nextProfile.points + q.reward,
-        bonus: { ...nextProfile.bonus, [q.id]: true },
-      };
-      newlyCompletedQuests.push({ name: q.name, reward: q.reward });
-    }
-  });
-
-  await syncProfileToCloud(nextProfile);
-  return { updatedProfile: nextProfile, newlyCompletedQuests };
-}
-
-export async function fetchLeaderboardData(
-  currentProfile: UserProfile
-): Promise<{
-  individuals: PublicLeaderboardUser[];
-  parties: PartyRoom[];
-}> {
-  let individuals = getLocalPublicUsers();
-
-  if (isFirebaseConfigured && db) {
-    try {
-      const q = query(
-        collection(db, 'users_public'),
-        orderBy('points', 'desc'),
-        limit(30)
-      );
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        individuals = snap.docs.map((d) => d.data() as PublicLeaderboardUser);
-      }
-    } catch {
-      // Fallback local
-    }
-  }
-
-  // Ensure current player is always up-to-date in leaderboard list
-  const meEntry: PublicLeaderboardUser = {
-    uid: currentProfile.uid,
-    name: currentProfile.name,
-    mssv: currentProfile.mssv,
-    facultyId: currentProfile.facultyId,
-    avatar: currentProfile.avatar,
-    points: currentProfile.points,
-    unlockedCount: Object.keys(currentProfile.done || {}).length,
-    partyId: currentProfile.partyId,
-    updatedAt: Date.now(),
-  };
-  const filtered = individuals.filter((u) => u.uid !== currentProfile.uid);
-  const mergedIndividuals = [...filtered, meEntry].sort((a, b) => b.points - a.points);
-
-  const parties = loadLocalParties().sort((a, b) => b.totalPoints - a.totalPoints);
-  return { individuals: mergedIndividuals, parties };
-}
-</file>
-
-<file path="src/services/partyService.ts">
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { FACULTIES } from '../data/faculties';
-import { FacultyId, PartyMember, PartyRoom, UserProfile } from '../types/game';
-import { syncProfileToCloud } from './authService';
-import { db, isFirebaseConfigured } from './firebase';
-
-const LOCAL_PARTIES_KEY = 'tdc_go_parties_v2';
-
-const SAMPLE_PARTIES: PartyRoom[] = [
-  {
-    code: 'TDC26A',
-    hostUid: 'sample_1',
-    name: 'Biệt đội Liên Khoa TDC',
-    memberUids: ['sample_1', 'sample_2', 'sample_3'],
-    members: [
-      {
-        uid: 'sample_1',
-        name: 'Minh Anh',
-        mssv: '24211TT0124',
-        facultyId: 'cntt',
-        avatar: 0,
-        points: 1420,
-      },
-      {
-        uid: 'sample_2',
-        name: 'Gia Huy',
-        mssv: '24211DD0089',
-        facultyId: 'dien_dt',
-        avatar: 1,
-        points: 1280,
-      },
-      {
-        uid: 'sample_3',
-        name: 'Thảo Vy',
-        mssv: '24211KT0215',
-        facultyId: 'kinh_te',
-        avatar: 2,
-        points: 1150,
-      },
-    ],
-    isCrossFaculty: true,
-    bonusMultiplier: 1.2,
-    totalPoints: 3850,
-    createdAt: Date.now() - 7200000,
-  },
-  {
-    code: 'CNTT99',
-    hostUid: 'sample_4',
-    name: 'Chiến thần Code & Cơ khí',
-    memberUids: ['sample_4', 'sample_6'],
-    members: [
-      {
-        uid: 'sample_4',
-        name: 'Quốc Bảo',
-        mssv: '24211OT0042',
-        facultyId: 'co_khi_oto',
-        avatar: 0,
-        points: 990,
-      },
-      {
-        uid: 'sample_6',
-        name: 'Tuấn Kiệt',
-        mssv: '24211CK0071',
-        facultyId: 'co_khi_ctm',
-        avatar: 1,
-        points: 740,
-      },
-    ],
-    isCrossFaculty: true,
-    bonusMultiplier: 1.2,
-    totalPoints: 1730,
-    createdAt: Date.now() - 5400000,
-  },
-];
-
-export function evaluateCrossFacultyBonus(members: PartyMember[]): {
-  isCrossFaculty: boolean;
-  bonusMultiplier: number;
-} {
-  const uniqueFaculties = new Set(members.map((m) => m.facultyId));
-  const isCross = uniqueFaculties.size >= 2;
-  return {
-    isCrossFaculty: isCross,
-    bonusMultiplier: isCross ? 1.2 : 1.0,
-  };
-}
-
-export function loadLocalParties(): PartyRoom[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_PARTIES_KEY);
-    if (!raw) {
-      localStorage.setItem(LOCAL_PARTIES_KEY, JSON.stringify(SAMPLE_PARTIES));
-      return [...SAMPLE_PARTIES];
-    }
-    const parsed = JSON.parse(raw) as PartyRoom[];
-    return Array.isArray(parsed) ? parsed : [...SAMPLE_PARTIES];
-  } catch {
-    return [...SAMPLE_PARTIES];
-  }
-}
-
-export function saveLocalParties(parties: PartyRoom[]): void {
-  try {
-    localStorage.setItem(LOCAL_PARTIES_KEY, JSON.stringify(parties));
-  } catch {
-    // Ignore
-  }
-}
-
-function generateRoomCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let out = '';
-  for (let i = 0; i < 6; i++) {
-    out += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return out;
-}
-
-export async function getPartyByCode(code: string): Promise<PartyRoom | null> {
-  const cleanCode = code.trim().toUpperCase();
-  if (!cleanCode) return null;
-
-  if (isFirebaseConfigured && db) {
-    try {
-      const snap = await getDoc(doc(db, 'parties', cleanCode));
-      if (snap.exists()) return snap.data() as PartyRoom;
-    } catch {
-      // Fallback local
-    }
-  }
-  const parties = loadLocalParties();
-  return parties.find((p) => p.code === cleanCode) || null;
-}
-
-export async function createPartyRoom(
-  profile: UserProfile,
-  partyName: string
-): Promise<{ room: PartyRoom; updatedProfile: UserProfile }> {
-  const code = generateRoomCode();
-  const hostMember: PartyMember = {
-    uid: profile.uid,
-    name: profile.name,
-    mssv: profile.mssv,
-    facultyId: profile.facultyId,
-    avatar: profile.avatar,
-    points: profile.points,
-  };
-
-  const room: PartyRoom = {
-    code,
-    hostUid: profile.uid,
-    name: partyName.trim().slice(0, 45) || `Tổ đội của ${profile.name}`,
-    memberUids: [profile.uid],
-    members: [hostMember],
-    isCrossFaculty: false,
-    bonusMultiplier: 1.0,
-    totalPoints: profile.points,
-    createdAt: Date.now(),
-  };
-
-  if (isFirebaseConfigured && db) {
-    try {
-      await setDoc(doc(db, 'parties', code), room);
-    } catch {
-      // Fallback local
-    }
-  }
-
-  const parties = loadLocalParties().filter((p) => p.code !== code);
-  parties.unshift(room);
-  saveLocalParties(parties);
-
-  const updatedProfile: UserProfile = {
-    ...profile,
-    partyId: code,
-    updatedAt: Date.now(),
-  };
-  await syncProfileToCloud(updatedProfile);
-  return { room, updatedProfile };
-}
-
-export async function joinPartyRoom(
-  profile: UserProfile,
-  codeInput: string
-): Promise<{ room: PartyRoom; updatedProfile: UserProfile }> {
-  const code = codeInput.trim().toUpperCase();
-  const room = await getPartyByCode(code);
-  if (!room) {
-    throw new Error(`Không tìm thấy phòng Tổ đội với mã "${code}".`);
-  }
-  if (!room.memberUids.includes(profile.uid) && room.members.length >= 4) {
-    throw new Error('Phòng Tổ đội này đã đủ tối đa 4 thành viên.');
-  }
-
-  const me: PartyMember = {
-    uid: profile.uid,
-    name: profile.name,
-    mssv: profile.mssv,
-    facultyId: profile.facultyId,
-    avatar: profile.avatar,
-    points: profile.points,
-  };
-
-  const filteredMembers = room.members.filter((m) => m.uid !== profile.uid);
-  const nextMembers = [...filteredMembers, me];
-  const nextUids = nextMembers.map((m) => m.uid);
-  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
-  const totalPoints = nextMembers.reduce((sum, m) => sum + m.points, 0);
-
-  const updatedRoom: PartyRoom = {
-    ...room,
-    memberUids: nextUids,
-    members: nextMembers,
-    isCrossFaculty,
-    bonusMultiplier,
-    totalPoints,
-  };
-
-  if (isFirebaseConfigured && db) {
-    try {
-      await setDoc(doc(db, 'parties', code), updatedRoom);
-    } catch {
-      // Fallback local
-    }
-  }
-
-  const parties = loadLocalParties();
-  const idx = parties.findIndex((p) => p.code === code);
-  if (idx >= 0) parties[idx] = updatedRoom;
-  else parties.unshift(updatedRoom);
-  saveLocalParties(parties);
-
-  const updatedProfile: UserProfile = {
-    ...profile,
-    partyId: code,
-    updatedAt: Date.now(),
-  };
-  await syncProfileToCloud(updatedProfile);
-
-  return { room: updatedRoom, updatedProfile };
-}
-
-export async function simulateTeammateJoin(
-  roomCode: string,
-  currentFacultyId: FacultyId
-): Promise<PartyRoom> {
-  const room = await getPartyByCode(roomCode);
-  if (!room) throw new Error('Không tìm thấy phòng tổ đội.');
-  if (room.members.length >= 4) {
-    throw new Error('Tổ đội đã đủ 4 thành viên.');
-  }
-
-  const otherFaculties = FACULTIES.filter((f) => f.id !== currentFacultyId);
-  const pickedFaculty =
-    otherFaculties[room.members.length % otherFaculties.length] || FACULTIES[1];
-  const sampleNames = ['Hoàng Nam', 'Khánh Linh', 'Đức Trọng', 'Phương Thảo'];
-  const idx = room.members.length;
-  const teammate: PartyMember = {
-    uid: `coop_ally_${Date.now()}`,
-    name: sampleNames[idx % sampleNames.length],
-    mssv: `25211${pickedFaculty.id.slice(0, 2).toUpperCase()}0${10 + idx}`,
-    facultyId: pickedFaculty.id,
-    avatar: idx % 3,
-    points: 240 + idx * 80,
-  };
-
-  const nextMembers = [...room.members, teammate];
-  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
-  const updatedRoom: PartyRoom = {
-    ...room,
-    memberUids: nextMembers.map((m) => m.uid),
-    members: nextMembers,
-    isCrossFaculty,
-    bonusMultiplier,
-    totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
-  };
-
-  if (isFirebaseConfigured && db) {
-    try {
-      await setDoc(doc(db, 'parties', room.code), updatedRoom);
-    } catch {
-      // Ignore
-    }
-  }
-
-  const parties = loadLocalParties();
-  const pIdx = parties.findIndex((p) => p.code === room.code);
-  if (pIdx >= 0) parties[pIdx] = updatedRoom;
-  else parties.unshift(updatedRoom);
-  saveLocalParties(parties);
-
-  return updatedRoom;
-}
-
-export async function syncMemberPointsInParty(profile: UserProfile): Promise<PartyRoom | null> {
-  if (!profile.partyId) return null;
-  const room = await getPartyByCode(profile.partyId);
-  if (!room) return null;
-
-  const nextMembers = room.members.map((m) =>
-    m.uid === profile.uid
-      ? {
-          ...m,
-          name: profile.name,
-          facultyId: profile.facultyId,
-          avatar: profile.avatar,
-          points: profile.points,
-        }
-      : m
-  );
-  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
-  const updatedRoom: PartyRoom = {
-    ...room,
-    members: nextMembers,
-    isCrossFaculty,
-    bonusMultiplier,
-    totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
-  };
-
-  if (isFirebaseConfigured && db) {
-    try {
-      await setDoc(doc(db, 'parties', room.code), updatedRoom);
-    } catch {
-      // Ignore
-    }
-  }
-
-  const parties = loadLocalParties();
-  const idx = parties.findIndex((p) => p.code === room.code);
-  if (idx >= 0) parties[idx] = updatedRoom;
-  saveLocalParties(parties);
-  return updatedRoom;
-}
-
-export async function leavePartyRoom(profile: UserProfile): Promise<UserProfile> {
-  if (profile.partyId) {
-    const code = profile.partyId.trim().toUpperCase();
-    const room = await getPartyByCode(code);
-    if (room) {
-      const nextMembers = room.members.filter((m) => m.uid !== profile.uid);
-      const nextUids = nextMembers.map((m) => m.uid);
-      const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
-      const updatedRoom: PartyRoom = {
-        ...room,
-        hostUid: nextMembers[0]?.uid || room.hostUid,
-        memberUids: nextUids,
-        members: nextMembers,
-        isCrossFaculty,
-        bonusMultiplier,
-        totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
-      };
-
-      if (isFirebaseConfigured && db && nextMembers.length > 0) {
-        try {
-          await setDoc(doc(db, 'parties', room.code), updatedRoom);
-        } catch {
-          // Ignore
-        }
-      }
-
-      const parties = loadLocalParties();
-      const idx = parties.findIndex((p) => p.code === room.code);
-      if (idx >= 0) {
-        if (nextMembers.length > 0) {
-          parties[idx] = updatedRoom;
-        } else {
-          parties.splice(idx, 1);
-        }
-        saveLocalParties(parties);
-      }
-    }
-  }
-
-  const updated: UserProfile = {
-    ...profile,
-    partyId: undefined,
-    updatedAt: Date.now(),
-  };
-  await syncProfileToCloud(updated);
-  return updated;
-}
-</file>
-
 <file path="src/types/game.ts">
 export type FacultyId =
   | 'cntt'
@@ -9675,793 +7895,6 @@ export interface CheckinLog {
   pts: number;
   timestamp: number;
 }
-</file>
-
-<file path="src/App.tsx">
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { GameHud } from './components/GameHud';
-import { Viewfinder } from './components/minigames/Viewfinder';
-import { CertificateModal } from './components/modals/CertificateModal';
-import { HelpModal } from './components/modals/HelpModal';
-import { LeaderboardModal } from './components/modals/LeaderboardModal';
-import { PartyModal } from './components/modals/PartyModal';
-import { ProfileBadgesModal } from './components/modals/ProfileBadgesModal';
-import { QuestsModal } from './components/modals/QuestsModal';
-import { QrScannerModal } from './components/QrScannerModal';
-import { StartScreen } from './components/StartScreen';
-import { StationModal } from './components/StationModal';
-import { audioSfx } from './engine/audioSfx';
-import {
-  FloatingTextItem,
-  GuideState,
-  MinimapSnapshot,
-  TdcCampusEngine,
-} from './engine/TdcCampusEngine';
-import { AdminDashboard } from './pages/AdminDashboard';
-import {
-  fetchStationsFromCloudOrLocal,
-  loadStations,
-} from './services/adminService';
-import {
-  loadLocalProfile,
-  loginOrRegisterExplorer,
-  resetExplorerProgress,
-  saveLocalProfile,
-} from './services/authService';
-import {
-  checkAntiCheatCooldown,
-  recordStarPickup,
-  recordStationUnlock,
-  verifyStationQrPayload,
-} from './services/gameService';
-import {
-  createPartyRoom,
-  getPartyByCode,
-  joinPartyRoom,
-  leavePartyRoom,
-  simulateTeammateJoin,
-} from './services/partyService';
-import {
-  FacultyId,
-  PartyRoom,
-  Station,
-  UserProfile,
-  VerificationMethod,
-} from './types/game';
-
-interface ToastItem {
-  id: number;
-  text: string;
-  gold?: boolean;
-}
-
-type ActiveModal =
-  | null
-  | { type: 'station'; station: Station; preverifiedMethod?: VerificationMethod | null }
-  | { type: 'qr'; targetStation?: Station | null }
-  | { type: 'quests' }
-  | { type: 'leaderboard' }
-  | { type: 'badges' }
-  | { type: 'party' }
-  | { type: 'help' }
-  | { type: 'certificate' };
-
-export const App: React.FC = () => {
-  const stageRef = useRef<HTMLDivElement | null>(null);
-  const engineRef = useRef<TdcCampusEngine | null>(null);
-
-  const [stations, setStations] = useState<Station[]>(() => loadStations());
-  const [profile, setProfile] = useState<UserProfile | null>(() => loadLocalProfile());
-  const [party, setParty] = useState<PartyRoom | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [showAdmin, setShowAdmin] = useState(
-    () => window.location.pathname === '/admin' || window.location.hash === '#admin'
-  );
-
-  const [nearStation, setNearStation] = useState<Station | null>(null);
-  const [guide, setGuide] = useState<GuideState>({
-    station: null,
-    distance: 0,
-    angleRad: 0,
-    allDone: false,
-  });
-  const [minimapSnap, setMinimapSnap] = useState<MinimapSnapshot | null>(null);
-  const [floatingTexts, setFloatingTexts] = useState<FloatingTextItem[]>([]);
-  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
-
-  const [photoMode, setPhotoMode] = useState<{
-    station: Station;
-    method: VerificationMethod;
-  } | null>(null);
-  const [showFlash, setShowFlash] = useState(false);
-  const [muted, setMuted] = useState(false);
-  const [pointsBump, setPointsBump] = useState(false);
-  const [toasts, setToasts] = useState<ToastItem[]>([]);
-
-  const profileRef = useRef<UserProfile | null>(profile);
-  profileRef.current = profile;
-  const stationsRef = useRef<Station[]>(stations);
-  stationsRef.current = stations;
-  const partyRef = useRef<PartyRoom | null>(party);
-  partyRef.current = party;
-
-  const pushToast = useCallback((text: string, gold = false) => {
-    const id = Date.now() + Math.floor(Math.random() * 1000);
-    setToasts((prev) => [...prev.slice(-2), { id, text, gold }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3200);
-  }, []);
-
-  const triggerPointsBump = useCallback(() => {
-    setPointsBump(false);
-    setTimeout(() => setPointsBump(true), 15);
-  }, []);
-
-  // Load stations & existing party on mount
-  useEffect(() => {
-    void fetchStationsFromCloudOrLocal().then((list) => {
-      setStations(list);
-    });
-    if (profile?.partyId) {
-      void getPartyByCode(profile.partyId).then((r) => {
-        if (r) setParty(r);
-      });
-    }
-  }, []);
-
-  // Mount Three.js 3D Engine
-  useEffect(() => {
-    const container = stageRef.current;
-    if (!container) return;
-
-    const engine = new TdcCampusEngine(
-      container,
-      stationsRef.current,
-      profileRef.current?.done || {},
-      {
-        onNearStationChange: (st) => setNearStation(st),
-        onOpenStationRequest: (st) => {
-          audioSfx.play('tap');
-          setActiveModal({ type: 'station', station: st });
-        },
-        onStarCollected: () => {
-          const cur = profileRef.current;
-          if (!cur) return;
-          const prevLevel = 1 + Math.floor(cur.points / 300);
-          const activeCount = stationsRef.current.filter((s) => s.active !== false).length;
-          void recordStarPickup(cur, activeCount).then(
-            ({ updatedProfile, newlyCompletedQuests }) => {
-              setProfile(updatedProfile);
-              triggerPointsBump();
-              const nextLevel = 1 + Math.floor(updatedProfile.points / 300);
-              if (nextLevel > prevLevel) {
-                pushToast(`🎉 Thăng cấp ${nextLevel}!`, true);
-                audioSfx.play('badge');
-              }
-              newlyCompletedQuests.forEach((q) => {
-                pushToast(`Hoàn thành nhiệm vụ: ${q.name} · +${q.reward}đ`, true);
-              });
-            }
-          );
-        },
-        onPlayerMoveSave: (pos) => {
-          const cur = profileRef.current;
-          if (!cur) return;
-          const updated: UserProfile = { ...cur, pos };
-          setProfile(updated);
-          saveLocalProfile(updated);
-        },
-        onFloatingTextsUpdate: (items) => setFloatingTexts(items),
-        onGuideUpdate: (g) => setGuide(g),
-        onMinimapUpdate: (snap) => setMinimapSnap(snap),
-      }
-    );
-
-    engineRef.current = engine;
-    return () => {
-      engine.dispose();
-      engineRef.current = null;
-    };
-  }, [pushToast, triggerPointsBump]);
-
-  // Sync stations and unlocked fog of war with 3D engine
-  useEffect(() => {
-    engineRef.current?.updateStationsAndProgress(stations, profile?.done || {});
-  }, [stations, profile?.done]);
-
-  // Pause 3D movement when modal or admin is open
-  useEffect(() => {
-    engineRef.current?.setPaused(Boolean(activeModal) || showAdmin);
-  }, [activeModal, showAdmin]);
-
-  const handleStartGame = async (params: {
-    name: string;
-    mssv: string;
-    email?: string;
-    password?: string;
-    facultyId: FacultyId;
-    avatar: number;
-    mode: 'demo' | 'email_login' | 'email_register' | 'google';
-  }) => {
-    const loggedIn = await loginOrRegisterExplorer(params);
-    setProfile(loggedIn);
-    if (loggedIn.partyId) {
-      const p = await getPartyByCode(loggedIn.partyId);
-      setParty(p);
-    }
-    const unlockedCount = Object.keys(loggedIn.done || {}).length;
-    engineRef.current?.startPlayer(
-      loggedIn.name,
-      loggedIn.avatar,
-      loggedIn.pos,
-      unlockedCount > 0
-    );
-    setIsPlaying(true);
-    audioSfx.play('ok');
-    pushToast(
-      unlockedCount > 0
-        ? `Chào mừng trở lại, ${loggedIn.name} (${loggedIn.mssv})!`
-        : `Chào ${loggedIn.name}! Hãy tiến tới Cổng 1 ngay trước mặt để xóa sương mù đầu tiên.`,
-      true
-    );
-  };
-
-  const handleResetProgress = () => {
-    if (!profile) return;
-    const reset = resetExplorerProgress(profile);
-    setProfile(reset);
-    pushToast('Đã đặt lại tiến độ và phủ lại lớp sương mù toàn trường!');
-  };
-
-  const handleCompleteStation = async (params: {
-    station: Station;
-    basePoints: number;
-    method: VerificationMethod;
-    isQuizOrGameSuccess: boolean;
-    summaryHtml?: string;
-    photoDataUrl?: string;
-  }) => {
-    if (!profile) {
-      return { finalPoints: params.basePoints, crossFacultyBonus: 0, qrBonus: 0 };
-    }
-    const prevLevel = 1 + Math.floor(profile.points / 300);
-    const activeCount = stations.filter((s) => s.active !== false).length;
-
-    const {
-      updatedProfile,
-      finalPoints,
-      crossFacultyBonus,
-      qrBonus,
-      newlyCompletedQuests,
-    } = await recordStationUnlock({
-      profile,
-      station: params.station,
-      baseEarnedPoints: params.basePoints,
-      method: params.method,
-      party,
-      photoDataUrl: params.photoDataUrl,
-      isQuizOrGameSuccess: params.isQuizOrGameSuccess,
-      totalStationsCount: activeCount,
-    });
-
-    setProfile(updatedProfile);
-    if (updatedProfile.partyId) {
-      const updatedParty = await getPartyByCode(updatedProfile.partyId);
-      if (updatedParty) setParty(updatedParty);
-    }
-
-    audioSfx.play('unlock');
-    engineRef.current?.celebrateStationUnlock(params.station, `+${finalPoints}`);
-    triggerPointsBump();
-
-    const nextLevel = 1 + Math.floor(updatedProfile.points / 300);
-    if (nextLevel > prevLevel) {
-      pushToast(`🎉 Thăng cấp ${nextLevel}!`, true);
-    }
-    newlyCompletedQuests.forEach((q) => {
-      pushToast(`Hoàn thành nhiệm vụ: ${q.name} · +${q.reward}đ`, true);
-    });
-
-    return { finalPoints, crossFacultyBonus, qrBonus };
-  };
-
-  const handleRequestPhotoMode = (station: Station, method: VerificationMethod) => {
-    setActiveModal(null);
-    setPhotoMode({ station, method });
-    engineRef.current?.enterPhotoMode(station);
-  };
-
-  const handleCapturePhoto = async () => {
-    if (!photoMode || !profile) return;
-    const dataUrl = engineRef.current?.capturePhotoDataUrl() || '';
-    setShowFlash(true);
-    setTimeout(() => setShowFlash(false), 500);
-    audioSfx.tone([1800, 1200], 0.05, 'square', 0.04, 0.04);
-
-    const { station, method } = photoMode;
-    engineRef.current?.exitPhotoMode();
-    setPhotoMode(null);
-
-    await handleCompleteStation({
-      station,
-      basePoints: station.pts,
-      method,
-      isQuizOrGameSuccess: true,
-      photoDataUrl: dataUrl,
-    });
-
-    setActiveModal({ type: 'station', station });
-  };
-
-  const handleQrDetected = (rawCode: string) => {
-    if (profile) {
-      const cooldown = checkAntiCheatCooldown(profile, 'qr');
-      if (!cooldown.allowed) {
-        audioSfx.play('bad');
-        pushToast(
-          `Chống gian lận (Anti-cheat): Bạn di chuyển giữa 2 trạm quá nhanh! Vui lòng đợi ${cooldown.waitSeconds}s.`
-        );
-        return;
-      }
-    }
-
-    const target =
-      activeModal?.type === 'qr' && activeModal.targetStation
-        ? activeModal.targetStation
-        : null;
-
-    if (target) {
-      const res = verifyStationQrPayload(target, rawCode);
-      if (res.valid) {
-        audioSfx.play('ok');
-        pushToast(res.message, true);
-        setActiveModal({
-          type: 'station',
-          station: target,
-          preverifiedMethod: 'qr',
-        });
-        return;
-      }
-    }
-
-    // Try matching across any station on campus
-    for (const st of stations) {
-      const check = verifyStationQrPayload(st, rawCode);
-      if (check.valid) {
-        audioSfx.play('ok');
-        pushToast(`Đã định vị & xác thực QR trạm: ${st.name}!`, true);
-        engineRef.current?.navigateToStation(st);
-        setActiveModal({
-          type: 'station',
-          station: st,
-          preverifiedMethod: 'qr',
-        });
-        return;
-      }
-    }
-
-    audioSfx.play('bad');
-    pushToast('Mã QR không hợp lệ hoặc không khớp với trạm nào tại TDC.');
-  };
-
-  const activeStationsCount = stations.filter((s) => s.active !== false).length;
-
-  return (
-    <div id="app">
-      {/* 3D WebGL Campus Canvas Container */}
-      <div id="stage" ref={stageRef} />
-
-      {/* Start Screen */}
-      {!isPlaying && !showAdmin && (
-        <StartScreen
-          existingProfile={profile}
-          totalStations={activeStationsCount}
-          onStartGame={handleStartGame}
-          onResetProgress={handleResetProgress}
-          onOpenAdmin={() => setShowAdmin(true)}
-        />
-      )}
-
-      {/* Main Game HUD */}
-      {isPlaying && profile && !showAdmin && (
-        <GameHud
-          profile={profile}
-          party={party}
-          stations={stations}
-          nearStation={nearStation}
-          guide={guide}
-          minimapSnap={minimapSnap}
-          floatingTexts={floatingTexts}
-          muted={muted}
-          dimmed={Boolean(photoMode)}
-          pointsBump={pointsBump}
-          onToggleMute={() => {
-            const next = audioSfx.toggleMute();
-            setMuted(next);
-          }}
-          onOpenStation={(st) => {
-            audioSfx.play('tap');
-            setActiveModal({ type: 'station', station: st });
-          }}
-          onNavigateGuide={() => {
-            if (guide.station) {
-              engineRef.current?.navigateToStation(guide.station);
-              pushToast(`Đang di chuyển tới ${guide.station.name}...`);
-            }
-          }}
-          onOpenQuests={() => setActiveModal({ type: 'quests' })}
-          onOpenLeaderboard={() => setActiveModal({ type: 'leaderboard' })}
-          onOpenBadges={() => setActiveModal({ type: 'badges' })}
-          onOpenParty={() => setActiveModal({ type: 'party' })}
-          onOpenQrScanner={() =>
-            setActiveModal({ type: 'qr', targetStation: nearStation })
-          }
-          onOpenHelp={() => setActiveModal({ type: 'help' })}
-          onOpenAdmin={() => setShowAdmin(true)}
-          onJoystickChange={(x, y) => engineRef.current?.setJoystick(x, y)}
-        />
-      )}
-
-      {/* 3D Polaroid Viewfinder */}
-      <Viewfinder
-        station={photoMode?.station || null}
-        onRotate={() => engineRef.current?.rotatePhotoCamera()}
-        onCapture={handleCapturePhoto}
-        onCancel={() => {
-          engineRef.current?.exitPhotoMode();
-          setPhotoMode(null);
-        }}
-      />
-
-      {showFlash && <div id="flash" />}
-
-      {/* Toasts */}
-      <div id="toasts" aria-live="polite">
-        {toasts.map((t) => (
-          <div key={t.id} className={`toast ${t.gold ? 'gold' : ''}`}>
-            {t.text}
-          </div>
-        ))}
-      </div>
-
-      {/* Active Modals */}
-      {activeModal?.type === 'station' && profile && (
-        <StationModal
-          station={activeModal.station}
-          profile={profile}
-          party={party}
-          totalStations={activeStationsCount}
-          nextStationName={guide.station?.name}
-          preverifiedMethod={activeModal.preverifiedMethod}
-          onClose={() => setActiveModal(null)}
-          onOpenQrScanner={(st) =>
-            setActiveModal({ type: 'qr', targetStation: st })
-          }
-          onRequestPhotoMode={handleRequestPhotoMode}
-          onCompleteStation={handleCompleteStation}
-          onShowCertificate={() => setActiveModal({ type: 'certificate' })}
-        />
-      )}
-
-      {activeModal?.type === 'qr' && (
-        <QrScannerModal
-          stations={stations}
-          targetStation={activeModal.targetStation}
-          onClose={() => setActiveModal(null)}
-          onQrDetected={handleQrDetected}
-        />
-      )}
-
-      {activeModal?.type === 'quests' && profile && (
-        <QuestsModal
-          profile={profile}
-          totalStations={activeStationsCount}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
-
-      {activeModal?.type === 'leaderboard' && profile && (
-        <LeaderboardModal
-          profile={profile}
-          totalStations={activeStationsCount}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
-
-      {activeModal?.type === 'badges' && profile && (
-        <ProfileBadgesModal
-          profile={profile}
-          stations={stations}
-          onClose={() => setActiveModal(null)}
-          onOpenCertificate={() => setActiveModal({ type: 'certificate' })}
-        />
-      )}
-
-      {activeModal?.type === 'party' && profile && (
-        <PartyModal
-          profile={profile}
-          party={party}
-          onClose={() => setActiveModal(null)}
-          onCreateParty={async (pName) => {
-            const { room, updatedProfile } = await createPartyRoom(profile, pName);
-            setParty(room);
-            setProfile(updatedProfile);
-            pushToast(`Đã tạo Tổ đội "${room.name}" (Mã: ${room.code})!`, true);
-          }}
-          onJoinParty={async (code) => {
-            const { room, updatedProfile } = await joinPartyRoom(profile, code);
-            setParty(room);
-            setProfile(updatedProfile);
-            pushToast(
-              `Đã gia nhập Tổ đội "${room.name}"${room.isCrossFaculty ? ' · Kích hoạt +20% Điểm Liên Khoa!' : ''}`,
-              true
-            );
-          }}
-          onLeaveParty={async () => {
-            const updated = await leavePartyRoom(profile);
-            setParty(null);
-            setProfile(updated);
-            pushToast('Đã rời khỏi phòng Tổ đội.');
-          }}
-          onSimulateTeammate={async () => {
-            if (!party) return;
-            const updatedRoom = await simulateTeammateJoin(
-              party.code,
-              profile.facultyId
-            );
-            setParty(updatedRoom);
-            pushToast(
-              `Đồng đội mới đã vào phòng! ${updatedRoom.isCrossFaculty ? '⚡ Kích hoạt +20% Điểm Liên Khoa!' : ''}`,
-              true
-            );
-          }}
-        />
-      )}
-
-      {activeModal?.type === 'help' && (
-        <HelpModal onClose={() => setActiveModal(null)} />
-      )}
-
-      {activeModal?.type === 'certificate' && profile && (
-        <CertificateModal
-          profile={profile}
-          stations={stations}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
-
-      {/* Admin CMS Dashboard */}
-      {showAdmin && (
-        <AdminDashboard
-          stations={stations}
-          onStationsUpdated={(next) => setStations(next)}
-          onBackToGame={() => setShowAdmin(false)}
-        />
-      )}
-    </div>
-  );
-};
-</file>
-
-<file path="src/game.test.ts">
-import { beforeEach, describe, expect, it } from 'vitest';
-import { DEFAULT_STATIONS } from './data/stations';
-
-const memoryStore = new Map<string, string>();
-if (typeof globalThis.localStorage === 'undefined') {
-  Object.defineProperty(globalThis, 'localStorage', {
-    value: {
-      getItem: (k: string) => (memoryStore.has(k) ? memoryStore.get(k)! : null),
-      setItem: (k: string, v: string) => {
-        memoryStore.set(k, String(v));
-      },
-      removeItem: (k: string) => {
-        memoryStore.delete(k);
-      },
-      clear: () => {
-        memoryStore.clear();
-      },
-    },
-    configurable: true,
-  });
-}
-
-beforeEach(() => {
-  memoryStore.clear();
-});
-import {
-  buildStationQrPayload,
-  generateAnalyticsCsv,
-  getAdminAnalytics,
-} from './services/adminService';
-import {
-  ANTI_CHEAT_COOLDOWN_MS,
-  calculateStationRewardPoints,
-  checkAntiCheatCooldown,
-  normalizeVietnameseAnswer,
-  verifyStationQrPayload,
-  verifyStationRiddle,
-} from './services/gameService';
-import {
-  createPartyRoom,
-  evaluateCrossFacultyBonus,
-  getPartyByCode,
-  joinPartyRoom,
-  leavePartyRoom,
-} from './services/partyService';
-import { PartyMember, PartyRoom, UserProfile } from './types/game';
-
-describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
-  it('1. Normalizes Vietnamese riddle answers accurately (case, accents, punctuation)', () => {
-    expect(normalizeVietnameseAnswer('  Kỹ Năng! ')).toBe('ky nang');
-    expect(normalizeVietnameseAnswer('Đạo đức - Tri thức')).toBe('dao duc tri thuc');
-  });
-
-  it('2. Verifies real-world observation riddles at stations (O2O verification)', () => {
-    const hallH = DEFAULT_STATIONS.find((s) => s.id === 'h')!;
-    expect(verifyStationRiddle(hallH, 'Kỹ năng')).toBe(true);
-    expect(verifyStationRiddle(hallH, 'ky nang')).toBe(true);
-    expect(verifyStationRiddle(hallH, 'sai dap an')).toBe(false);
-    expect(verifyStationRiddle(hallH, '   ')).toBe(false);
-  });
-
-  it('3. Verifies QR code payloads (both JSON Standee payload and direct secret token)', () => {
-    const itStation = DEFAULT_STATIONS.find((s) => s.id === 'b_it')!;
-    const jsonPayload = buildStationQrPayload(itStation);
-
-    const resJson = verifyStationQrPayload(itStation, jsonPayload);
-    expect(resJson.valid).toBe(true);
-
-    const resToken = verifyStationQrPayload(itStation, 'tdc-qr-toab-cntt');
-    expect(resToken.valid).toBe(true);
-
-    const resInvalid = verifyStationQrPayload(itStation, 'WRONG-TOKEN-999');
-    expect(resInvalid.valid).toBe(false);
-  });
-
-  it('4. Enforces Anti-Cheat Cooldown between consecutive real-world station unlocks', () => {
-    const now = 1000000;
-    const baseProfile: UserProfile = {
-      uid: 'u1',
-      name: 'SV Test',
-      mssv: '26211TT0001',
-      email: 'test@mail.tdc.edu.vn',
-      facultyId: 'cntt',
-      role: 'student',
-      avatar: 0,
-      points: 100,
-      stars: 0,
-      quizOk: 0,
-      photos: 0,
-      done: {
-        g1: { pts: 60, unlockedAt: now - 1500, method: 'qr' },
-      },
-      bonus: {},
-      updatedAt: now,
-    };
-
-    // Trying to unlock another station 1.5s later via QR should be blocked
-    const blocked = checkAntiCheatCooldown(baseProfile, 'qr', now);
-    expect(blocked.allowed).toBe(false);
-    expect(blocked.waitSeconds).toBeGreaterThan(0);
-
-    // After ANTI_CHEAT_COOLDOWN_MS, it should be allowed
-    const allowed = checkAntiCheatCooldown(
-      baseProfile,
-      'qr',
-      now + ANTI_CHEAT_COOLDOWN_MS + 100
-    );
-    expect(allowed.allowed).toBe(true);
-
-    // Demo mode bypasses physical travel cooldown for classroom testing
-    const demoAllowed = checkAntiCheatCooldown(baseProfile, 'demo', now);
-    expect(demoAllowed.allowed).toBe(true);
-  });
-
-  it('5. Evaluates Cross-Faculty Party Bonus (+20%) when 2+ faculties team up', () => {
-    const sameFacultyMembers: PartyMember[] = [
-      { uid: '1', name: 'A', mssv: '1', facultyId: 'cntt', avatar: 0, points: 100 },
-      { uid: '2', name: 'B', mssv: '2', facultyId: 'cntt', avatar: 1, points: 120 },
-    ];
-    const sameEval = evaluateCrossFacultyBonus(sameFacultyMembers);
-    expect(sameEval.isCrossFaculty).toBe(false);
-    expect(sameEval.bonusMultiplier).toBe(1.0);
-
-    const crossFacultyMembers: PartyMember[] = [
-      ...sameFacultyMembers,
-      { uid: '3', name: 'C', mssv: '3', facultyId: 'dien_dt', avatar: 2, points: 150 },
-    ];
-    const crossEval = evaluateCrossFacultyBonus(crossFacultyMembers);
-    expect(crossEval.isCrossFaculty).toBe(true);
-    expect(crossEval.bonusMultiplier).toBe(1.2);
-  });
-
-  it('6. Calculates total station reward points with O2O QR bonus, Cross-Faculty bonus, and Campaign Event multiplier', () => {
-    const crossParty: PartyRoom = {
-      code: 'TDC123',
-      hostUid: '1',
-      name: 'Party',
-      memberUids: ['1', '2'],
-      members: [],
-      isCrossFaculty: true,
-      bonusMultiplier: 1.2,
-      totalPoints: 200,
-      createdAt: Date.now(),
-    };
-
-    const rewardNoEvent = calculateStationRewardPoints({
-      basePoints: 100,
-      party: crossParty,
-      method: 'qr',
-      eventMultiplier: 1.0,
-    });
-
-    expect(rewardNoEvent.qrBonus).toBe(15);
-    expect(rewardNoEvent.crossFacultyBonus).toBe(20);
-    expect(rewardNoEvent.eventBonus).toBe(0);
-    expect(rewardNoEvent.finalPoints).toBe(135);
-
-    const rewardWithEvent = calculateStationRewardPoints({
-      basePoints: 100,
-      party: crossParty,
-      method: 'qr',
-      eventMultiplier: 1.5,
-    });
-    expect(rewardWithEvent.eventBonus).toBe(50);
-    expect(rewardWithEvent.finalPoints).toBe(185);
-  });
-
-  it('7. Generates Admin Analytics and valid CSV report', () => {
-    const summary = getAdminAnalytics(DEFAULT_STATIONS);
-    expect(summary.stationStats.length).toBe(DEFAULT_STATIONS.length);
-    expect(summary.facultyStats.length).toBeGreaterThan(0);
-
-    const csv = generateAnalyticsCsv(summary);
-    expect(csv).toContain('BAO CAO THONG KE HE THONG TDC GO');
-    expect(csv).toContain('Tòa D (11 tầng) & Cổng 2');
-  });
-
-  it('8. Removes departing member and recalculates party totalPoints & cross-faculty status on leavePartyRoom', async () => {
-    const host: UserProfile = {
-      uid: 'u_host',
-      name: 'Host CNTT',
-      mssv: '26211TT0010',
-      email: 'host@mail.tdc.edu.vn',
-      facultyId: 'cntt',
-      role: 'student',
-      avatar: 0,
-      points: 200,
-      stars: 0,
-      quizOk: 0,
-      photos: 0,
-      done: {},
-      bonus: {},
-      updatedAt: Date.now(),
-    };
-    const guest: UserProfile = {
-      ...host,
-      uid: 'u_guest',
-      name: 'Guest Điện',
-      mssv: '26211DD0020',
-      facultyId: 'dien_dt',
-      points: 300,
-    };
-
-    const { room } = await createPartyRoom(host, 'Test Co-op Room');
-    const joined = await joinPartyRoom(guest, room.code);
-    expect(joined.room.members.length).toBe(2);
-    expect(joined.room.isCrossFaculty).toBe(true);
-    expect(joined.room.totalPoints).toBe(500);
-
-    await leavePartyRoom(joined.updatedProfile);
-    const afterLeave = await getPartyByCode(room.code);
-    expect(afterLeave).not.toBeNull();
-    expect(afterLeave!.members.length).toBe(1);
-    expect(afterLeave!.isCrossFaculty).toBe(false);
-    expect(afterLeave!.totalPoints).toBe(200);
-  });
-});
 </file>
 
 <file path="src/index.css">
@@ -11872,7 +9305,19 @@ ui-debug.log
 
 <file path="firebase.json">
 {
+  "auth": {
+    "providers": {
+      "anonymous": true,
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "TDC GO",
+        "supportEmail": "kuganagia@gmail.com"
+      }
+    }
+  },
   "firestore": {
+    "database": "(default)",
+    "location": "asia-southeast1",
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
@@ -12391,6 +9836,2582 @@ export default defineConfig({
     port: 5173,
     host: true,
   },
+});
+</file>
+
+<file path="src/engine/TdcCampusEngine.ts">
+import * as THREE from 'three';
+import { AVATARS, CAMP, PATHS } from '../data/campusLayout';
+import { Station, UnlockedStationRecord } from '../types/game';
+import { audioSfx } from './audioSfx';
+import { buildCampusEnvironment } from './campusBuilder';
+import { animChibi, buildPathGraphAndNpcs, makeChibi } from './chibiBuilder';
+import { FogOfWarSystem } from './fogOfWar';
+import { buildNatureAndTrain } from './natureAndTrain';
+import {
+  AABB,
+  canvasTex,
+  clamp,
+  coinTex,
+  createMaterialCache,
+  createRng,
+  ell,
+  lerpAngle,
+  mesh,
+  pill,
+} from './threeHelpers';
+
+export interface FloatingTextItem {
+  id: number;
+  text: string;
+  x: number;
+  y: number;
+  opacity: number;
+  scale: number;
+  color?: string;
+}
+
+export interface GuideState {
+  station: Station | null;
+  distance: number;
+  angleRad: number;
+  allDone: boolean;
+}
+
+export interface MinimapSnapshot {
+  playerX: number;
+  playerZ: number;
+  playerRotY: number;
+  camYaw: number;
+  col: AABB[];
+}
+
+export interface EngineCallbacks {
+  onNearStationChange: (st: Station | null) => void;
+  onOpenStationRequest: (st: Station) => void;
+  onStarCollected: () => void;
+  onPlayerMoveSave: (pos: [number, number]) => void;
+  onFloatingTextsUpdate: (items: FloatingTextItem[]) => void;
+  onGuideUpdate: (guide: GuideState) => void;
+  onMinimapUpdate: (snap: MinimapSnapshot) => void;
+}
+
+interface StarObject {
+  m: THREE.Mesh;
+  alive: boolean;
+  timer: number;
+  ph: number;
+}
+
+interface Station3DNode {
+  g: THREE.Group;
+  ring: THREE.Mesh;
+  disc: THREE.Mesh;
+  beam: THREE.Mesh;
+  icon: THREE.Sprite;
+  lab: THREE.Sprite;
+}
+
+export class TdcCampusEngine {
+  private container: HTMLElement;
+  private callbacks: EngineCallbacks;
+  private renderer: THREE.WebGLRenderer;
+  private scene: THREE.Scene;
+  private camera: THREE.PerspectiveCamera;
+  private sun: THREE.DirectionalLight;
+  private col: AABB[] = [];
+  private mat = createMaterialCache();
+  private rng = createRng(20261021);
+  private fogOfWar: FogOfWarSystem;
+
+  private stations: Station[] = [];
+  private unlockedMap: Record<string, UnlockedStationRecord> = {};
+  private st3d: Record<string, Station3DNode> = {};
+  private stars: StarObject[] = [];
+  private parts: { m: THREE.Mesh; v: THREE.Vector3; life: number }[] = [];
+  private fxList: {
+    id: number;
+    text: string;
+    p: THREE.Vector3;
+    life: number;
+    color?: string;
+  }[] = [];
+  private fxSeq = 1;
+
+  private player = {
+    obj: null as THREE.Group | null,
+    pos: new THREE.Vector3(-66, 0, 100),
+    ph: 0,
+    tag: null as THREE.Sprite | null,
+  };
+
+  private cam = {
+    yaw: 0.25,
+    pitch: 0.92,
+    dist: 40,
+    curD: null as number | null,
+    curP: null as number | null,
+    tgt: new THREE.Vector3(-5, 0, -5),
+  };
+
+  private running = false;
+  private paused = false;
+  private photoStation: Station | null = null;
+  private nearStation: Station | null = null;
+  private moveTarget: THREE.Vector3 | null = null;
+  private tMark: THREE.Mesh | null = null;
+  private flagMesh: THREE.Mesh | null = null;
+
+  private keys = new Set<string>();
+  private joy = { x: 0, y: 0 };
+  private disposed = false;
+  private rafId = 0;
+  private resizeObs: ResizeObserver;
+
+  private cleanupWindowListeners?: () => void;
+
+  private animateNatureAndTrain?: (dt: number, t: number) => void;
+  private animateNpcs?: (dt: number, t: number) => void;
+
+  constructor(
+    container: HTMLElement,
+    initialStations: Station[],
+    initialUnlocked: Record<string, UnlockedStationRecord>,
+    callbacks: EngineCallbacks
+  ) {
+    this.container = container;
+    this.stations = initialStations;
+    this.unlockedMap = initialUnlocked;
+    this.callbacks = callbacks;
+
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.container.appendChild(this.renderer.domElement);
+
+    this.scene = new THREE.Scene();
+    this.scene.fog = new THREE.Fog(0xd3eedf, 380, 1100);
+    this.camera = new THREE.PerspectiveCamera(42, 1, 0.5, 2600);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8dbf73, 0.74));
+
+    this.sun = new THREE.DirectionalLight(0xfff2d8, 0.8);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(this.sun.shadow.camera, {
+      left: -150,
+      right: 150,
+      top: 150,
+      bottom: -150,
+      near: 10,
+      far: 500,
+    });
+    this.sun.shadow.bias = -0.0006;
+    this.sun.shadow.normalBias = 0.03;
+    this.scene.add(this.sun, this.sun.target);
+
+    this.fogOfWar = new FogOfWarSystem(this.scene);
+
+    this.resizeObs = new ResizeObserver(() => this.resize());
+    this.resizeObs.observe(this.container);
+    this.resize();
+
+    this.initWorld();
+    this.bindEvents();
+    this.startLoop();
+  }
+
+  private initWorld(): void {
+    const { flag } = buildCampusEnvironment({
+      scene: this.scene,
+      col: this.col,
+      mat: this.mat,
+      rng: this.rng,
+    });
+    this.flagMesh = flag;
+
+    const nat = buildNatureAndTrain({
+      scene: this.scene,
+      col: this.col,
+      stations: this.stations,
+      mat: this.mat,
+      rng: this.rng,
+    });
+    this.animateNatureAndTrain = nat.animate;
+
+    const npcState = buildPathGraphAndNpcs({
+      scene: this.scene,
+      mat: this.mat,
+      rng: this.rng,
+    });
+    this.animateNpcs = npcState.animateNpcs;
+
+    // Stars
+    const sh = new THREE.Shape();
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+      const r = i % 2 ? 0.45 : 1;
+      if (i) sh.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+      else sh.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+    const sg = new THREE.ExtrudeGeometry(sh, {
+      depth: 0.32,
+      bevelEnabled: true,
+      bevelSize: 0.1,
+      bevelThickness: 0.1,
+      bevelSegments: 1,
+    });
+    sg.center();
+    const sm = new THREE.MeshPhongMaterial({
+      color: '#FFD23F',
+      emissive: '#7A5200',
+      shininess: 60,
+      flatShading: true,
+    });
+    for (let i = 0; i < 34; i++) {
+      const m = mesh(sg, sm, 0, 1.7, 0);
+      this.scene.add(m);
+      const s: StarObject = { m, alive: true, timer: 0, ph: this.rng() * 6 };
+      this.placeStar(s);
+      this.stars.push(s);
+    }
+
+    // Build 3D station markers & Fog of War
+    this.rebuildStations3D();
+
+    // Ground tap marker & particles
+    this.tMark = new THREE.Mesh(
+      new THREE.RingGeometry(0.9, 1.3, 28).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: '#FFFFFF', transparent: true, opacity: 0.9 })
+    );
+    this.tMark.visible = false;
+    this.scene.add(this.tMark);
+
+    const pg = new THREE.OctahedronGeometry(0.28, 0);
+    for (let i = 0; i < 60; i++) {
+      const m = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ color: '#FFD23F' }));
+      m.visible = false;
+      this.scene.add(m);
+      this.parts.push({ m, v: new THREE.Vector3(), life: 0 });
+    }
+  }
+
+  public rebuildStations3D(): void {
+    Object.values(this.st3d).forEach((node) => {
+      this.scene.remove(node.g);
+    });
+    this.st3d = {};
+
+    const beamT = canvasTex(
+      4,
+      128,
+      (g, W, H) => {
+        const gr = g.createLinearGradient(0, 0, 0, H);
+        gr.addColorStop(0, 'rgba(255,255,255,0)');
+        gr.addColorStop(1, 'rgba(255,255,255,.75)');
+        g.fillStyle = gr;
+        g.fillRect(0, 0, W, H);
+      },
+      false
+    );
+
+    this.stations
+      .filter((st) => st.active !== false)
+      .forEach((st) => {
+        const g = new THREE.Group();
+        g.position.set(st.x, 0, st.z);
+        this.scene.add(g);
+
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(2.6, 3.3, 40).rotateX(-Math.PI / 2),
+          new THREE.MeshBasicMaterial({ color: st.col, transparent: true, opacity: 0.9 })
+        );
+        ring.position.y = 0.16;
+        g.add(ring);
+
+        const disc = new THREE.Mesh(
+          new THREE.CircleGeometry(2.6, 40).rotateX(-Math.PI / 2),
+          new THREE.MeshBasicMaterial({ color: st.col, transparent: true, opacity: 0.22 })
+        );
+        disc.position.y = 0.15;
+        g.add(disc);
+
+        const beam = new THREE.Mesh(
+          new THREE.CylinderGeometry(1.4, 2.2, 22, 20, 1, true),
+          new THREE.MeshBasicMaterial({
+            color: st.col,
+            map: beamT,
+            transparent: true,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+            opacity: 0.55,
+          })
+        );
+        beam.position.y = 11;
+        g.add(beam);
+
+        const ped = mesh(new THREE.CylinderGeometry(0.9, 1.2, 0.8, 12), this.mat('#FFFFFF'), 0, 0.4, 0);
+        g.add(ped);
+
+        const isDone = this.unlockedMap[st.id] != null;
+        const icon = new THREE.Sprite(
+          new THREE.SpriteMaterial({ map: coinTex(st, isDone), transparent: true })
+        );
+        icon.scale.setScalar(4.6);
+        icon.position.y = 5.5;
+        g.add(icon);
+
+        const lab = pill(st.name, { h: 2.2, dot: st.col });
+        lab.position.y = 9;
+        g.add(lab);
+
+        this.st3d[st.id] = { g, ring, disc, beam, icon, lab };
+        this.applyStationVisualState(st);
+      });
+
+    this.fogOfWar.buildForStations(
+      this.stations.filter((s) => s.active !== false),
+      this.unlockedMap
+    );
+  }
+
+  private applyStationVisualState(st: Station): void {
+    const s = this.st3d[st.id];
+    if (!s) return;
+    const d = this.unlockedMap[st.id] != null;
+    s.icon.material.map = coinTex(st, d);
+    s.icon.material.needsUpdate = true;
+    s.beam.visible = !d;
+    (s.ring.material as THREE.MeshBasicMaterial).color.set(d ? '#3DAA5C' : st.col);
+    (s.disc.material as THREE.MeshBasicMaterial).color.set(d ? '#3DAA5C' : st.col);
+  }
+
+  public updateStationsAndProgress(
+    stations: Station[],
+    unlocked: Record<string, UnlockedStationRecord>
+  ): void {
+    const prevKey = this.stations
+      .map((s) => `${s.id}:${s.x}:${s.z}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`)
+      .join('|');
+    const nextKey = stations
+      .map((s) => `${s.id}:${s.x}:${s.z}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`)
+      .join('|');
+    const structureChanged = prevKey !== nextKey;
+
+    this.stations = stations;
+    this.unlockedMap = unlocked;
+
+    if (structureChanged) {
+      this.rebuildStations3D();
+    } else {
+      this.stations.forEach((st) => this.applyStationVisualState(st));
+      this.fogOfWar.syncUnlocked(this.unlockedMap);
+    }
+  }
+
+  public startPlayer(
+    name: string,
+    avatarIdx: number,
+    savedPos?: [number, number] | null,
+    hasProgress?: boolean
+  ): void {
+    audioSfx.init();
+    if (this.player.obj) {
+      this.scene.remove(this.player.obj);
+    }
+    const spec = AVATARS[avatarIdx] || AVATARS[0];
+    this.player.obj = makeChibi(spec, true, this.mat);
+    this.player.obj.traverse((m) => {
+      if ((m as THREE.Mesh).isMesh) m.castShadow = true;
+    });
+    this.player.tag = pill(name || 'Bạn', { h: 1.25, fs: 40, bg: '#1E3528', fg: '#FFFFFF' });
+    this.player.tag.position.y = 3.9;
+    this.player.obj.add(this.player.tag);
+    this.scene.add(this.player.obj);
+
+    if (savedPos && hasProgress) {
+      this.player.pos.set(savedPos[0], 0, savedPos[1]);
+    } else {
+      this.player.pos.set(-66, 0, 98);
+    }
+    this.player.obj.position.copy(this.player.pos);
+    this.player.obj.rotation.y = Math.PI;
+    this.cam.yaw = 0;
+    this.cam.tgt.set(this.player.pos.x, 1.6, this.player.pos.z);
+    this.running = true;
+    this.paused = false;
+  }
+
+  public setPaused(p: boolean): void {
+    this.paused = p;
+    if (p) {
+      this.keys.clear();
+      this.joy.x = 0;
+      this.joy.y = 0;
+    }
+  }
+
+  public setJoystick(x: number, y: number): void {
+    this.joy.x = x;
+    this.joy.y = y;
+  }
+
+  public enterPhotoMode(st: Station): void {
+    this.photoStation = st;
+    if (this.player.obj) {
+      this.player.obj.rotation.y = Math.atan2(
+        Math.sin(this.cam.yaw),
+        Math.cos(this.cam.yaw)
+      );
+    }
+  }
+
+  public exitPhotoMode(): void {
+    this.photoStation = null;
+  }
+
+  public rotatePhotoCamera(): void {
+    this.cam.yaw += 0.6;
+    if (this.player.obj) {
+      this.player.obj.rotation.y = Math.atan2(
+        Math.sin(this.cam.yaw),
+        Math.cos(this.cam.yaw)
+      );
+    }
+  }
+
+  public capturePhotoDataUrl(): string {
+    this.renderer.render(this.scene, this.camera);
+    try {
+      return this.renderer.domElement.toDataURL('image/jpeg', 0.85);
+    } catch {
+      return '';
+    }
+  }
+
+  public navigateToStation(st: Station): void {
+    if (!this.running) return;
+    this.moveTarget = new THREE.Vector3(
+      st.x,
+      0,
+      st.z + (st.z > this.player.pos.z ? -3 : 3)
+    );
+    if (this.tMark) {
+      this.tMark.position.set(this.moveTarget.x, 0.2, this.moveTarget.z);
+      this.tMark.visible = true;
+      this.tMark.scale.setScalar(1.6);
+    }
+  }
+
+  public celebrateStationUnlock(st: Station, ptsText: string): void {
+    this.burst(
+      new THREE.Vector3(st.x, 5, st.z),
+      ['#FFD23F', '#FF6F59', '#00AEEF', '#38B865', '#FF8FB1', '#9B6BFF'],
+      42
+    );
+    this.spawnFloatText(ptsText, new THREE.Vector3(st.x, 4, st.z));
+  }
+
+  public spawnFloatText(text: string, worldPos: THREE.Vector3, color?: string): void {
+    this.fxList.push({
+      id: this.fxSeq++,
+      text,
+      p: worldPos.clone().add(new THREE.Vector3(0, 2.5, 0)),
+      life: 1,
+      color,
+    });
+  }
+
+  public burst(pos: THREE.Vector3, colors: string[], n: number): void {
+    let k = 0;
+    for (const p of this.parts) {
+      if (p.life > 0) continue;
+      p.life = 1;
+      p.m.visible = true;
+      p.m.position.copy(pos);
+      (p.m.material as THREE.MeshBasicMaterial).color.set(colors[k % colors.length]);
+      p.v.set(
+        (Math.random() - 0.5) * 10,
+        6 + Math.random() * 7,
+        (Math.random() - 0.5) * 10
+      );
+      if (++k >= n) break;
+    }
+  }
+
+  private placeStar(s: StarObject): void {
+    for (let k = 0; k < 40; k++) {
+      const p = PATHS[Math.floor(this.rng() * PATHS.length)];
+      const t = this.rng();
+      const x = p[0] + (p[2] - p[0]) * t + (this.rng() - 0.5) * 1.6;
+      const z = p[1] + (p[3] - p[1]) * t + (this.rng() - 0.5) * 1.6;
+      if (this.stations.some((st) => Math.hypot(st.x - x, st.z - z) < 6)) continue;
+      if (
+        this.col.some((c) => x > c[0] - 1 && x < c[2] + 1 && z > c[1] - 1 && z < c[3] + 1)
+      )
+        continue;
+      if (
+        Math.hypot(x - this.player.pos.x, z - this.player.pos.z) < 10 &&
+        this.running
+      )
+        continue;
+      s.m.position.set(x, 1.7, z);
+      s.m.visible = true;
+      s.alive = true;
+      return;
+    }
+  }
+
+  private resolveCollision(p: THREE.Vector3): void {
+    const r = 0.7;
+    for (const c of this.col) {
+      if (p.x > c[0] - r && p.x < c[2] + r && p.z > c[1] - r && p.z < c[3] + r) {
+        const dl = p.x - (c[0] - r);
+        const dr = c[2] + r - p.x;
+        const dt = p.z - (c[1] - r);
+        const db = c[3] + r - p.z;
+        const m = Math.min(dl, dr, dt, db);
+        if (m === dl) p.x = c[0] - r;
+        else if (m === dr) p.x = c[2] + r;
+        else if (m === dt) p.z = c[1] - r;
+        else p.z = c[3] + r;
+      }
+    }
+    const d = ell(p.x, p.z);
+    if (d > 0.985) {
+      const k = 0.985 / d;
+      p.x = CAMP.cx + (p.x - CAMP.cx) * k;
+      p.z = CAMP.cz + (p.z - CAMP.cz) * k;
+    }
+  }
+
+  private bindEvents(): void {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (!this.running || this.paused || this.photoStation) return;
+      const k = e.key.toLowerCase();
+      if ((k === 'enter' || k === ' ') && this.nearStation) {
+        e.preventDefault();
+        this.callbacks.onOpenStationRequest(this.nearStation);
+        return;
+      }
+      if (
+        [
+          'w',
+          'a',
+          's',
+          'd',
+          'q',
+          'e',
+          'arrowup',
+          'arrowdown',
+          'arrowleft',
+          'arrowright',
+        ].includes(k)
+      ) {
+        e.preventDefault();
+        this.keys.add(k);
+      }
+      if (k === '+' || k === '=') this.cam.dist = clamp(this.cam.dist * 0.85, 16, 130);
+      if (k === '-') this.cam.dist = clamp(this.cam.dist / 0.85, 16, 130);
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      this.keys.delete(e.key.toLowerCase());
+    };
+
+    const onBlur = () => {
+      this.keys.clear();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
+    this.cleanupWindowListeners = () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
+    };
+
+    const cv = this.renderer.domElement;
+    const ptrs = new Map<number, { x: number; y: number }>();
+    let drag: {
+      x: number;
+      y: number;
+      sx: number;
+      sy: number;
+      moved: boolean;
+    } | null = null;
+    let pinch: number | null = null;
+    const ray = new THREE.Raycaster();
+    const GROUND = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+    const tapMove = (e: PointerEvent) => {
+      const r = cv.getBoundingClientRect();
+      ray.setFromCamera(
+        new THREE.Vector2(
+          ((e.clientX - r.left) / r.width) * 2 - 1,
+          -((e.clientY - r.top) / r.height) * 2 + 1
+        ),
+        this.camera
+      );
+      const p = new THREE.Vector3();
+      if (!ray.ray.intersectPlane(GROUND, p)) return;
+      if (ell(p.x, p.z) > 0.985) return;
+      this.moveTarget = p;
+      if (this.tMark) {
+        this.tMark.position.set(p.x, 0.2, p.z);
+        this.tMark.visible = true;
+        this.tMark.scale.setScalar(1.6);
+      }
+      audioSfx.play('tap');
+    };
+
+    cv.addEventListener('pointerdown', (e) => {
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      try {
+        cv.setPointerCapture(e.pointerId);
+      } catch {
+        // Ignore capture error
+      }
+      if (ptrs.size === 1) {
+        drag = {
+          x: e.clientX,
+          y: e.clientY,
+          sx: e.clientX,
+          sy: e.clientY,
+          moved: false,
+        };
+      } else if (ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()];
+        pinch = Math.hypot(a.x - b.x, a.y - b.y);
+        drag = null;
+      }
+    });
+
+    cv.addEventListener('pointermove', (e) => {
+      if (!ptrs.has(e.pointerId)) return;
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (!this.running) return;
+      if (pinch && ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        this.cam.dist = clamp((this.cam.dist * pinch) / d, 16, 130);
+        pinch = d;
+        return;
+      }
+      if (!drag) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      drag.x = e.clientX;
+      drag.y = e.clientY;
+      if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 8) drag.moved = true;
+      if (drag.moved) {
+        this.cam.yaw -= dx * 0.006;
+        this.cam.pitch = clamp(this.cam.pitch + dy * 0.004, 0.32, 1.38);
+      }
+    });
+
+    const endPtr = (e: PointerEvent) => {
+      if (
+        drag &&
+        !drag.moved &&
+        ptrs.size === 1 &&
+        this.running &&
+        !this.paused &&
+        !this.photoStation
+      ) {
+        tapMove(e);
+      }
+      ptrs.delete(e.pointerId);
+      if (ptrs.size < 2) pinch = null;
+      if (!ptrs.size) drag = null;
+    };
+
+    cv.addEventListener('pointerup', endPtr);
+    cv.addEventListener('pointercancel', (e) => {
+      ptrs.delete(e.pointerId);
+      drag = null;
+      pinch = null;
+    });
+    cv.addEventListener(
+      'wheel',
+      (e) => {
+        if (!this.running) return;
+        e.preventDefault();
+        this.cam.dist = clamp(this.cam.dist * (1 + e.deltaY * 0.0012), 16, 130);
+      },
+      { passive: false }
+    );
+    cv.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  private resize(): void {
+    const w = this.container.clientWidth;
+    const h = this.container.clientHeight;
+    if (!w || !h) return;
+    this.renderer.setSize(w, h, false);
+    this.renderer.domElement.style.width = `${w}px`;
+    this.renderer.domElement.style.height = `${h}px`;
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+  }
+
+  private startLoop(): void {
+    let last = performance.now();
+    let T = 0;
+    let saveT = 0;
+    let hudSyncT = 0;
+    const tmpV = new THREE.Vector3();
+
+    const frame = (now: number) => {
+      if (this.disposed) return;
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      T += dt;
+
+      if (this.running && !this.paused && !this.photoStation) {
+        this.updatePlayer(dt, T);
+        saveT -= dt;
+        if (saveT <= 0) {
+          saveT = 2.0;
+          this.callbacks.onPlayerMoveSave([
+            +this.player.pos.x.toFixed(1),
+            +this.player.pos.z.toFixed(1),
+          ]);
+        }
+      } else if (this.running && this.player.obj) {
+        animChibi(this.player.obj, this.player.ph, 0, T);
+      }
+
+      // Camera update
+      let d: number;
+      let p: number;
+      if (this.running) {
+        this.cam.tgt.lerp(
+          tmpV.set(this.player.pos.x, 1.6, this.player.pos.z),
+          1 - Math.exp(-dt * 7)
+        );
+        d = this.photoStation ? 15 : this.cam.dist;
+        p = this.photoStation ? 0.38 : this.cam.pitch;
+      } else {
+        this.cam.yaw += dt * 0.035;
+        this.cam.tgt.lerp(tmpV.set(10, 0, -2), 1 - Math.exp(-dt * 2));
+        const a = this.camera.aspect || 1;
+        d = a < 1 ? (430 / Math.max(a, 0.5)) * 0.75 : 300;
+        p = 0.74;
+      }
+      this.cam.curD =
+        this.cam.curD == null
+          ? d
+          : this.cam.curD + (d - this.cam.curD) * (1 - Math.exp(-dt * 4));
+      this.cam.curP =
+        this.cam.curP == null
+          ? p
+          : this.cam.curP + (p - this.cam.curP) * (1 - Math.exp(-dt * 4));
+
+      this.camera.position.set(
+        this.cam.tgt.x + Math.sin(this.cam.yaw) * Math.cos(this.cam.curP) * this.cam.curD,
+        this.cam.tgt.y + Math.sin(this.cam.curP) * this.cam.curD,
+        this.cam.tgt.z + Math.cos(this.cam.yaw) * Math.cos(this.cam.curP) * this.cam.curD
+      );
+      this.camera.lookAt(this.cam.tgt);
+      this.sun.position.set(this.cam.tgt.x + 70, 150, this.cam.tgt.z + 55);
+      this.sun.target.position.copy(this.cam.tgt);
+
+      // Animate world
+      this.animateWorld(dt, T);
+      this.fogOfWar.animate(dt, T);
+
+      this.renderer.render(this.scene, this.camera);
+
+      if (this.running) {
+        this.updateFloatingTexts(dt, tmpV);
+        hudSyncT -= dt;
+        if (hudSyncT <= 0) {
+          hudSyncT = 0.08;
+          this.emitGuideAndMinimap();
+        }
+      }
+
+      this.rafId = requestAnimationFrame(frame);
+    };
+
+    this.rafId = requestAnimationFrame(frame);
+  }
+
+  private updatePlayer(dt: number, t: number): void {
+    let ix = 0;
+    let iy = 0;
+    if (this.keys.has('w') || this.keys.has('arrowup')) iy += 1;
+    if (this.keys.has('s') || this.keys.has('arrowdown')) iy -= 1;
+    if (this.keys.has('a') || this.keys.has('arrowleft')) ix -= 1;
+    if (this.keys.has('d') || this.keys.has('arrowright')) ix += 1;
+    if (this.keys.has('q')) this.cam.yaw += 1.7 * dt;
+    if (this.keys.has('e')) this.cam.yaw -= 1.7 * dt;
+    ix += this.joy.x;
+    iy += this.joy.y;
+
+    const fx = -Math.sin(this.cam.yaw);
+    const fz = -Math.cos(this.cam.yaw);
+    const rx = Math.cos(this.cam.yaw);
+    const rz = -Math.sin(this.cam.yaw);
+    let mx = fx * iy + rx * ix;
+    let mz = fz * iy + rz * ix;
+    let amt = Math.hypot(mx, mz);
+
+    if (amt > 0.08) {
+      this.moveTarget = null;
+      if (this.tMark) this.tMark.visible = false;
+      mx /= amt;
+      mz /= amt;
+      if (amt > 1) amt = 1;
+    } else if (this.moveTarget) {
+      mx = this.moveTarget.x - this.player.pos.x;
+      mz = this.moveTarget.z - this.player.pos.z;
+      const d = Math.hypot(mx, mz);
+      if (d < 0.7) {
+        this.moveTarget = null;
+        if (this.tMark) this.tMark.visible = false;
+        amt = 0;
+      } else {
+        mx /= d;
+        mz /= d;
+        amt = 1;
+      }
+    } else {
+      amt = 0;
+    }
+
+    const sp = 10 * amt;
+    if (amt > 0) {
+      const ox = this.player.pos.x;
+      const oz = this.player.pos.z;
+      this.player.pos.x += mx * sp * dt;
+      this.player.pos.z += mz * sp * dt;
+      this.resolveCollision(this.player.pos);
+      if (
+        this.moveTarget &&
+        Math.hypot(this.player.pos.x - ox, this.player.pos.z - oz) < sp * dt * 0.15
+      ) {
+        this.moveTarget = null;
+        if (this.tMark) this.tMark.visible = false;
+      }
+      if (this.player.obj) {
+        this.player.obj.rotation.y = lerpAngle(
+          this.player.obj.rotation.y,
+          Math.atan2(mx, mz),
+          1 - Math.exp(-dt * 12)
+        );
+      }
+      this.player.ph += dt * sp * 1.1;
+    }
+
+    if (this.player.obj) {
+      animChibi(this.player.obj, this.player.ph, amt, t);
+      this.player.obj.position.set(this.player.pos.x, 0, this.player.pos.z);
+    }
+
+    // Collect stars
+    for (const s of this.stars) {
+      if (!s.alive) continue;
+      if (
+        Math.hypot(
+          s.m.position.x - this.player.pos.x,
+          s.m.position.z - this.player.pos.z
+        ) < 2.4
+      ) {
+        s.alive = false;
+        s.m.visible = false;
+        s.timer = 45;
+        this.burst(s.m.position, ['#FFD23F', '#FFF3B0', '#FFAA1F'], 10);
+        this.spawnFloatText('+10', s.m.position);
+        audioSfx.play('coin');
+        this.callbacks.onStarCollected();
+      }
+    }
+
+    // Check near station
+    let near: Station | null = null;
+    let best = 6.8;
+    this.stations
+      .filter((st) => st.active !== false)
+      .forEach((st) => {
+        const d = Math.hypot(st.x - this.player.pos.x, st.z - this.player.pos.z);
+        if (d < best) {
+          best = d;
+          near = st;
+        }
+      });
+
+    if (near !== this.nearStation) {
+      this.nearStation = near;
+      this.callbacks.onNearStationChange(near);
+    }
+  }
+
+  private animateWorld(dt: number, t: number): void {
+    this.animateNatureAndTrain?.(dt, t);
+    this.animateNpcs?.(dt, t);
+
+    if (this.flagMesh) {
+      this.flagMesh.rotation.y = Math.sin(t * 3) * 0.25;
+    }
+
+    this.stars.forEach((s) => {
+      if (!s.alive) {
+        s.timer -= dt;
+        if (s.timer <= 0) this.placeStar(s);
+        return;
+      }
+      s.m.rotation.y = t * 2 + s.ph;
+      s.m.position.y = 1.7 + Math.sin(t * 2.4 + s.ph) * 0.3;
+    });
+
+    this.stations.forEach((st, i) => {
+      const s = this.st3d[st.id];
+      if (!s) return;
+      s.icon.position.y = 5.5 + Math.sin(t * 2 + i) * 0.45;
+      const k = 1 + ((t * 0.8 + i * 0.3) % 1) * 0.35;
+      s.ring.scale.set(k, 1, k);
+      (s.ring.material as THREE.MeshBasicMaterial).opacity =
+        0.95 - ((t * 0.8 + i * 0.3) % 1) * 0.6;
+    });
+
+    this.parts.forEach((p) => {
+      if (p.life <= 0) return;
+      p.life -= dt * 1.1;
+      p.v.y -= 22 * dt;
+      p.m.position.addScaledVector(p.v, dt);
+      p.m.rotation.x += dt * 6;
+      p.m.scale.setScalar(Math.max(0.05, p.life * 1.3));
+      if (p.life <= 0) p.m.visible = false;
+    });
+
+    if (this.tMark && this.tMark.visible) {
+      this.tMark.scale.multiplyScalar(1 - dt * 1.4);
+      if (this.tMark.scale.x < 0.9) this.tMark.scale.setScalar(1.6);
+    }
+  }
+
+  private updateFloatingTexts(dt: number, tmpV: THREE.Vector3): void {
+    if (this.fxList.length === 0) return;
+    const w = this.container.clientWidth;
+    const h = this.container.clientHeight;
+    const out: FloatingTextItem[] = [];
+
+    for (let i = this.fxList.length - 1; i >= 0; i--) {
+      const f = this.fxList[i];
+      f.life -= dt * 0.9;
+      f.p.y += dt * 3;
+      if (f.life <= 0) {
+        this.fxList.splice(i, 1);
+        continue;
+      }
+      tmpV.copy(f.p).project(this.camera);
+      out.push({
+        id: f.id,
+        text: f.text,
+        x: ((tmpV.x + 1) / 2) * w,
+        y: ((1 - tmpV.y) / 2) * h,
+        opacity: Math.min(1, f.life * 2),
+        scale: 0.8 + f.life * 0.4,
+        color: f.color,
+      });
+    }
+    this.callbacks.onFloatingTextsUpdate(out);
+  }
+
+  private emitGuideAndMinimap(): void {
+    let best: Station | null = null;
+    let bd = 1e9;
+    const activeStations = this.stations.filter((st) => st.active !== false);
+    activeStations.forEach((st) => {
+      if (this.unlockedMap[st.id] != null) return;
+      const d = Math.hypot(st.x - this.player.pos.x, st.z - this.player.pos.z);
+      if (d < bd) {
+        bd = d;
+        best = st;
+      }
+    });
+
+    let angleRad = 0;
+    if (best) {
+      const target = best as Station;
+      const vx = target.x - this.player.pos.x;
+      const vz = target.z - this.player.pos.z;
+      const fx = -Math.sin(this.cam.yaw);
+      const fz = -Math.cos(this.cam.yaw);
+      const rx = Math.cos(this.cam.yaw);
+      const rz = -Math.sin(this.cam.yaw);
+      angleRad = Math.atan2(vx * rx + vz * rz, vx * fx + vz * fz);
+    }
+
+    this.callbacks.onGuideUpdate({
+      station: best,
+      distance: best ? bd : 0,
+      angleRad,
+      allDone: best === null && activeStations.length > 0,
+    });
+
+    this.callbacks.onMinimapUpdate({
+      playerX: this.player.pos.x,
+      playerZ: this.player.pos.z,
+      playerRotY: this.player.obj ? this.player.obj.rotation.y : 0,
+      camYaw: this.cam.yaw,
+      col: this.col,
+    });
+  }
+
+  public dispose(): void {
+    this.disposed = true;
+    cancelAnimationFrame(this.rafId);
+    this.cleanupWindowListeners?.();
+    this.resizeObs.disconnect();
+    this.renderer.dispose();
+    if (this.renderer.domElement.parentNode === this.container) {
+      this.container.removeChild(this.renderer.domElement);
+    }
+  }
+}
+</file>
+
+<file path="src/services/gameService.ts">
+import { addDoc, collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { QUESTS } from '../data/campusLayout';
+import { DEFAULT_EVENTS } from '../data/stations';
+import {
+  CampaignEvent,
+  CheckinLog,
+  PartyRoom,
+  PublicLeaderboardUser,
+  Station,
+  UnlockedStationRecord,
+  UserProfile,
+  VerificationMethod,
+} from '../types/game';
+import { getLocalPublicUsers, syncProfileToCloud } from './authService';
+import { db, isFirebaseConfigured } from './firebase';
+import { loadLocalParties, syncMemberPointsInParty } from './partyService';
+
+const LOCAL_CHECKINS_KEY = 'tdc_go_checkins_v2';
+const LOCAL_EVENTS_KEY = 'tdc_go_events_v2';
+
+// Minimum cooldown in ms between real-world QR/Riddle check-ins to prevent automated replay
+export const ANTI_CHEAT_COOLDOWN_MS = 4000;
+
+export function normalizeVietnameseAnswer(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+export function verifyStationRiddle(station: Station, userInput: string): boolean {
+  if (!station.riddle) return true;
+  const expected = normalizeVietnameseAnswer(station.riddle.answer);
+  const actual = normalizeVietnameseAnswer(userInput);
+  if (!actual) return false;
+  return actual === expected || actual.includes(expected);
+}
+
+export function verifyStationQrPayload(
+  station: Station,
+  scannedCode: string
+): { valid: boolean; matchedStationId?: string; message: string } {
+  const clean = scannedCode.trim();
+  if (!clean) {
+    return { valid: false, message: 'Mã QR trống hoặc không hợp lệ.' };
+  }
+
+  // Support either JSON payload `{"app":"TDC_GO","stationId":"...","token":"..."}` or direct token string
+  try {
+    if (clean.startsWith('{')) {
+      const obj = JSON.parse(clean) as {
+        app?: string;
+        stationId?: string;
+        token?: string;
+      };
+      if (obj.token === station.qrSecretToken || obj.stationId === station.id) {
+        return {
+          valid: true,
+          matchedStationId: station.id,
+          message: `Xác thực QR thành công tại ${station.name}!`,
+        };
+      }
+      return {
+        valid: false,
+        matchedStationId: obj.stationId,
+        message: 'Mã QR này thuộc về một trạm khác trong khuôn viên.',
+      };
+    }
+  } catch {
+    // Plain string check below
+  }
+
+  if (
+    clean.toUpperCase() === station.qrSecretToken.toUpperCase() ||
+    clean.toLowerCase() === station.id.toLowerCase()
+  ) {
+    return {
+      valid: true,
+      matchedStationId: station.id,
+      message: `Xác thực mã định danh trạm ${station.name} thành công!`,
+    };
+  }
+
+  return {
+    valid: false,
+    message: 'Mã QR không khớp với trạm hiện tại. Hãy kiểm tra lại bảng QR tại trạm!',
+  };
+}
+
+export function checkAntiCheatCooldown(
+  profile: UserProfile,
+  method: VerificationMethod,
+  now = Date.now()
+): { allowed: boolean; waitSeconds: number } {
+  if (method === 'demo') return { allowed: true, waitSeconds: 0 };
+
+  const timestamps = Object.values(profile.done || {}).map((r) => r.unlockedAt || 0);
+  if (timestamps.length === 0) return { allowed: true, waitSeconds: 0 };
+
+  const lastUnlock = Math.max(...timestamps);
+  const elapsed = now - lastUnlock;
+  if (elapsed < ANTI_CHEAT_COOLDOWN_MS) {
+    return {
+      allowed: false,
+      waitSeconds: Math.ceil((ANTI_CHEAT_COOLDOWN_MS - elapsed) / 1000),
+    };
+  }
+  return { allowed: true, waitSeconds: 0 };
+}
+
+export function loadLocalEvents(): CampaignEvent[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_EVENTS_KEY);
+    if (!raw) {
+      localStorage.setItem(LOCAL_EVENTS_KEY, JSON.stringify(DEFAULT_EVENTS));
+      return [...DEFAULT_EVENTS];
+    }
+    const list = JSON.parse(raw) as CampaignEvent[];
+    return Array.isArray(list) ? list : [...DEFAULT_EVENTS];
+  } catch {
+    return [...DEFAULT_EVENTS];
+  }
+}
+
+export function getActiveEventMultiplier(): {
+  event: CampaignEvent | null;
+  multiplier: number;
+} {
+  const events = loadLocalEvents();
+  const active = events.find((e) => e.active);
+  return {
+    event: active || null,
+    multiplier: active ? active.bonusMultiplier : 1.0,
+  };
+}
+
+export function calculateStationRewardPoints(params: {
+  basePoints: number;
+  party: PartyRoom | null;
+  method: VerificationMethod;
+  eventMultiplier?: number;
+}): {
+  finalPoints: number;
+  crossFacultyBonus: number;
+  qrBonus: number;
+  eventBonus: number;
+  activeEventTitle?: string;
+} {
+  const qrBonus = params.method === 'qr' ? 15 : params.method === 'riddle' ? 10 : 0;
+  const crossMultiplier =
+    params.party && params.party.isCrossFaculty ? params.party.bonusMultiplier : 1.0;
+  const crossFacultyBonus =
+    crossMultiplier > 1 ? Math.round(params.basePoints * (crossMultiplier - 1)) : 0;
+
+  const activeEvt =
+    params.eventMultiplier !== undefined
+      ? { event: null, multiplier: params.eventMultiplier }
+      : getActiveEventMultiplier();
+  const evtMult = activeEvt.multiplier > 1 ? activeEvt.multiplier : 1.0;
+  const eventBonus =
+    evtMult > 1 ? Math.round(params.basePoints * (evtMult - 1)) : 0;
+
+  const finalPoints = params.basePoints + qrBonus + crossFacultyBonus + eventBonus;
+  return {
+    finalPoints,
+    crossFacultyBonus,
+    qrBonus,
+    eventBonus,
+    activeEventTitle: activeEvt.event?.title,
+  };
+}
+
+export function loadLocalCheckinLogs(): CheckinLog[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_CHECKINS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as CheckinLog[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function recordStationUnlock(params: {
+  profile: UserProfile;
+  station: Station;
+  baseEarnedPoints: number;
+  method: VerificationMethod;
+  party: PartyRoom | null;
+  photoDataUrl?: string;
+  isQuizOrGameSuccess?: boolean;
+  totalStationsCount: number;
+}): Promise<{
+  updatedProfile: UserProfile;
+  finalPoints: number;
+  crossFacultyBonus: number;
+  qrBonus: number;
+  newlyCompletedQuests: { name: string; reward: number }[];
+}> {
+  const { finalPoints, crossFacultyBonus, qrBonus } = calculateStationRewardPoints({
+    basePoints: params.baseEarnedPoints,
+    party: params.party,
+    method: params.method,
+  });
+
+  const record: UnlockedStationRecord = {
+    pts: finalPoints,
+    unlockedAt: Date.now(),
+    method: params.method,
+    ...(params.photoDataUrl ? { photoDataUrl: params.photoDataUrl } : {}),
+  };
+
+  const nextDone = {
+    ...(params.profile.done || {}),
+    [params.station.id]: record,
+  };
+
+  let nextProfile: UserProfile = {
+    ...params.profile,
+    points: params.profile.points + finalPoints,
+    quizOk:
+      params.profile.quizOk + (params.isQuizOrGameSuccess ? 1 : 0),
+    photos:
+      params.profile.photos + (params.station.type === 'photo' ? 1 : 0),
+    done: nextDone,
+    updatedAt: Date.now(),
+  };
+
+  const newlyCompletedQuests: { name: string; reward: number }[] = [];
+  QUESTS.forEach((q) => {
+    if (!nextProfile.bonus[q.id] && q.getValue(nextProfile, params.totalStationsCount) >= q.need) {
+      nextProfile = {
+        ...nextProfile,
+        points: nextProfile.points + q.reward,
+        bonus: { ...nextProfile.bonus, [q.id]: true },
+      };
+      newlyCompletedQuests.push({ name: q.name, reward: q.reward });
+    }
+  });
+
+  // Save checkin log
+  const logEntry: CheckinLog = {
+    id: `chk_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    uid: nextProfile.uid,
+    userName: nextProfile.name,
+    stationId: params.station.id,
+    facultyId: nextProfile.facultyId,
+    method: params.method,
+    pts: finalPoints,
+    timestamp: Date.now(),
+  };
+
+  try {
+    const logs = loadLocalCheckinLogs();
+    logs.unshift(logEntry);
+    localStorage.setItem(LOCAL_CHECKINS_KEY, JSON.stringify(logs.slice(0, 300)));
+  } catch {
+    // Ignore
+  }
+
+  if (isFirebaseConfigured && db) {
+    try {
+      await addDoc(collection(db, 'checkins'), {
+        uid: logEntry.uid,
+        userName: logEntry.userName,
+        stationId: logEntry.stationId,
+        facultyId: logEntry.facultyId,
+        method: logEntry.method,
+        pts: logEntry.pts,
+        timestamp: logEntry.timestamp,
+      });
+    } catch {
+      // Fallback local
+    }
+  }
+
+  await syncProfileToCloud(nextProfile);
+  await syncMemberPointsInParty(nextProfile);
+
+  return {
+    updatedProfile: nextProfile,
+    finalPoints,
+    crossFacultyBonus,
+    qrBonus,
+    newlyCompletedQuests,
+  };
+}
+
+export async function recordStarPickup(
+  profile: UserProfile,
+  totalStationsCount: number
+): Promise<{
+  updatedProfile: UserProfile;
+  newlyCompletedQuests: { name: string; reward: number }[];
+}> {
+  let nextProfile: UserProfile = {
+    ...profile,
+    stars: (profile.stars || 0) + 1,
+    points: profile.points + 10,
+    updatedAt: Date.now(),
+  };
+
+  const newlyCompletedQuests: { name: string; reward: number }[] = [];
+  QUESTS.forEach((q) => {
+    if (!nextProfile.bonus[q.id] && q.getValue(nextProfile, totalStationsCount) >= q.need) {
+      nextProfile = {
+        ...nextProfile,
+        points: nextProfile.points + q.reward,
+        bonus: { ...nextProfile.bonus, [q.id]: true },
+      };
+      newlyCompletedQuests.push({ name: q.name, reward: q.reward });
+    }
+  });
+
+  await syncProfileToCloud(nextProfile);
+  return { updatedProfile: nextProfile, newlyCompletedQuests };
+}
+
+export async function fetchLeaderboardData(
+  currentProfile: UserProfile
+): Promise<{
+  individuals: PublicLeaderboardUser[];
+  parties: PartyRoom[];
+}> {
+  let individuals = getLocalPublicUsers();
+
+  if (isFirebaseConfigured && db) {
+    try {
+      const q = query(
+        collection(db, 'users_public'),
+        orderBy('points', 'desc'),
+        limit(30)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        individuals = snap.docs.map((d) => d.data() as PublicLeaderboardUser);
+      }
+    } catch {
+      // Fallback local
+    }
+  }
+
+  // Ensure current player is always up-to-date in leaderboard list
+  const meEntry: PublicLeaderboardUser = {
+    uid: currentProfile.uid,
+    name: currentProfile.name,
+    mssv: currentProfile.mssv,
+    facultyId: currentProfile.facultyId,
+    avatar: currentProfile.avatar,
+    points: currentProfile.points,
+    unlockedCount: Object.keys(currentProfile.done || {}).length,
+    partyId: currentProfile.partyId,
+    updatedAt: Date.now(),
+  };
+  const filtered = individuals.filter((u) => u.uid !== currentProfile.uid);
+  const mergedIndividuals = [...filtered, meEntry].sort((a, b) => b.points - a.points);
+
+  const parties = loadLocalParties().sort((a, b) => b.totalPoints - a.totalPoints);
+  return { individuals: mergedIndividuals, parties };
+}
+</file>
+
+<file path="src/services/partyService.ts">
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { FACULTIES } from '../data/faculties';
+import { FacultyId, PartyMember, PartyRoom, UserProfile } from '../types/game';
+import { syncProfileToCloud } from './authService';
+import { db, isFirebaseConfigured } from './firebase';
+
+const LOCAL_PARTIES_KEY = 'tdc_go_parties_v2';
+
+const SAMPLE_PARTIES: PartyRoom[] = [
+  {
+    code: 'TDC26A',
+    hostUid: 'sample_1',
+    name: 'Biệt đội Liên Khoa TDC',
+    memberUids: ['sample_1', 'sample_2', 'sample_3'],
+    members: [
+      {
+        uid: 'sample_1',
+        name: 'Minh Anh',
+        mssv: '24211TT0124',
+        facultyId: 'cntt',
+        avatar: 0,
+        points: 1420,
+      },
+      {
+        uid: 'sample_2',
+        name: 'Gia Huy',
+        mssv: '24211DD0089',
+        facultyId: 'dien_dt',
+        avatar: 1,
+        points: 1280,
+      },
+      {
+        uid: 'sample_3',
+        name: 'Thảo Vy',
+        mssv: '24211KT0215',
+        facultyId: 'kinh_te',
+        avatar: 2,
+        points: 1150,
+      },
+    ],
+    isCrossFaculty: true,
+    bonusMultiplier: 1.2,
+    totalPoints: 3850,
+    createdAt: Date.now() - 7200000,
+  },
+  {
+    code: 'CNTT99',
+    hostUid: 'sample_4',
+    name: 'Chiến thần Code & Cơ khí',
+    memberUids: ['sample_4', 'sample_6'],
+    members: [
+      {
+        uid: 'sample_4',
+        name: 'Quốc Bảo',
+        mssv: '24211OT0042',
+        facultyId: 'co_khi_oto',
+        avatar: 0,
+        points: 990,
+      },
+      {
+        uid: 'sample_6',
+        name: 'Tuấn Kiệt',
+        mssv: '24211CK0071',
+        facultyId: 'co_khi_ctm',
+        avatar: 1,
+        points: 740,
+      },
+    ],
+    isCrossFaculty: true,
+    bonusMultiplier: 1.2,
+    totalPoints: 1730,
+    createdAt: Date.now() - 5400000,
+  },
+];
+
+export function evaluateCrossFacultyBonus(members: PartyMember[]): {
+  isCrossFaculty: boolean;
+  bonusMultiplier: number;
+} {
+  const uniqueFaculties = new Set(members.map((m) => m.facultyId));
+  const isCross = uniqueFaculties.size >= 2;
+  return {
+    isCrossFaculty: isCross,
+    bonusMultiplier: isCross ? 1.2 : 1.0,
+  };
+}
+
+export function loadLocalParties(): PartyRoom[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_PARTIES_KEY);
+    if (!raw) {
+      localStorage.setItem(LOCAL_PARTIES_KEY, JSON.stringify(SAMPLE_PARTIES));
+      return [...SAMPLE_PARTIES];
+    }
+    const parsed = JSON.parse(raw) as PartyRoom[];
+    return Array.isArray(parsed) ? parsed : [...SAMPLE_PARTIES];
+  } catch {
+    return [...SAMPLE_PARTIES];
+  }
+}
+
+export function saveLocalParties(parties: PartyRoom[]): void {
+  try {
+    localStorage.setItem(LOCAL_PARTIES_KEY, JSON.stringify(parties));
+  } catch {
+    // Ignore
+  }
+}
+
+function generateRoomCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 6; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
+}
+
+export async function getPartyByCode(code: string): Promise<PartyRoom | null> {
+  const cleanCode = code.trim().toUpperCase();
+  if (!cleanCode) return null;
+
+  if (isFirebaseConfigured && db) {
+    try {
+      const snap = await getDoc(doc(db, 'parties', cleanCode));
+      if (snap.exists()) return snap.data() as PartyRoom;
+    } catch {
+      // Fallback local
+    }
+  }
+  const parties = loadLocalParties();
+  return parties.find((p) => p.code === cleanCode) || null;
+}
+
+export async function createPartyRoom(
+  profile: UserProfile,
+  partyName: string
+): Promise<{ room: PartyRoom; updatedProfile: UserProfile }> {
+  const code = generateRoomCode();
+  const hostMember: PartyMember = {
+    uid: profile.uid,
+    name: profile.name,
+    mssv: profile.mssv,
+    facultyId: profile.facultyId,
+    avatar: profile.avatar,
+    points: profile.points,
+  };
+
+  const room: PartyRoom = {
+    code,
+    hostUid: profile.uid,
+    name: partyName.trim().slice(0, 45) || `Tổ đội của ${profile.name}`,
+    memberUids: [profile.uid],
+    members: [hostMember],
+    isCrossFaculty: false,
+    bonusMultiplier: 1.0,
+    totalPoints: profile.points,
+    createdAt: Date.now(),
+  };
+
+  if (isFirebaseConfigured && db) {
+    try {
+      await setDoc(doc(db, 'parties', code), room);
+    } catch {
+      // Fallback local
+    }
+  }
+
+  const parties = loadLocalParties().filter((p) => p.code !== code);
+  parties.unshift(room);
+  saveLocalParties(parties);
+
+  const updatedProfile: UserProfile = {
+    ...profile,
+    partyId: code,
+    updatedAt: Date.now(),
+  };
+  await syncProfileToCloud(updatedProfile);
+  return { room, updatedProfile };
+}
+
+export async function joinPartyRoom(
+  profile: UserProfile,
+  codeInput: string
+): Promise<{ room: PartyRoom; updatedProfile: UserProfile }> {
+  const code = codeInput.trim().toUpperCase();
+  const room = await getPartyByCode(code);
+  if (!room) {
+    throw new Error(`Không tìm thấy phòng Tổ đội với mã "${code}".`);
+  }
+  if (!room.memberUids.includes(profile.uid) && room.members.length >= 4) {
+    throw new Error('Phòng Tổ đội này đã đủ tối đa 4 thành viên.');
+  }
+
+  const me: PartyMember = {
+    uid: profile.uid,
+    name: profile.name,
+    mssv: profile.mssv,
+    facultyId: profile.facultyId,
+    avatar: profile.avatar,
+    points: profile.points,
+  };
+
+  const filteredMembers = room.members.filter((m) => m.uid !== profile.uid);
+  const nextMembers = [...filteredMembers, me];
+  const nextUids = nextMembers.map((m) => m.uid);
+  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
+  const totalPoints = nextMembers.reduce((sum, m) => sum + m.points, 0);
+
+  const updatedRoom: PartyRoom = {
+    ...room,
+    memberUids: nextUids,
+    members: nextMembers,
+    isCrossFaculty,
+    bonusMultiplier,
+    totalPoints,
+  };
+
+  if (isFirebaseConfigured && db) {
+    try {
+      await setDoc(doc(db, 'parties', code), updatedRoom);
+    } catch {
+      // Fallback local
+    }
+  }
+
+  const parties = loadLocalParties();
+  const idx = parties.findIndex((p) => p.code === code);
+  if (idx >= 0) parties[idx] = updatedRoom;
+  else parties.unshift(updatedRoom);
+  saveLocalParties(parties);
+
+  const updatedProfile: UserProfile = {
+    ...profile,
+    partyId: code,
+    updatedAt: Date.now(),
+  };
+  await syncProfileToCloud(updatedProfile);
+
+  return { room: updatedRoom, updatedProfile };
+}
+
+export async function simulateTeammateJoin(
+  roomCode: string,
+  currentFacultyId: FacultyId
+): Promise<PartyRoom> {
+  const room = await getPartyByCode(roomCode);
+  if (!room) throw new Error('Không tìm thấy phòng tổ đội.');
+  if (room.members.length >= 4) {
+    throw new Error('Tổ đội đã đủ 4 thành viên.');
+  }
+
+  const otherFaculties = FACULTIES.filter((f) => f.id !== currentFacultyId);
+  const pickedFaculty =
+    otherFaculties[room.members.length % otherFaculties.length] || FACULTIES[1];
+  const sampleNames = ['Hoàng Nam', 'Khánh Linh', 'Đức Trọng', 'Phương Thảo'];
+  const idx = room.members.length;
+  const teammate: PartyMember = {
+    uid: `coop_ally_${Date.now()}`,
+    name: sampleNames[idx % sampleNames.length],
+    mssv: `25211${pickedFaculty.id.slice(0, 2).toUpperCase()}0${10 + idx}`,
+    facultyId: pickedFaculty.id,
+    avatar: idx % 3,
+    points: 240 + idx * 80,
+  };
+
+  const nextMembers = [...room.members, teammate];
+  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
+  const updatedRoom: PartyRoom = {
+    ...room,
+    memberUids: nextMembers.map((m) => m.uid),
+    members: nextMembers,
+    isCrossFaculty,
+    bonusMultiplier,
+    totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
+  };
+
+  if (isFirebaseConfigured && db) {
+    try {
+      await setDoc(doc(db, 'parties', room.code), updatedRoom);
+    } catch {
+      // Ignore
+    }
+  }
+
+  const parties = loadLocalParties();
+  const pIdx = parties.findIndex((p) => p.code === room.code);
+  if (pIdx >= 0) parties[pIdx] = updatedRoom;
+  else parties.unshift(updatedRoom);
+  saveLocalParties(parties);
+
+  return updatedRoom;
+}
+
+export async function syncMemberPointsInParty(profile: UserProfile): Promise<PartyRoom | null> {
+  if (!profile.partyId) return null;
+  const room = await getPartyByCode(profile.partyId);
+  if (!room) return null;
+
+  const nextMembers = room.members.map((m) =>
+    m.uid === profile.uid
+      ? {
+          ...m,
+          name: profile.name,
+          facultyId: profile.facultyId,
+          avatar: profile.avatar,
+          points: profile.points,
+        }
+      : m
+  );
+  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
+  const updatedRoom: PartyRoom = {
+    ...room,
+    members: nextMembers,
+    isCrossFaculty,
+    bonusMultiplier,
+    totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
+  };
+
+  if (isFirebaseConfigured && db) {
+    try {
+      await setDoc(doc(db, 'parties', room.code), updatedRoom);
+    } catch {
+      // Ignore
+    }
+  }
+
+  const parties = loadLocalParties();
+  const idx = parties.findIndex((p) => p.code === room.code);
+  if (idx >= 0) parties[idx] = updatedRoom;
+  saveLocalParties(parties);
+  return updatedRoom;
+}
+
+export async function leavePartyRoom(profile: UserProfile): Promise<UserProfile> {
+  if (profile.partyId) {
+    const code = profile.partyId.trim().toUpperCase();
+    const room = await getPartyByCode(code);
+    if (room) {
+      const nextMembers = room.members.filter((m) => m.uid !== profile.uid);
+      const nextUids = nextMembers.map((m) => m.uid);
+      const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
+      const updatedRoom: PartyRoom = {
+        ...room,
+        hostUid: nextMembers[0]?.uid || room.hostUid,
+        memberUids: nextUids,
+        members: nextMembers,
+        isCrossFaculty,
+        bonusMultiplier,
+        totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
+      };
+
+      if (isFirebaseConfigured && db && nextMembers.length > 0) {
+        try {
+          await setDoc(doc(db, 'parties', room.code), updatedRoom);
+        } catch {
+          // Ignore
+        }
+      }
+
+      const parties = loadLocalParties();
+      const idx = parties.findIndex((p) => p.code === room.code);
+      if (idx >= 0) {
+        if (nextMembers.length > 0) {
+          parties[idx] = updatedRoom;
+        } else {
+          parties.splice(idx, 1);
+        }
+        saveLocalParties(parties);
+      }
+    }
+  }
+
+  const updated: UserProfile = {
+    ...profile,
+    partyId: undefined,
+    updatedAt: Date.now(),
+  };
+  await syncProfileToCloud(updated);
+  return updated;
+}
+</file>
+
+<file path="src/App.tsx">
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { GameHud } from './components/GameHud';
+import { Viewfinder } from './components/minigames/Viewfinder';
+import { CertificateModal } from './components/modals/CertificateModal';
+import { HelpModal } from './components/modals/HelpModal';
+import { LeaderboardModal } from './components/modals/LeaderboardModal';
+import { PartyModal } from './components/modals/PartyModal';
+import { ProfileBadgesModal } from './components/modals/ProfileBadgesModal';
+import { QuestsModal } from './components/modals/QuestsModal';
+import { QrScannerModal } from './components/QrScannerModal';
+import { StartScreen } from './components/StartScreen';
+import { StationModal } from './components/StationModal';
+import { audioSfx } from './engine/audioSfx';
+import {
+  FloatingTextItem,
+  GuideState,
+  MinimapSnapshot,
+  TdcCampusEngine,
+} from './engine/TdcCampusEngine';
+import { AdminDashboard } from './pages/AdminDashboard';
+import {
+  fetchStationsFromCloudOrLocal,
+  loadStations,
+} from './services/adminService';
+import {
+  loadLocalProfile,
+  loginOrRegisterExplorer,
+  resetExplorerProgress,
+  saveLocalProfile,
+} from './services/authService';
+import {
+  checkAntiCheatCooldown,
+  recordStarPickup,
+  recordStationUnlock,
+  verifyStationQrPayload,
+} from './services/gameService';
+import {
+  createPartyRoom,
+  getPartyByCode,
+  joinPartyRoom,
+  leavePartyRoom,
+  simulateTeammateJoin,
+} from './services/partyService';
+import {
+  FacultyId,
+  PartyRoom,
+  Station,
+  UserProfile,
+  VerificationMethod,
+} from './types/game';
+
+interface ToastItem {
+  id: number;
+  text: string;
+  gold?: boolean;
+}
+
+type ActiveModal =
+  | null
+  | { type: 'station'; station: Station; preverifiedMethod?: VerificationMethod | null }
+  | { type: 'qr'; targetStation?: Station | null }
+  | { type: 'quests' }
+  | { type: 'leaderboard' }
+  | { type: 'badges' }
+  | { type: 'party' }
+  | { type: 'help' }
+  | { type: 'certificate' };
+
+export const App: React.FC = () => {
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const engineRef = useRef<TdcCampusEngine | null>(null);
+
+  const [stations, setStations] = useState<Station[]>(() => loadStations());
+  const [profile, setProfile] = useState<UserProfile | null>(() => loadLocalProfile());
+  const [party, setParty] = useState<PartyRoom | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(
+    () => window.location.pathname === '/admin' || window.location.hash === '#admin'
+  );
+
+  const [nearStation, setNearStation] = useState<Station | null>(null);
+  const [guide, setGuide] = useState<GuideState>({
+    station: null,
+    distance: 0,
+    angleRad: 0,
+    allDone: false,
+  });
+  const [minimapSnap, setMinimapSnap] = useState<MinimapSnapshot | null>(null);
+  const [floatingTexts, setFloatingTexts] = useState<FloatingTextItem[]>([]);
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+
+  const [photoMode, setPhotoMode] = useState<{
+    station: Station;
+    method: VerificationMethod;
+  } | null>(null);
+  const [showFlash, setShowFlash] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [pointsBump, setPointsBump] = useState(false);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  const profileRef = useRef<UserProfile | null>(profile);
+  profileRef.current = profile;
+  const stationsRef = useRef<Station[]>(stations);
+  stationsRef.current = stations;
+  const partyRef = useRef<PartyRoom | null>(party);
+  partyRef.current = party;
+
+  const pushToast = useCallback((text: string, gold = false) => {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    setToasts((prev) => [...prev.slice(-2), { id, text, gold }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3200);
+  }, []);
+
+  const triggerPointsBump = useCallback(() => {
+    setPointsBump(false);
+    setTimeout(() => setPointsBump(true), 15);
+  }, []);
+
+  // Load stations & existing party on mount
+  useEffect(() => {
+    void fetchStationsFromCloudOrLocal().then((list) => {
+      setStations(list);
+    });
+    if (profile?.partyId) {
+      void getPartyByCode(profile.partyId).then((r) => {
+        if (r) setParty(r);
+      });
+    }
+  }, []);
+
+  // Mount Three.js 3D Engine
+  useEffect(() => {
+    const container = stageRef.current;
+    if (!container) return;
+
+    const engine = new TdcCampusEngine(
+      container,
+      stationsRef.current,
+      profileRef.current?.done || {},
+      {
+        onNearStationChange: (st) => setNearStation(st),
+        onOpenStationRequest: (st) => {
+          audioSfx.play('tap');
+          setActiveModal({ type: 'station', station: st });
+        },
+        onStarCollected: () => {
+          const cur = profileRef.current;
+          if (!cur) return;
+          const prevLevel = 1 + Math.floor(cur.points / 300);
+          const activeCount = stationsRef.current.filter((s) => s.active !== false).length;
+          void recordStarPickup(cur, activeCount).then(
+            ({ updatedProfile, newlyCompletedQuests }) => {
+              setProfile(updatedProfile);
+              triggerPointsBump();
+              const nextLevel = 1 + Math.floor(updatedProfile.points / 300);
+              if (nextLevel > prevLevel) {
+                pushToast(`🎉 Thăng cấp ${nextLevel}!`, true);
+                audioSfx.play('badge');
+              }
+              newlyCompletedQuests.forEach((q) => {
+                pushToast(`Hoàn thành nhiệm vụ: ${q.name} · +${q.reward}đ`, true);
+              });
+            }
+          );
+        },
+        onPlayerMoveSave: (pos) => {
+          const cur = profileRef.current;
+          if (!cur) return;
+          const updated: UserProfile = { ...cur, pos };
+          setProfile(updated);
+          saveLocalProfile(updated);
+        },
+        onFloatingTextsUpdate: (items) => setFloatingTexts(items),
+        onGuideUpdate: (g) => setGuide(g),
+        onMinimapUpdate: (snap) => setMinimapSnap(snap),
+      }
+    );
+
+    engineRef.current = engine;
+    return () => {
+      engine.dispose();
+      engineRef.current = null;
+    };
+  }, [pushToast, triggerPointsBump]);
+
+  // Sync stations and unlocked fog of war with 3D engine
+  useEffect(() => {
+    engineRef.current?.updateStationsAndProgress(stations, profile?.done || {});
+  }, [stations, profile?.done]);
+
+  // Pause 3D movement when modal or admin is open
+  useEffect(() => {
+    engineRef.current?.setPaused(Boolean(activeModal) || showAdmin);
+  }, [activeModal, showAdmin]);
+
+  const handleStartGame = async (params: {
+    name: string;
+    mssv: string;
+    email?: string;
+    password?: string;
+    facultyId: FacultyId;
+    avatar: number;
+    mode: 'demo' | 'email_login' | 'email_register' | 'google';
+  }) => {
+    const loggedIn = await loginOrRegisterExplorer(params);
+    setProfile(loggedIn);
+    if (loggedIn.partyId) {
+      const p = await getPartyByCode(loggedIn.partyId);
+      setParty(p);
+    }
+    const unlockedCount = Object.keys(loggedIn.done || {}).length;
+    engineRef.current?.startPlayer(
+      loggedIn.name,
+      loggedIn.avatar,
+      loggedIn.pos,
+      unlockedCount > 0
+    );
+    setIsPlaying(true);
+    audioSfx.play('ok');
+    pushToast(
+      unlockedCount > 0
+        ? `Chào mừng trở lại, ${loggedIn.name} (${loggedIn.mssv})!`
+        : `Chào ${loggedIn.name}! Hãy tiến tới Cổng 1 ngay trước mặt để xóa sương mù đầu tiên.`,
+      true
+    );
+  };
+
+  const handleResetProgress = () => {
+    if (!profile) return;
+    const reset = resetExplorerProgress(profile);
+    setProfile(reset);
+    pushToast('Đã đặt lại tiến độ và phủ lại lớp sương mù toàn trường!');
+  };
+
+  const handleCompleteStation = async (params: {
+    station: Station;
+    basePoints: number;
+    method: VerificationMethod;
+    isQuizOrGameSuccess: boolean;
+    summaryHtml?: string;
+    photoDataUrl?: string;
+  }) => {
+    if (!profile) {
+      return { finalPoints: params.basePoints, crossFacultyBonus: 0, qrBonus: 0 };
+    }
+    const prevLevel = 1 + Math.floor(profile.points / 300);
+    const activeCount = stations.filter((s) => s.active !== false).length;
+
+    const {
+      updatedProfile,
+      finalPoints,
+      crossFacultyBonus,
+      qrBonus,
+      newlyCompletedQuests,
+    } = await recordStationUnlock({
+      profile,
+      station: params.station,
+      baseEarnedPoints: params.basePoints,
+      method: params.method,
+      party,
+      photoDataUrl: params.photoDataUrl,
+      isQuizOrGameSuccess: params.isQuizOrGameSuccess,
+      totalStationsCount: activeCount,
+    });
+
+    setProfile(updatedProfile);
+    if (updatedProfile.partyId) {
+      const updatedParty = await getPartyByCode(updatedProfile.partyId);
+      if (updatedParty) setParty(updatedParty);
+    }
+
+    audioSfx.play('unlock');
+    engineRef.current?.celebrateStationUnlock(params.station, `+${finalPoints}`);
+    triggerPointsBump();
+
+    const nextLevel = 1 + Math.floor(updatedProfile.points / 300);
+    if (nextLevel > prevLevel) {
+      pushToast(`🎉 Thăng cấp ${nextLevel}!`, true);
+    }
+    newlyCompletedQuests.forEach((q) => {
+      pushToast(`Hoàn thành nhiệm vụ: ${q.name} · +${q.reward}đ`, true);
+    });
+
+    return { finalPoints, crossFacultyBonus, qrBonus };
+  };
+
+  const handleRequestPhotoMode = (station: Station, method: VerificationMethod) => {
+    setActiveModal(null);
+    setPhotoMode({ station, method });
+    engineRef.current?.enterPhotoMode(station);
+  };
+
+  const handleCapturePhoto = async () => {
+    if (!photoMode || !profile) return;
+    const dataUrl = engineRef.current?.capturePhotoDataUrl() || '';
+    setShowFlash(true);
+    setTimeout(() => setShowFlash(false), 500);
+    audioSfx.tone([1800, 1200], 0.05, 'square', 0.04, 0.04);
+
+    const { station, method } = photoMode;
+    engineRef.current?.exitPhotoMode();
+    setPhotoMode(null);
+
+    await handleCompleteStation({
+      station,
+      basePoints: station.pts,
+      method,
+      isQuizOrGameSuccess: true,
+      photoDataUrl: dataUrl,
+    });
+
+    setActiveModal({ type: 'station', station });
+  };
+
+  const handleQrDetected = (rawCode: string) => {
+    if (profile) {
+      const cooldown = checkAntiCheatCooldown(profile, 'qr');
+      if (!cooldown.allowed) {
+        audioSfx.play('bad');
+        pushToast(
+          `Chống gian lận (Anti-cheat): Bạn di chuyển giữa 2 trạm quá nhanh! Vui lòng đợi ${cooldown.waitSeconds}s.`
+        );
+        return;
+      }
+    }
+
+    const target =
+      activeModal?.type === 'qr' && activeModal.targetStation
+        ? activeModal.targetStation
+        : null;
+
+    if (target) {
+      const res = verifyStationQrPayload(target, rawCode);
+      if (res.valid) {
+        audioSfx.play('ok');
+        pushToast(res.message, true);
+        setActiveModal({
+          type: 'station',
+          station: target,
+          preverifiedMethod: 'qr',
+        });
+        return;
+      }
+    }
+
+    // Try matching across any station on campus
+    for (const st of stations) {
+      const check = verifyStationQrPayload(st, rawCode);
+      if (check.valid) {
+        audioSfx.play('ok');
+        pushToast(`Đã định vị & xác thực QR trạm: ${st.name}!`, true);
+        engineRef.current?.navigateToStation(st);
+        setActiveModal({
+          type: 'station',
+          station: st,
+          preverifiedMethod: 'qr',
+        });
+        return;
+      }
+    }
+
+    audioSfx.play('bad');
+    pushToast('Mã QR không hợp lệ hoặc không khớp với trạm nào tại TDC.');
+  };
+
+  const activeStationsCount = stations.filter((s) => s.active !== false).length;
+
+  return (
+    <div id="app">
+      {/* 3D WebGL Campus Canvas Container */}
+      <div id="stage" ref={stageRef} />
+
+      {/* Start Screen */}
+      {!isPlaying && !showAdmin && (
+        <StartScreen
+          existingProfile={profile}
+          totalStations={activeStationsCount}
+          onStartGame={handleStartGame}
+          onResetProgress={handleResetProgress}
+          onOpenAdmin={() => setShowAdmin(true)}
+        />
+      )}
+
+      {/* Main Game HUD */}
+      {isPlaying && profile && !showAdmin && (
+        <GameHud
+          profile={profile}
+          party={party}
+          stations={stations}
+          nearStation={nearStation}
+          guide={guide}
+          minimapSnap={minimapSnap}
+          floatingTexts={floatingTexts}
+          muted={muted}
+          dimmed={Boolean(photoMode)}
+          pointsBump={pointsBump}
+          onToggleMute={() => {
+            const next = audioSfx.toggleMute();
+            setMuted(next);
+          }}
+          onOpenStation={(st) => {
+            audioSfx.play('tap');
+            setActiveModal({ type: 'station', station: st });
+          }}
+          onNavigateGuide={() => {
+            if (guide.station) {
+              engineRef.current?.navigateToStation(guide.station);
+              pushToast(`Đang di chuyển tới ${guide.station.name}...`);
+            }
+          }}
+          onOpenQuests={() => setActiveModal({ type: 'quests' })}
+          onOpenLeaderboard={() => setActiveModal({ type: 'leaderboard' })}
+          onOpenBadges={() => setActiveModal({ type: 'badges' })}
+          onOpenParty={() => setActiveModal({ type: 'party' })}
+          onOpenQrScanner={() =>
+            setActiveModal({ type: 'qr', targetStation: nearStation })
+          }
+          onOpenHelp={() => setActiveModal({ type: 'help' })}
+          onOpenAdmin={() => setShowAdmin(true)}
+          onJoystickChange={(x, y) => engineRef.current?.setJoystick(x, y)}
+        />
+      )}
+
+      {/* 3D Polaroid Viewfinder */}
+      <Viewfinder
+        station={photoMode?.station || null}
+        onRotate={() => engineRef.current?.rotatePhotoCamera()}
+        onCapture={handleCapturePhoto}
+        onCancel={() => {
+          engineRef.current?.exitPhotoMode();
+          setPhotoMode(null);
+        }}
+      />
+
+      {showFlash && <div id="flash" />}
+
+      {/* Toasts */}
+      <div id="toasts" aria-live="polite">
+        {toasts.map((t) => (
+          <div key={t.id} className={`toast ${t.gold ? 'gold' : ''}`}>
+            {t.text}
+          </div>
+        ))}
+      </div>
+
+      {/* Active Modals */}
+      {activeModal?.type === 'station' && profile && (
+        <StationModal
+          station={activeModal.station}
+          profile={profile}
+          party={party}
+          totalStations={activeStationsCount}
+          nextStationName={guide.station?.name}
+          preverifiedMethod={activeModal.preverifiedMethod}
+          onClose={() => setActiveModal(null)}
+          onOpenQrScanner={(st) =>
+            setActiveModal({ type: 'qr', targetStation: st })
+          }
+          onRequestPhotoMode={handleRequestPhotoMode}
+          onCompleteStation={handleCompleteStation}
+          onShowCertificate={() => setActiveModal({ type: 'certificate' })}
+        />
+      )}
+
+      {activeModal?.type === 'qr' && (
+        <QrScannerModal
+          stations={stations}
+          targetStation={activeModal.targetStation}
+          onClose={() => setActiveModal(null)}
+          onQrDetected={handleQrDetected}
+        />
+      )}
+
+      {activeModal?.type === 'quests' && profile && (
+        <QuestsModal
+          profile={profile}
+          totalStations={activeStationsCount}
+          onClose={() => setActiveModal(null)}
+        />
+      )}
+
+      {activeModal?.type === 'leaderboard' && profile && (
+        <LeaderboardModal
+          profile={profile}
+          totalStations={activeStationsCount}
+          onClose={() => setActiveModal(null)}
+        />
+      )}
+
+      {activeModal?.type === 'badges' && profile && (
+        <ProfileBadgesModal
+          profile={profile}
+          stations={stations}
+          onClose={() => setActiveModal(null)}
+          onOpenCertificate={() => setActiveModal({ type: 'certificate' })}
+        />
+      )}
+
+      {activeModal?.type === 'party' && profile && (
+        <PartyModal
+          profile={profile}
+          party={party}
+          onClose={() => setActiveModal(null)}
+          onCreateParty={async (pName) => {
+            const { room, updatedProfile } = await createPartyRoom(profile, pName);
+            setParty(room);
+            setProfile(updatedProfile);
+            pushToast(`Đã tạo Tổ đội "${room.name}" (Mã: ${room.code})!`, true);
+          }}
+          onJoinParty={async (code) => {
+            const { room, updatedProfile } = await joinPartyRoom(profile, code);
+            setParty(room);
+            setProfile(updatedProfile);
+            pushToast(
+              `Đã gia nhập Tổ đội "${room.name}"${room.isCrossFaculty ? ' · Kích hoạt +20% Điểm Liên Khoa!' : ''}`,
+              true
+            );
+          }}
+          onLeaveParty={async () => {
+            const updated = await leavePartyRoom(profile);
+            setParty(null);
+            setProfile(updated);
+            pushToast('Đã rời khỏi phòng Tổ đội.');
+          }}
+          onSimulateTeammate={async () => {
+            if (!party) return;
+            const updatedRoom = await simulateTeammateJoin(
+              party.code,
+              profile.facultyId
+            );
+            setParty(updatedRoom);
+            pushToast(
+              `Đồng đội mới đã vào phòng! ${updatedRoom.isCrossFaculty ? '⚡ Kích hoạt +20% Điểm Liên Khoa!' : ''}`,
+              true
+            );
+          }}
+        />
+      )}
+
+      {activeModal?.type === 'help' && (
+        <HelpModal onClose={() => setActiveModal(null)} />
+      )}
+
+      {activeModal?.type === 'certificate' && profile && (
+        <CertificateModal
+          profile={profile}
+          stations={stations}
+          onClose={() => setActiveModal(null)}
+        />
+      )}
+
+      {/* Admin CMS Dashboard */}
+      {showAdmin && (
+        <AdminDashboard
+          stations={stations}
+          onStationsUpdated={(next) => setStations(next)}
+          onBackToGame={() => setShowAdmin(false)}
+        />
+      )}
+    </div>
+  );
+};
+</file>
+
+<file path="src/game.test.ts">
+import { beforeEach, describe, expect, it } from 'vitest';
+import { DEFAULT_STATIONS } from './data/stations';
+
+const memoryStore = new Map<string, string>();
+if (typeof globalThis.localStorage === 'undefined') {
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: {
+      getItem: (k: string) => (memoryStore.has(k) ? memoryStore.get(k)! : null),
+      setItem: (k: string, v: string) => {
+        memoryStore.set(k, String(v));
+      },
+      removeItem: (k: string) => {
+        memoryStore.delete(k);
+      },
+      clear: () => {
+        memoryStore.clear();
+      },
+    },
+    configurable: true,
+  });
+}
+
+beforeEach(() => {
+  memoryStore.clear();
+});
+import {
+  buildStationQrPayload,
+  generateAnalyticsCsv,
+  getAdminAnalytics,
+} from './services/adminService';
+import {
+  ANTI_CHEAT_COOLDOWN_MS,
+  calculateStationRewardPoints,
+  checkAntiCheatCooldown,
+  normalizeVietnameseAnswer,
+  verifyStationQrPayload,
+  verifyStationRiddle,
+} from './services/gameService';
+import {
+  createPartyRoom,
+  evaluateCrossFacultyBonus,
+  getPartyByCode,
+  joinPartyRoom,
+  leavePartyRoom,
+} from './services/partyService';
+import { PartyMember, PartyRoom, UserProfile } from './types/game';
+
+describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
+  it('1. Normalizes Vietnamese riddle answers accurately (case, accents, punctuation)', () => {
+    expect(normalizeVietnameseAnswer('  Kỹ Năng! ')).toBe('ky nang');
+    expect(normalizeVietnameseAnswer('Đạo đức - Tri thức')).toBe('dao duc tri thuc');
+  });
+
+  it('2. Verifies real-world observation riddles at stations (O2O verification)', () => {
+    const hallH = DEFAULT_STATIONS.find((s) => s.id === 'h')!;
+    expect(verifyStationRiddle(hallH, 'Kỹ năng')).toBe(true);
+    expect(verifyStationRiddle(hallH, 'ky nang')).toBe(true);
+    expect(verifyStationRiddle(hallH, 'sai dap an')).toBe(false);
+    expect(verifyStationRiddle(hallH, '   ')).toBe(false);
+  });
+
+  it('3. Verifies QR code payloads (both JSON Standee payload and direct secret token)', () => {
+    const itStation = DEFAULT_STATIONS.find((s) => s.id === 'b_it')!;
+    const jsonPayload = buildStationQrPayload(itStation);
+
+    const resJson = verifyStationQrPayload(itStation, jsonPayload);
+    expect(resJson.valid).toBe(true);
+
+    const resToken = verifyStationQrPayload(itStation, 'tdc-qr-toab-cntt');
+    expect(resToken.valid).toBe(true);
+
+    const resInvalid = verifyStationQrPayload(itStation, 'WRONG-TOKEN-999');
+    expect(resInvalid.valid).toBe(false);
+  });
+
+  it('4. Enforces Anti-Cheat Cooldown between consecutive real-world station unlocks', () => {
+    const now = 1000000;
+    const baseProfile: UserProfile = {
+      uid: 'u1',
+      name: 'SV Test',
+      mssv: '26211TT0001',
+      email: 'test@mail.tdc.edu.vn',
+      facultyId: 'cntt',
+      role: 'student',
+      avatar: 0,
+      points: 100,
+      stars: 0,
+      quizOk: 0,
+      photos: 0,
+      done: {
+        g1: { pts: 60, unlockedAt: now - 1500, method: 'qr' },
+      },
+      bonus: {},
+      updatedAt: now,
+    };
+
+    // Trying to unlock another station 1.5s later via QR should be blocked
+    const blocked = checkAntiCheatCooldown(baseProfile, 'qr', now);
+    expect(blocked.allowed).toBe(false);
+    expect(blocked.waitSeconds).toBeGreaterThan(0);
+
+    // After ANTI_CHEAT_COOLDOWN_MS, it should be allowed
+    const allowed = checkAntiCheatCooldown(
+      baseProfile,
+      'qr',
+      now + ANTI_CHEAT_COOLDOWN_MS + 100
+    );
+    expect(allowed.allowed).toBe(true);
+
+    // Demo mode bypasses physical travel cooldown for classroom testing
+    const demoAllowed = checkAntiCheatCooldown(baseProfile, 'demo', now);
+    expect(demoAllowed.allowed).toBe(true);
+  });
+
+  it('5. Evaluates Cross-Faculty Party Bonus (+20%) when 2+ faculties team up', () => {
+    const sameFacultyMembers: PartyMember[] = [
+      { uid: '1', name: 'A', mssv: '1', facultyId: 'cntt', avatar: 0, points: 100 },
+      { uid: '2', name: 'B', mssv: '2', facultyId: 'cntt', avatar: 1, points: 120 },
+    ];
+    const sameEval = evaluateCrossFacultyBonus(sameFacultyMembers);
+    expect(sameEval.isCrossFaculty).toBe(false);
+    expect(sameEval.bonusMultiplier).toBe(1.0);
+
+    const crossFacultyMembers: PartyMember[] = [
+      ...sameFacultyMembers,
+      { uid: '3', name: 'C', mssv: '3', facultyId: 'dien_dt', avatar: 2, points: 150 },
+    ];
+    const crossEval = evaluateCrossFacultyBonus(crossFacultyMembers);
+    expect(crossEval.isCrossFaculty).toBe(true);
+    expect(crossEval.bonusMultiplier).toBe(1.2);
+  });
+
+  it('6. Calculates total station reward points with O2O QR bonus, Cross-Faculty bonus, and Campaign Event multiplier', () => {
+    const crossParty: PartyRoom = {
+      code: 'TDC123',
+      hostUid: '1',
+      name: 'Party',
+      memberUids: ['1', '2'],
+      members: [],
+      isCrossFaculty: true,
+      bonusMultiplier: 1.2,
+      totalPoints: 200,
+      createdAt: Date.now(),
+    };
+
+    const rewardNoEvent = calculateStationRewardPoints({
+      basePoints: 100,
+      party: crossParty,
+      method: 'qr',
+      eventMultiplier: 1.0,
+    });
+
+    expect(rewardNoEvent.qrBonus).toBe(15);
+    expect(rewardNoEvent.crossFacultyBonus).toBe(20);
+    expect(rewardNoEvent.eventBonus).toBe(0);
+    expect(rewardNoEvent.finalPoints).toBe(135);
+
+    const rewardWithEvent = calculateStationRewardPoints({
+      basePoints: 100,
+      party: crossParty,
+      method: 'qr',
+      eventMultiplier: 1.5,
+    });
+    expect(rewardWithEvent.eventBonus).toBe(50);
+    expect(rewardWithEvent.finalPoints).toBe(185);
+  });
+
+  it('7. Generates Admin Analytics and valid CSV report', () => {
+    const summary = getAdminAnalytics(DEFAULT_STATIONS);
+    expect(summary.stationStats.length).toBe(DEFAULT_STATIONS.length);
+    expect(summary.facultyStats.length).toBeGreaterThan(0);
+
+    const csv = generateAnalyticsCsv(summary);
+    expect(csv).toContain('BAO CAO THONG KE HE THONG TDC GO');
+    expect(csv).toContain('Tòa D (11 tầng) & Cổng 2');
+  });
+
+  it('8. Removes departing member and recalculates party totalPoints & cross-faculty status on leavePartyRoom', async () => {
+    const host: UserProfile = {
+      uid: 'u_host',
+      name: 'Host CNTT',
+      mssv: '26211TT0010',
+      email: 'host@mail.tdc.edu.vn',
+      facultyId: 'cntt',
+      role: 'student',
+      avatar: 0,
+      points: 200,
+      stars: 0,
+      quizOk: 0,
+      photos: 0,
+      done: {},
+      bonus: {},
+      updatedAt: Date.now(),
+    };
+    const guest: UserProfile = {
+      ...host,
+      uid: 'u_guest',
+      name: 'Guest Điện',
+      mssv: '26211DD0020',
+      facultyId: 'dien_dt',
+      points: 300,
+    };
+
+    const { room } = await createPartyRoom(host, 'Test Co-op Room');
+    const joined = await joinPartyRoom(guest, room.code);
+    expect(joined.room.members.length).toBe(2);
+    expect(joined.room.isCrossFaculty).toBe(true);
+    expect(joined.room.totalPoints).toBe(500);
+
+    await leavePartyRoom(joined.updatedProfile);
+    const afterLeave = await getPartyByCode(room.code);
+    expect(afterLeave).not.toBeNull();
+    expect(afterLeave!.members.length).toBe(1);
+    expect(afterLeave!.isCrossFaculty).toBe(false);
+    expect(afterLeave!.totalPoints).toBe(200);
+  });
 });
 </file>
 
