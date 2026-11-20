@@ -367,10 +367,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                   <div>
                     <label className="text-xs font-black uppercase text-slate-500">
-                      Tọa độ X (Đông)
+                      Tọa độ X (Đông/Tây)
                     </label>
                     <input
                       type="number"
+                      step="0.1"
                       value={editingStation.x}
                       onChange={(e) =>
                         setEditingStation({
@@ -383,10 +384,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                   <div>
                     <label className="text-xs font-black uppercase text-slate-500">
-                      Tọa độ Z (Nam)
+                      Tọa độ Z (Nam/Bắc)
                     </label>
                     <input
                       type="number"
+                      step="0.1"
                       value={editingStation.z}
                       onChange={(e) =>
                         setEditingStation({
@@ -399,17 +401,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                   <div>
                     <label className="text-xs font-black uppercase text-slate-500">
-                      Bán kính Sương mù (m)
+                      Tầng (B1=-1, T1..11)
                     </label>
                     <input
                       type="number"
-                      value={editingStation.fogRadius}
-                      onChange={(e) =>
+                      min={-1}
+                      max={11}
+                      value={editingStation.floor ?? 1}
+                      onChange={(e) => {
+                        const fl = Number(e.target.value) || 1;
+                        const yElev = fl === -1 ? -4.2 : Math.max(0, (fl - 1) * 4.2);
                         setEditingStation({
                           ...editingStation,
-                          fogRadius: Number(e.target.value) || 28,
-                        })
-                      }
+                          floor: fl,
+                          y: +yElev.toFixed(1),
+                        });
+                      }}
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold text-sm"
                     />
                   </div>
@@ -544,7 +551,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <div>
                         <h3 className="m-0 font-black text-base">{st.name}</h3>
                         <p className="m-0 text-xs font-bold text-slate-500">
-                          {st.sub} · Tọa độ ({st.x}, {st.z}) · Sương mù R={st.fogRadius}m
+                          {st.sub} · 3D ({st.x}, {st.y || 0}m, {st.z}) · Tầng {st.floor === -1 ? 'B1' : st.floor || 1}
                         </p>
                       </div>
                     </div>

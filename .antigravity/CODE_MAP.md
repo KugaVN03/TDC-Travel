@@ -62,6 +62,7 @@ src/
     StationModal.tsx
     StationSticker.tsx
   data/
+    campusBuildings.ts
     campusLayout.ts
     faculties.ts
     stations.ts
@@ -80,6 +81,7 @@ src/
     authService.ts
     firebase.ts
     gameService.ts
+    gpsService.ts
     partyService.ts
   types/
     game.ts
@@ -105,11 +107,718 @@ vite.config.ts
 <files>
 This section contains the contents of the repository's files.
 
-<file path=".firebaserc">
-{
-  "projects": {
-    "default": "tdc-go-2026"
+<file path="src/data/campusBuildings.ts">
+import { CampusBuildingZone } from '../types/game';
+import { FH } from '../engine/threeHelpers';
+
+/**
+ * Hệ quy chiếu Địa không gian 3D (WGS84 GPS + Altitude <-> Local 3D Campus X, Y, Z)
+ * Trường Cao đẳng Công nghệ Thủ Đức (TDC)
+ * Địa chỉ: 53 Võ Văn Ngân, Phường Linh Chiểu, TP. Thủ Đức, TP. Hồ Chí Minh
+ */
+
+export const TDC_GEO_ANCHORS = {
+  // Tâm khuôn viên 3D tại (x = 0, y = 0, z = 0)
+  ORIGIN_LAT: 10.85142,
+  ORIGIN_LNG: 106.75818,
+  // Độ cao nền sân trường chuẩn so với mực nước biển (ASL - Above Sea Level) tại Linh Chiểu, Thủ Đức (~12.0m)
+  GROUND_ALTITUDE_ASL_M: 12.0,
+  // Chiều cao chuẩn mỗi tầng trong mô hình 3D (1 tầng = 4.2m)
+  FLOOR_HEIGHT_M: FH,
+  // Góc xoay hướng Bắc của bản đồ 3D so với Bắc địa lý (radian)
+  MAP_ROTATION_RAD: 0.0,
+  // Hệ số quy đổi mét kinh độ / vĩ độ tại vĩ độ 10.8514° Bắc
+  METERS_PER_DEG_LAT: 110609.0,
+  METERS_PER_DEG_LNG: 109345.0,
+};
+
+/**
+ * Danh sách chi tiết các Tòa nhà & Khu vực trong khuôn viên TDC kèm biên tọa độ (x0, z0, x1, z1) và cấu trúc phân tầng (Y/Floor)
+ */
+export const CAMPUS_BUILDINGS: CampusBuildingZone[] = [
+  {
+    id: 'bld_a1',
+    code: 'A1',
+    name: 'Tòa A1 · Khu Hành chính & Phòng Đào tạo',
+    bounds: [-141.5, 48.0, -76.5, 67.5],
+    minFloor: 1,
+    maxFloor: 3,
+    floorHeightMeters: FH,
+    color: '#E2574C',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Trệt)',
+        elevationMeters: 0,
+        departments: 'Phòng Đào tạo (A101–A104), Phòng Công tác Chính trị HSSV, Bộ phận Một cửa',
+        highlights: 'Nơi tiếp nhận hồ sơ, giải quyết thủ tục học vụ, cấp giấy xác nhận sinh viên',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2',
+        elevationMeters: FH,
+        departments: 'Ban Giám hiệu, Phòng Tổ chức Hành chính, Phòng Tài chính Kế toán (A201–A208)',
+        highlights: 'Khu vực điều hành trung tâm và hành lang cầu nối sang dãy A2',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3',
+        elevationMeters: 2 * FH,
+        departments: 'Phòng học Lý thuyết Đại cương & Khoa Kinh tế – Quản trị (A301–A310)',
+        highlights: 'Hệ thống giảng đường lý thuyết dưới mái ngói đỏ truyền thống',
+      },
+    ],
+  },
+  {
+    id: 'bld_a2',
+    code: 'A2',
+    name: 'Tòa A2 · Giảng đường Lý thuyết & Khoa Kinh tế',
+    bounds: [-76.5, 50.0, -21.0, 64.0],
+    minFloor: 1,
+    maxFloor: 3,
+    floorHeightMeters: FH,
+    color: '#FF8A4C',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Trệt)',
+        elevationMeters: 0,
+        departments: 'Văn phòng Khoa Tài chính – Kế toán, Phòng Tư vấn Tuyển sinh',
+        highlights: 'Kết nối trực tiếp trục đường chính từ Cổng 1 Võ Văn Ngân',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2',
+        elevationMeters: FH,
+        departments: 'Phòng Thực hành Nghiệp vụ Kế toán & Quản trị Doanh nghiệp (A209–A215)',
+        highlights: 'Trang bị hệ thống máy tính phần mềm kế toán MISA, ERP',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3',
+        elevationMeters: 2 * FH,
+        departments: 'Phòng học chuyên đề Logistics & Thương mại điện tử (A311–A318)',
+        highlights: 'Tầm nhìn hướng ra cụm sân thể thao trung tâm',
+      },
+    ],
+  },
+  {
+    id: 'bld_h',
+    code: 'H',
+    name: 'Tòa H · Hội trường Lớn & Trung tâm Sự kiện',
+    bounds: [-99.5, -0.5, -76.5, 49.0],
+    minFloor: 1,
+    maxFloor: 3,
+    floorHeightMeters: FH,
+    color: '#9B6BFF',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Sảnh Hội trường)',
+        elevationMeters: 0,
+        departments: 'Sảnh đón đại biểu, Văn phòng Đoàn Thanh niên – Hội Sinh viên TDC',
+        highlights: 'Bậc tam cấp lớn nhìn thẳng ra 3 sân bóng chuyền và cột cờ trường',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2 (Khán phòng Hội trường H)',
+        elevationMeters: FH,
+        departments: 'Hội trường Lớn sức chứa hơn 800 chỗ ngồi, Sân khấu chính',
+        highlights: 'Nơi tổ chức Lễ Khai giảng, Tốt nghiệp, Hội diễn Văn nghệ & Talkshow',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3 (Ban công & Phòng Kỹ thuật Âm thanh – Ánh sáng)',
+        elevationMeters: 2 * FH,
+        departments: 'Tầng lửng khán đài B, Trung tâm điều khiển âm thanh ánh sáng & Khoa Ngoại ngữ',
+        highlights: 'Phía trên mặt tiền gắn khẩu hiệu "Đạo đức – Tri thức – Kỹ năng"',
+      },
+    ],
+  },
+  {
+    id: 'bld_b_west',
+    code: 'B-Tây',
+    name: 'Tòa B (Cánh Tây) · Khoa Công nghệ Thông tin & Y tế',
+    bounds: [-123.5, -32.5, -93.1, -1.0],
+    minFloor: 1,
+    maxFloor: 4,
+    floorHeightMeters: FH,
+    color: '#2FA8F0',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Trệt)',
+        elevationMeters: 0,
+        departments: 'Phòng Y tế Trường (+ Y Tế), Văn phòng Khoa CNTT, Phòng Lab Mạng cơ bản',
+        highlights: 'Hỗ trợ sơ cấp cứu, chăm sóc sức khỏe HSSV ngay đầu hành lang Tây',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2',
+        elevationMeters: FH,
+        departments: 'Phòng Lab Lập trình Phần mềm, Phát triển Web & Mobile (B201–B206)',
+        highlights: 'Trang bị dàn PC cấu hình cao phục vụ thực hành Full-stack & CSDL',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3',
+        elevationMeters: 2 * FH,
+        departments: 'Phòng Lab Đồ họa Đa phương tiện, Thiết kế UI/UX & Xử lý ảnh (B301–B306)',
+        highlights: 'Trung tâm sáng tạo nội dung số và truyền thông đa phương tiện',
+      },
+      {
+        floor: 4,
+        label: 'Tầng 4',
+        elevationMeters: 3 * FH,
+        departments: 'Phòng Lab An toàn thông tin, Điện toán đám mây & AI/IoT (B401–B405)',
+        highlights: 'Nơi sinh hoạt CLB Học thuật CNTT và đội tuyển Hackathon TDC',
+      },
+    ],
+  },
+  {
+    id: 'bld_b_east',
+    code: 'B-Đông',
+    name: 'Tòa B (Cánh Đông) · Khoa Điện – Điện tử',
+    bounds: [-93.1, -30.5, -46.0, -1.0],
+    minFloor: 1,
+    maxFloor: 5,
+    floorHeightMeters: FH,
+    color: '#F07F55',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Trệt)',
+        elevationMeters: 0,
+        departments: 'Xưởng Thực hành Điện Công nghiệp, Máy điện & Khí cụ điện',
+        highlights: 'Hệ thống tủ điện công nghiệp, bàn thực hành đấu nối động cơ 3 pha',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2',
+        elevationMeters: FH,
+        departments: 'Văn phòng Khoa Điện – Điện tử, Phòng Thực hành Điện tử Cơ bản',
+        highlights: 'Trưng bày các mô hình nghiên cứu khoa học sinh viên ngành Điện',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3',
+        elevationMeters: 2 * FH,
+        departments: 'Phòng Lab Vi điều khiển, Hệ thống Nhúng & Điện tử Viễn thông',
+        highlights: 'Thực hành thiết kế mạch PCB, lập trình ARM, ESP32 và cảm biến',
+      },
+      {
+        floor: 4,
+        label: 'Tầng 4',
+        elevationMeters: 3 * FH,
+        departments: 'Phòng Lab Tự động hóa PLC, Khí nén – Thủy lực & Robot công nghiệp',
+        highlights: 'Trang bị trạm PLC Siemens/Mitsubishi và dây chuyền phân loại tự động',
+      },
+      {
+        floor: 5,
+        label: 'Tầng 5',
+        elevationMeters: 4 * FH,
+        departments: 'Phòng Thực hành Năng lượng Tái tạo, Điện Mặt trời & Nhà thông minh (Smart Home)',
+        highlights: 'Tầng cao nhất Khu B với hệ thống pin quang điện thực nghiệm',
+      },
+    ],
+  },
+  {
+    id: 'bld_workshop',
+    code: 'Xưởng CK',
+    name: 'Xưởng Thực hành Cơ khí – Công nghệ Ô tô',
+    bounds: [1.0, 39.0, 21.0, 53.0],
+    minFloor: 1,
+    maxFloor: 1,
+    floorHeightMeters: 6.5,
+    color: '#6F93B8',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Nhà xưởng Mái răng cưa)',
+        elevationMeters: 0,
+        departments: 'Xưởng Động cơ đốt trong, Khung gầm Ô tô, Máy cắt gọt kim loại & CNC',
+        highlights: 'Kiến trúc 3 nhịp mái răng cưa cao 6.5m thông gió và lấy sáng tự nhiên',
+      },
+    ],
+  },
+  {
+    id: 'bld_c',
+    code: 'C',
+    name: 'Tòa C · Giảng đường Khu Đông & Khoa Cơ khí – Ngoại ngữ',
+    bounds: [52.5, -23.0, 129.0, 1.0],
+    minFloor: 1,
+    maxFloor: 3,
+    floorHeightMeters: FH,
+    color: '#6F8CF0',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Trệt)',
+        elevationMeters: 0,
+        departments: 'Phòng Thực hành CAD/CAM – CNC, Văn phòng Khoa Cơ khí Chế tạo máy (C101–C108)',
+        highlights: 'Kết nối trực tiếp với Khu B qua hành lang mái che dài gần 100m',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2',
+        elevationMeters: FH,
+        departments: 'Phòng Lab Ngoại ngữ Đa phương tiện (Tiếng Anh, Tiếng Nhật, Tiếng Hàn) (C201–C210)',
+        highlights: 'Hệ thống cabin luyện âm tiêu chuẩn quốc tế',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3',
+        elevationMeters: 2 * FH,
+        departments: 'Khoa Du lịch, Thực hành Nghiệp vụ Nhà hàng – Khách sạn & Hướng dẫn (C301–C310)',
+        highlights: 'Phòng mô phỏng buồng phòng khách sạn và quầy Bar thực hành',
+      },
+    ],
+  },
+  {
+    id: 'bld_ktx',
+    code: 'KTX',
+    name: 'Ký túc xá Sinh viên TDC',
+    bounds: [57.5, -46.0, 101.5, -28.5],
+    minFloor: 1,
+    maxFloor: 3,
+    floorHeightMeters: FH,
+    color: '#E8608C',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Trệt)',
+        elevationMeters: 0,
+        departments: 'Ban Quản lý Ký túc xá, Phòng Sinh hoạt chung, Khu vực Căng-tin & Tự học',
+        highlights: 'Không gian xanh mát, an ninh 24/7 ngay trong khuôn viên trường',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2',
+        elevationMeters: FH,
+        departments: 'Khu Phòng ở Nội trú Sinh viên (P.201 – P.216)',
+        highlights: 'Phòng ở thoáng mát có ban công nhìn ra khu vực cây xanh phía Bắc',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3',
+        elevationMeters: 2 * FH,
+        departments: 'Khu Phòng ở Nội trú Sinh viên (P.301 – P.316)',
+        highlights: 'Tiện lợi di chuyển sang Tòa C và Tòa D chỉ trong 2 phút đi bộ',
+      },
+    ],
+  },
+  {
+    id: 'bld_d',
+    code: 'D',
+    name: 'Tòa D · Trung tâm Công nghệ Cao & Thư viện (11 Tầng nổi + 1 Tầng hầm)',
+    bounds: [23.0, 5.0, 86.5, 50.5],
+    minFloor: -1,
+    maxFloor: 11,
+    floorHeightMeters: FH,
+    color: '#00AEEF',
+    floors: [
+      {
+        floor: -1,
+        label: 'Tầng Hầm (B1)',
+        elevationMeters: -FH,
+        departments: 'Hầm giữ xe Cán bộ – Giảng viên, Trạm biến áp, Hệ thống kỹ thuật tòa nhà & PCCC',
+        highlights: 'Tầng hầm bê tông cốt thép hiện đại nằm dưới toàn bộ khối đế Tòa D',
+      },
+      {
+        floor: 1,
+        label: 'Tầng 1 (Sảnh chính Tòa D)',
+        elevationMeters: 0,
+        departments: 'Sảnh lễ tân trung tâm, Không gian Triển lãm Công nghệ TDC & Cụm 4 thang máy tốc độ cao',
+        highlights: 'Lối vào chính mở ra quảng trường Cổng 2 đường Chương Dương',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2 (Khối đế bo cong)',
+        elevationMeters: FH,
+        departments: 'Thư viện Số Thông minh (Smart Library) & Không gian Học tập Mở (Learning Commons)',
+        highlights: 'Thiết kế mặt dựng kính bo cong tầm nhìn 180 độ ra khuôn viên trường',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3 (Khối đế bo cong)',
+        elevationMeters: 2 * FH,
+        departments: 'Trung tâm Đổi mới Sáng tạo, Khởi nghiệp Sinh viên & Phòng Hội thảo Quốc tế',
+        highlights: 'Không gian Co-working space dành cho các dự án NCKH sinh viên',
+      },
+      {
+        floor: 4,
+        label: 'Tầng 4',
+        elevationMeters: 3 * FH,
+        departments: 'Cụm Phòng Máy tính Chuyên ngành Công nghệ Thông tin & Phần mềm (D04-01 – D04-12)',
+        highlights: 'Hệ thống phòng Lab máy trạm hiệu năng cao',
+      },
+      {
+        floor: 5,
+        label: 'Tầng 5',
+        elevationMeters: 4 * FH,
+        departments: 'Cụm Phòng Thực hành Thiết kế Đồ họa, Truyền thông & Thương mại Điện tử (D05-01 – D05-12)',
+        highlights: 'Studio thực hành quay dựng và xử lý đa phương tiện',
+      },
+      {
+        floor: 6,
+        label: 'Tầng 6',
+        elevationMeters: 5 * FH,
+        departments: 'Cụm Phòng Lab Điện tử – Viễn thông & Tự động hóa Công nghiệp 4.0 (D06-01 – D06-10)',
+        highlights: 'Kết nối giữa khối tháp chữ L và khối đế bo cong',
+      },
+      {
+        floor: 7,
+        label: 'Tầng 7 (Đỉnh khối đế bo cong)',
+        elevationMeters: 6 * FH,
+        departments: 'Phòng Học Thông minh (Smart Classrooms) & Sân vườn Thượng uyển Tầng 7',
+        highlights: 'Tầng kết thúc khối đế bo cong 7 tầng với tầm nhìn toàn cảnh sân trường',
+      },
+      {
+        floor: 8,
+        label: 'Tầng 8 (Khối tháp chữ L)',
+        elevationMeters: 7 * FH,
+        departments: 'Giảng đường Lý thuyết Chất lượng cao Khoa Kinh tế & Quản trị (D08-01 – D08-08)',
+        highlights: 'Hành lang thoáng đãng đón gió tự nhiên từ hướng Đông Nam',
+      },
+      {
+        floor: 9,
+        label: 'Tầng 9 (Khối tháp chữ L)',
+        elevationMeters: 8 * FH,
+        departments: 'Giảng đường Chuyên ngành Ngôn ngữ Anh, Nhật, Hàn & Du lịch (D09-01 – D09-08)',
+        highlights: 'Trang bị màn hình tương tác thông minh tại tất cả các phòng',
+      },
+      {
+        floor: 10,
+        label: 'Tầng 10 (Khối tháp chữ L)',
+        elevationMeters: 9 * FH,
+        departments: 'Trung tâm Nghiên cứu Ứng dụng Khoa học Công nghệ & Hợp tác Doanh nghiệp',
+        highlights: 'Nơi đặt các phòng Lab hợp tác cùng doanh nghiệp trong và ngoài nước',
+      },
+      {
+        floor: 11,
+        label: 'Tầng 11 (Tầng cao nhất Tòa D)',
+        elevationMeters: 10 * FH,
+        departments: 'Hội trường Đa năng Tầng 11, Đài quan sát Toàn cảnh TP. Thủ Đức & Tháp Logo TDC',
+        highlights: 'Độ cao hơn 42m so với sân trường, ngắm trọn vẹn tuyến Metro số 1 và trung tâm Thủ Đức',
+      },
+    ],
+  },
+];
+</file>
+
+<file path="src/services/gpsService.ts">
+import { CAMPUS_BUILDINGS, TDC_GEO_ANCHORS } from '../data/campusBuildings';
+import { CAMP } from '../data/campusLayout';
+import { ell } from '../engine/threeHelpers';
+import { CampusBuildingZone, GpsTelemetry3D } from '../types/game';
+
+/**
+ * Chuyển đổi tọa độ GPS thực tế (WGS84 Latitude, Longitude, Altitude ASL)
+ * sang hệ tọa độ không gian 3 chiều của khuôn viên TDC (X: Đông/Tây, Y: Cao độ phân tầng, Z: Nam/Bắc)
+ */
+export function gpsToCampus3D(params: {
+  lat: number;
+  lng: number;
+  altitudeAsl?: number | null;
+  groundAltitudeReferenceAsl?: number;
+}): {
+  x: number;
+  y: number;
+  z: number;
+  insideCampus: boolean;
+} {
+  const dLat = params.lat - TDC_GEO_ANCHORS.ORIGIN_LAT;
+  const dLng = params.lng - TDC_GEO_ANCHORS.ORIGIN_LNG;
+
+  const eastMeters = dLng * TDC_GEO_ANCHORS.METERS_PER_DEG_LNG;
+  const northMeters = dLat * TDC_GEO_ANCHORS.METERS_PER_DEG_LAT;
+
+  const cosR = Math.cos(TDC_GEO_ANCHORS.MAP_ROTATION_RAD);
+  const sinR = Math.sin(TDC_GEO_ANCHORS.MAP_ROTATION_RAD);
+
+  // Trong Three.js: +X là hướng Đông, -Z là hướng Bắc (+Z là hướng Nam về phía Võ Văn Ngân)
+  const x = +(eastMeters * cosR - northMeters * sinR).toFixed(2);
+  const z = +(-northMeters * cosR - eastMeters * sinR).toFixed(2);
+
+  const groundRef =
+    params.groundAltitudeReferenceAsl ?? TDC_GEO_ANCHORS.GROUND_ALTITUDE_ASL_M;
+  const rawY =
+    params.altitudeAsl != null && Number.isFinite(params.altitudeAsl)
+      ? params.altitudeAsl - groundRef
+      : 0;
+  // Giới hạn độ cao hợp lệ trong khuôn viên từ tầng hầm (-4.2m) tới đỉnh tháp Tòa D (+50m)
+  const y = +Math.max(-TDC_GEO_ANCHORS.FLOOR_HEIGHT_M, Math.min(52, rawY)).toFixed(2);
+
+  const insideCampus = ell(x, z) <= 1.05;
+
+  return { x, y, z, insideCampus };
+}
+
+/**
+ * Chuyển đổi ngược từ tọa độ 3D khuôn viên TDC (X, Y, Z) sang tọa độ GPS (Lat, Lng, Altitude ASL)
+ */
+export function campus3DToGps(params: {
+  x: number;
+  y?: number;
+  z: number;
+  groundAltitudeReferenceAsl?: number;
+}): {
+  lat: number;
+  lng: number;
+  altitudeAsl: number;
+} {
+  const cosR = Math.cos(-TDC_GEO_ANCHORS.MAP_ROTATION_RAD);
+  const sinR = Math.sin(-TDC_GEO_ANCHORS.MAP_ROTATION_RAD);
+
+  const eastMeters = params.x * cosR + params.z * sinR;
+  const northMeters = -params.z * cosR + params.x * sinR;
+
+  const lat = +(
+    TDC_GEO_ANCHORS.ORIGIN_LAT +
+    northMeters / TDC_GEO_ANCHORS.METERS_PER_DEG_LAT
+  ).toFixed(6);
+  const lng = +(
+    TDC_GEO_ANCHORS.ORIGIN_LNG +
+    eastMeters / TDC_GEO_ANCHORS.METERS_PER_DEG_LNG
+  ).toFixed(6);
+
+  const groundRef =
+    params.groundAltitudeReferenceAsl ?? TDC_GEO_ANCHORS.GROUND_ALTITUDE_ASL_M;
+  const altitudeAsl = +(groundRef + (params.y || 0)).toFixed(2);
+
+  return { lat, lng, altitudeAsl };
+}
+
+/**
+ * Nhận diện tòa nhà sinh viên đang đứng (dựa theo mặt phẳng X, Z với dung sai biên GPS)
+ */
+export function detectBuildingAtPosition(
+  x: number,
+  z: number,
+  marginMeters = 2.5
+): CampusBuildingZone | null {
+  let bestMatch: CampusBuildingZone | null = null;
+  let bestDist = Infinity;
+
+  for (const b of CAMPUS_BUILDINGS) {
+    const [x0, z0, x1, z1] = b.bounds;
+    if (
+      x >= x0 - marginMeters &&
+      x <= x1 + marginMeters &&
+      z >= z0 - marginMeters &&
+      z <= z1 + marginMeters
+    ) {
+      // Khoảng cách vào tâm tòa nhà để ưu tiên tòa gần nhất nếu đứng ở ranh giới nối
+      const cx = (x0 + x1) / 2;
+      const cz = (z0 + z1) / 2;
+      const d = Math.hypot(x - cx, z - cz);
+      if (d < bestDist) {
+        bestDist = d;
+        bestMatch = b;
+      }
+    }
   }
+  return bestMatch;
+}
+
+/**
+ * Tính toán Tầng hiện tại (Floor) từ cao độ tương đối Y (mét so với mặt sân trường)
+ * và giới hạn theo số tầng thực tế của tòa nhà đang đứng.
+ * - Tầng hầm B1: floor = -1 (y <= -1.8m, chỉ có tại Tòa D)
+ * - Tầng trệt (Tầng 1): floor = 1 (0m <= y < 4.2m)
+ * - Tầng N (N >= 1): floor = 1 + Math.floor((y + 1.2) / 4.2)
+ */
+export function resolveFloorFromElevation(
+  yMeters: number,
+  building: CampusBuildingZone | null
+): {
+  floor: number;
+  clampedY: number;
+} {
+  const fh = building?.floorHeightMeters || TDC_GEO_ANCHORS.FLOOR_HEIGHT_M;
+
+  let floor: number;
+  if (yMeters <= -1.8) {
+    floor = -1;
+  } else {
+    floor = Math.max(1, 1 + Math.floor((yMeters + 1.1) / fh));
+  }
+
+  if (building) {
+    if (floor < building.minFloor) floor = building.minFloor;
+    if (floor > building.maxFloor) floor = building.maxFloor;
+  } else {
+    // Ngoài sân trường không thuộc tòa nhà nào thì mặc định ở mặt đất (Tầng 1 / y = 0)
+    if (floor < 1) floor = 1;
+    if (floor > 11) floor = 11;
+  }
+
+  const clampedY = floor === -1 ? -fh : (floor - 1) * fh;
+  return { floor, clampedY: +clampedY.toFixed(2) };
+}
+
+/**
+ * Chuyển số tầng (floor) sang độ cao Y (mét) trong không gian 3D
+ */
+export function floorToElevationMeters(
+  floor: number,
+  building?: CampusBuildingZone | null
+): number {
+  const fh = building?.floorHeightMeters || TDC_GEO_ANCHORS.FLOOR_HEIGHT_M;
+  if (floor === -1) return -fh;
+  return Math.max(0, (floor - 1) * fh);
+}
+
+/**
+ * Tính khoảng cách không gian 3 chiều thực tế (Euclidean 3D distance) giữa 2 điểm (X, Y, Z)
+ */
+export function distance3D(
+  a: { x: number; y?: number; z: number },
+  b: { x: number; y?: number; z: number }
+): number {
+  const dx = a.x - b.x;
+  const dy = (a.y || 0) - (b.y || 0);
+  const dz = a.z - b.z;
+  return Math.hypot(dx, dy, dz);
+}
+
+/**
+ * Bộ lọc Kalman 1 chiều đơn giản giúp làm mượt nhiễu GPS thực tế trên thiết bị di động
+ * đặc biệt là trục cao độ (Altitude) và tọa độ ngang khi đứng gần các tòa nhà cao tầng như Tòa D.
+ */
+export class GpsKalmanFilter3D {
+  private xEst: number | null = null;
+  private yEst: number | null = null;
+  private zEst: number | null = null;
+  private pX = 1;
+  private pY = 1;
+  private pZ = 1;
+
+  // Nhiễu quá trình (Process noise Q)
+  private readonly qHoriz = 0.35;
+  private readonly qVert = 0.2;
+
+  public reset(x?: number, y?: number, z?: number): void {
+    this.xEst = x ?? null;
+    this.yEst = y ?? null;
+    this.zEst = z ?? null;
+    this.pX = 1;
+    this.pY = 1;
+    this.pZ = 1;
+  }
+
+  public filter(
+    rawX: number,
+    rawY: number,
+    rawZ: number,
+    horizAccuracyMeters = 8,
+    vertAccuracyMeters = 10
+  ): { x: number; y: number; z: number } {
+    const rH = Math.max(0.5, Math.min(50, horizAccuracyMeters * 0.25));
+    const rV = Math.max(0.5, Math.min(50, vertAccuracyMeters * 0.35));
+
+    if (this.xEst === null || this.yEst === null || this.zEst === null) {
+      this.xEst = rawX;
+      this.yEst = rawY;
+      this.zEst = rawZ;
+      return { x: rawX, y: rawY, z: rawZ };
+    }
+
+    // Cập nhật trục X
+    this.pX += this.qHoriz;
+    const kX = this.pX / (this.pX + rH);
+    this.xEst = this.xEst + kX * (rawX - this.xEst);
+    this.pX = (1 - kX) * this.pX;
+
+    // Cập nhật trục Z
+    this.pZ += this.qHoriz;
+    const kZ = this.pZ / (this.pZ + rH);
+    this.zEst = this.zEst + kZ * (rawZ - this.zEst);
+    this.pZ = (1 - kZ) * this.pZ;
+
+    // Cập nhật trục Y (Cao độ)
+    this.pY += this.qVert;
+    const kY = this.pY / (this.pY + rV);
+    this.yEst = this.yEst + kY * (rawY - this.yEst);
+    this.pY = (1 - kY) * this.pY;
+
+    return {
+      x: +this.xEst.toFixed(2),
+      y: +this.yEst.toFixed(2),
+      z: +this.zEst.toFixed(2),
+    };
+  }
+}
+
+/**
+ * Kẹp tọa độ (X, Z) vào biên elip của khuôn viên TDC nếu bật chế độ giữ trong khuôn viên
+ */
+export function clampToCampusBoundary(x: number, z: number): { x: number; z: number } {
+  const d = ell(x, z);
+  if (d <= 0.985) return { x, z };
+  const k = 0.985 / d;
+  return {
+    x: +(CAMP.cx + (x - CAMP.cx) * k).toFixed(2),
+    z: +(CAMP.cz + (z - CAMP.cz) * k).toFixed(2),
+  };
+}
+
+/**
+ * Tạo gói dữ liệu Telemetry 3D đầy đủ từ tọa độ 3D hoặc tín hiệu Geolocation
+ */
+export function buildTelemetryFromCampus3D(params: {
+  x: number;
+  y: number;
+  z: number;
+  accuracyMeters?: number;
+  altitudeAccuracyMeters?: number | null;
+  headingDeg?: number | null;
+  speedMps?: number | null;
+  source: GpsTelemetry3D['source'];
+  lockedFloor?: number | null;
+  groundAltitudeReferenceAsl?: number;
+}): GpsTelemetry3D {
+  const building = detectBuildingAtPosition(params.x, params.z);
+  const clampedLockedFloor =
+    params.lockedFloor != null
+      ? building
+        ? Math.max(building.minFloor, Math.min(building.maxFloor, params.lockedFloor))
+        : Math.max(-1, Math.min(11, params.lockedFloor))
+      : null;
+
+  const resolved =
+    clampedLockedFloor != null
+      ? {
+          floor: clampedLockedFloor,
+          clampedY: floorToElevationMeters(clampedLockedFloor, building),
+        }
+      : resolveFloorFromElevation(params.y, building);
+
+  const effectiveY = clampedLockedFloor != null ? resolved.clampedY : params.y;
+  const gps = campus3DToGps({
+    x: params.x,
+    y: effectiveY,
+    z: params.z,
+    groundAltitudeReferenceAsl: params.groundAltitudeReferenceAsl,
+  });
+
+  return {
+    lat: gps.lat,
+    lng: gps.lng,
+    altitudeAsl: gps.altitudeAsl,
+    accuracyMeters: params.accuracyMeters ?? 2.5,
+    altitudeAccuracyMeters: params.altitudeAccuracyMeters ?? 3.0,
+    headingDeg: params.headingDeg ?? null,
+    speedMps: params.speedMps ?? null,
+    x: +params.x.toFixed(2),
+    y: +effectiveY.toFixed(2),
+    z: +params.z.toFixed(2),
+    detectedFloor: resolved.floor,
+    detectedBuilding: building,
+    insideCampus: ell(params.x, params.z) <= 1.05,
+    source: params.source,
+    timestamp: Date.now(),
+  };
 }
 </file>
 
@@ -922,34 +1631,41 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
 
         <div className="sh-body help">
           <div>
-            <h3>1. Bản đồ 3D & Cơ chế Mở khóa Sương mù (Fog of War)</h3>
+            <h3>1. Bản đồ 3D Khuôn viên TDC & Định vị GPS 3 Trục (X · Y · Z)</h3>
             <p>
-              Các phân khu chưa khám phá trong trường được bao phủ bởi làn sương mù 3D và vùng tối trên Minimap. Hãy di chuyển tới các cột sáng trạm thử thách, vượt qua câu đố để xóa tan sương mù và thu thập đủ 10 Huy hiệu.
+              Hệ thống sử dụng tín hiệu <b>GPS độ chính xác cao (High-Accuracy WGS84 + Altitude)</b> kết hợp bộ lọc <b>Kalman 3D</b> để định vị vị trí thực tế của bạn trong khuôn viên Trường Cao đẳng Công nghệ Thủ Đức (53 Võ Văn Ngân) theo cả 3 trục:
             </p>
-          </div>
-          <div>
-            <h3>2. Cách Điều khiển Nhân vật</h3>
             <ul>
               <li>
-                <b>Trên Máy tính:</b> Dùng phím <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd>{' '}
-                <kbd>D</kbd> hoặc phím mũi tên để đi bộ, <kbd>Q</kbd> <kbd>E</kbd> hoặc kéo chuột để xoay góc nhìn, cuộn chuột để phóng to/thu nhỏ.
+                <b>Trục X (Đông – Tây) & Trục Z (Nam – Bắc):</b> Xác định vị trí của bạn trên mặt bằng khuôn viên và tự động nhận diện tòa nhà bạn đang đứng (Khu A, Khu B, Hội trường H, Tòa C, Tòa D, KTX, Xưởng Cơ khí).
               </li>
               <li>
-                <b>Trên Điện thoại:</b> Kéo cần điều khiển (Joystick) ở góc trái dưới, vuốt 1 ngón để xoay camera, chụm 2 ngón để zoom.
+                <b>Trục Cao độ Y / Phân tầng (Floor Level):</b> Tính toán độ cao so với mặt sân trường (1 tầng = 4.2m) để hiển thị chính xác tầng bạn đang khám phá từ <b>Tầng Hầm B1 (-4.2m)</b> lên tới <b>Tầng 11 (+42.0m tại Tòa D)</b>.
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h3>2. Khám phá Phân tầng 3D & Chế độ Cắt lớp (3D Floor Cutaway)</h3>
+            <ul>
+              <li>
+                <b>Thanh Chọn Tầng 3D (B1 → T11):</b> Sử dụng thanh thang máy phân tầng ở cạnh trái màn hình hoặc nút <b>Chọn Tòa/Tầng</b> trên bảng GPS để chuyển nhanh giữa các tầng và xem danh sách Phòng ban / Khoa / Phòng Lab tại tầng đó.
               </li>
               <li>
-                <b>Tự động Tìm đường:</b> Bấm trực tiếp xuống mặt đất hoặc bấm vào <b>Thanh la bàn chỉ đường</b> ở dưới đáy màn hình để nhân vật tự chạy tới trạm gần nhất.
+                <b>Cắt lớp Tầng 3D (Cutaway View):</b> Bấm nút <b>Cắt lớp Tầng 3D</b> trên bảng điều khiển GPS để ẩn các tầng phía trên và quan sát trực diện mặt sàn bên trong tầng bạn đang đứng.
+              </li>
+              <li>
+                <b>Chuẩn 0m (Tare Ground Altitude):</b> Khi đứng ở sân trường, bấm <b>Chuẩn 0m</b> để hiệu chuẩn áp kế / độ cao GPS của điện thoại về mốc chuẩn Tầng 1 (0.0m).
               </li>
             </ul>
           </div>
           <div>
             <h3>3. Check-in Thực địa (QR + Mật thư) & Tổ đội Liên khoa</h3>
             <p>
-              Tại mỗi trạm, bạn có thể <b>Quét mã QR</b> qua Camera trình duyệt hoặc <b>Giải mật thư quan sát</b> để nhận thêm điểm thưởng O2O. Hãy lập <b>Tổ đội 2–4 sinh viên khác Khoa</b> để kích hoạt <b>+20% điểm thưởng Liên khoa</b>!
+              Tại mỗi trạm, bạn có thể <b>Quét mã QR</b> qua Camera trình duyệt hoặc <b>Giải mật thư quan sát</b> để xóa tan sương mù (Fog of War) và nhận thêm điểm thưởng O2O. Hãy lập <b>Tổ đội 2–4 sinh viên khác Khoa</b> để kích hoạt <b>+20% điểm thưởng Liên khoa</b>!
             </p>
           </div>
           <button type="button" className="btn big" onClick={onClose}>
-            Đã sẵn sàng Khám phá!
+            Đã sẵn sàng Định vị & Khám phá!
           </button>
         </div>
       </div>
@@ -1612,8 +2328,7 @@ export const QuestsModal: React.FC<QuestsModalProps> = ({
             })}
           </div>
           <p className="note text-center">
-            ⭐ Ngôi sao năng lượng tự mọc lại trên lối đi sau mỗi 45 giây. Đã nhặt:{' '}
-            <b>{profile.stars || 0}</b> ngôi sao.
+            📡 Định vị GPS 3 trục (X, Y, Z) và khám phá đủ các tòa nhà phân tầng trong trường để hoàn thành trọn bộ nhiệm vụ!
           </p>
         </div>
       </div>
@@ -1623,20 +2338,29 @@ export const QuestsModal: React.FC<QuestsModalProps> = ({
 </file>
 
 <file path="src/components/GameHud.tsx">
-import React, { useRef } from 'react';
+import React, { useState } from 'react';
 import {
   ArrowUp,
   Award,
+  Building2,
+  Compass,
+  Crosshair,
+  Eye,
+  EyeOff,
   HelpCircle,
+  Layers,
   ListChecks,
+  Navigation,
   QrCode,
   Shield,
+  SlidersHorizontal,
   Star,
   Trophy,
   Users,
   Volume2,
   VolumeX,
 } from 'lucide-react';
+import { CAMPUS_BUILDINGS } from '../data/campusBuildings';
 import { QUESTS, TYPE_LABEL } from '../data/campusLayout';
 import { getFacultyById } from '../data/faculties';
 import { getAvatarSvg } from '../engine/chibiBuilder';
@@ -1645,7 +2369,14 @@ import {
   GuideState,
   MinimapSnapshot,
 } from '../engine/TdcCampusEngine';
-import { PartyRoom, Station, UserProfile } from '../types/game';
+import { floorToElevationMeters } from '../services/gpsService';
+import {
+  CampusBuildingZone,
+  GpsTelemetry3D,
+  PartyRoom,
+  Station,
+  UserProfile,
+} from '../types/game';
 import { MiniMap } from './MiniMap';
 import { StationSticker } from './StationSticker';
 
@@ -1656,6 +2387,8 @@ interface GameHudProps {
   nearStation: Station | null;
   guide: GuideState;
   minimapSnap: MinimapSnapshot | null;
+  gpsTelemetry: GpsTelemetry3D | null;
+  cutawayMode: boolean;
   floatingTexts: FloatingTextItem[];
   muted: boolean;
   dimmed: boolean;
@@ -1670,7 +2403,10 @@ interface GameHudProps {
   onOpenQrScanner: () => void;
   onOpenHelp: () => void;
   onOpenAdmin: () => void;
-  onJoystickChange: (x: number, y: number) => void;
+  onSelectFloor: (floor: number | null) => void;
+  onToggleCutaway: (enabled: boolean) => void;
+  onCalibrateGroundZero: () => void;
+  onTeleportGps3D: (x: number, y: number, z: number, label: string) => void;
 }
 
 export const GameHud: React.FC<GameHudProps> = ({
@@ -1680,6 +2416,8 @@ export const GameHud: React.FC<GameHudProps> = ({
   nearStation,
   guide,
   minimapSnap,
+  gpsTelemetry,
+  cutawayMode,
   floatingTexts,
   muted,
   dimmed,
@@ -1694,11 +2432,12 @@ export const GameHud: React.FC<GameHudProps> = ({
   onOpenQrScanner,
   onOpenHelp,
   onOpenAdmin,
-  onJoystickChange,
+  onSelectFloor,
+  onToggleCutaway,
+  onCalibrateGroundZero,
+  onTeleportGps3D,
 }) => {
-  const joyRef = useRef<HTMLDivElement | null>(null);
-  const knobRef = useRef<HTMLElement | null>(null);
-  const activePtrRef = useRef<number | null>(null);
+  const [showGpsCalibrationPanel, setShowGpsCalibrationPanel] = useState(false);
 
   const activeStations = stations.filter((s) => s.active !== false);
   const unlockedCount = activeStations.filter((s) => profile.done?.[s.id] != null).length;
@@ -1717,52 +2456,33 @@ export const GameHud: React.FC<GameHudProps> = ({
         (q.id === 'all_stations' ? activeStations.length : q.need)
   );
 
-  // Touch joystick handlers
-  const updateJoyFromEvent = (e: React.PointerEvent) => {
-    const el = joyRef.current;
-    const kn = knobRef.current;
-    if (!el || !kn) return;
-    const r = el.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-    let dx = e.clientX - cx;
-    let dy = e.clientY - cy;
-    const L = Math.hypot(dx, dy);
-    const M = 46;
-    if (L > M) {
-      dx *= M / L;
-      dy *= M / L;
-    }
-    kn.style.transform = `translate(${dx}px,${dy}px)`;
-    onJoystickChange(dx / M, -dy / M);
-  };
-
-  const handleJoyDown = (e: React.PointerEvent) => {
-    activePtrRef.current = e.pointerId;
-    joyRef.current?.setPointerCapture(e.pointerId);
-    updateJoyFromEvent(e);
-  };
-
-  const handleJoyMove = (e: React.PointerEvent) => {
-    if (activePtrRef.current === e.pointerId) {
-      updateJoyFromEvent(e);
-    }
-  };
-
-  const handleJoyEnd = (e: React.PointerEvent) => {
-    if (activePtrRef.current !== e.pointerId) return;
-    activePtrRef.current = null;
-    if (knobRef.current) knobRef.current.style.transform = '';
-    onJoystickChange(0, 0);
-  };
-
   const isNearDone = nearStation ? profile.done?.[nearStation.id] != null : false;
+
+  const curBuilding: CampusBuildingZone | null = gpsTelemetry?.detectedBuilding || null;
+  const curFloor = gpsTelemetry?.detectedFloor ?? 1;
+  const curFloorSpec =
+    curBuilding?.floors.find((f) => f.floor === curFloor) ||
+    curBuilding?.floors[0] ||
+    null;
+
+  // Danh sách các tầng có thể chọn: nếu đang đứng tại một tòa nhà thì hiển thị đúng số tầng của tòa đó; ngược lại hiển thị toàn dải tầng của trường (-1..11)
+  const floorList: number[] = curBuilding
+    ? curBuilding.floors.map((f) => f.floor).sort((a, b) => b - a)
+    : [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, -1];
+
+  const handlePickBuildingAndFloor = (b: CampusBuildingZone, floorNum: number) => {
+    const [x0, z0, x1, z1] = b.bounds;
+    const cx = +((x0 + x1) / 2).toFixed(1);
+    const cz = +((z0 + z1) / 2).toFixed(1);
+    const cy = floorToElevationMeters(floorNum, b);
+    onTeleportGps3D(cx, cy, cz, `${b.code} · Tầng ${floorNum === -1 ? 'Hầm B1' : floorNum}`);
+  };
 
   return (
     <div id="hud" className={dimmed ? 'dim' : ''}>
       <div className="hud-top">
-        {/* Top-left Explorer Profile Card */}
-        <div className="flex flex-col gap-2">
+        {/* Top-left Explorer Profile Card + 3-Axis GPS Telemetry Card */}
+        <div className="flex flex-col gap-2 max-w-[355px] sm:max-w-[390px]">
           <div
             className="me card cursor-pointer"
             onClick={onOpenBadges}
@@ -1790,6 +2510,179 @@ export const GameHud: React.FC<GameHudProps> = ({
               </div>
             </div>
           </div>
+
+          {/* 3-Axis GPS (X, Y, Z) & Multi-Floor Telemetry Status Bar */}
+          {gpsTelemetry && (
+            <div className="bg-slate-900/92 text-white rounded-2xl p-2.5 border-2 border-sky-400/70 shadow-lg pointer-events-auto text-xs flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 font-black text-sky-300 uppercase tracking-wider text-[11px]">
+                  <Navigation className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+                  Định vị GPS 3 Trục (X · Y · Z)
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                    gpsTelemetry.source === 'gps_hardware'
+                      ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-400/40'
+                      : 'bg-sky-500/25 text-sky-200 border border-sky-400/40'
+                  }`}
+                >
+                  ±{gpsTelemetry.accuracyMeters}m
+                </span>
+              </div>
+
+              {/* Coordinates Grid: WGS84 Lat/Lng/Alt & Campus 3D X/Y/Z */}
+              <div className="grid grid-cols-3 gap-1 bg-slate-800/90 rounded-xl px-2 py-1.5 font-mono text-[11px]">
+                <div>
+                  <span className="text-slate-400 block text-[9px]">TRỤC X (ĐÔNG/TÂY)</span>
+                  <b className="text-sky-300">{gpsTelemetry.x >= 0 ? `+${gpsTelemetry.x}` : gpsTelemetry.x}m</b>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[9px]">TRỤC Z (NAM/BẮC)</span>
+                  <b className="text-emerald-300">{gpsTelemetry.z >= 0 ? `+${gpsTelemetry.z}` : gpsTelemetry.z}m</b>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[9px]">CAO ĐỘ Y / TẦNG</span>
+                  <b className="text-amber-300">
+                    {gpsTelemetry.y >= 0 ? `+${gpsTelemetry.y}` : gpsTelemetry.y}m (
+                    {curFloor === -1 ? 'B1' : `T${curFloor}`})
+                  </b>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-[10px] text-slate-300 font-semibold px-0.5">
+                <span>
+                  WGS84: {gpsTelemetry.lat.toFixed(5)}°N, {gpsTelemetry.lng.toFixed(5)}°E
+                </span>
+                <span>ASL: {gpsTelemetry.altitudeAsl ?? 12.0}m</span>
+              </div>
+
+              {/* Current Building & Floor Department Inspector */}
+              <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-2 flex flex-col gap-0.5">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="font-extrabold text-amber-300 flex items-center gap-1 truncate">
+                    <Building2 className="w-3.5 h-3.5 shrink-0" />
+                    {curBuilding
+                      ? `${curBuilding.name}`
+                      : 'Khuôn viên Ngoài trời · Sân trường TDC'}
+                  </span>
+                </div>
+                {curFloorSpec ? (
+                  <>
+                    <div className="text-[11px] font-extrabold text-white">
+                      📍 {curFloorSpec.label}: {curFloorSpec.departments}
+                    </div>
+                    <div className="text-[10px] text-slate-300">
+                      💡 {curFloorSpec.highlights}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-[10px] text-slate-300">
+                    Đang ở độ cao mặt sân chuẩn (Tầng 1 · 0.0m). Tiến vào tòa nhà hoặc chọn tầng bên trái để khám phá phân tầng 3D.
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons for GPS Calibration & Floor Cutaway */}
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <button
+                  type="button"
+                  onClick={() => onToggleCutaway(!cutawayMode)}
+                  className={`px-2.5 py-1 rounded-lg font-extrabold text-[11px] flex items-center gap-1 cursor-pointer ${
+                    cutawayMode
+                      ? 'bg-amber-400 text-slate-950'
+                      : 'bg-slate-700 hover:bg-slate-600 text-sky-200'
+                  }`}
+                  title="Cắt lớp mặt bằng 3D của tầng đang chọn để quan sát bên trong"
+                >
+                  {cutawayMode ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                  {cutawayMode ? 'Đang Cắt lớp 3D' : 'Cắt lớp Tầng 3D'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onCalibrateGroundZero}
+                  className="px-2.5 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-emerald-300 font-extrabold text-[11px] flex items-center gap-1 cursor-pointer"
+                  title="Hiệu chuẩn áp kế / cao độ GPS mặt đất hiện tại về 0.0m (Tầng 1)"
+                >
+                  <Crosshair className="w-3.5 h-3.5" /> Chuẩn 0m
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowGpsCalibrationPanel(!showGpsCalibrationPanel)}
+                  className={`px-2.5 py-1 rounded-lg font-extrabold text-[11px] flex items-center gap-1 cursor-pointer ${
+                    showGpsCalibrationPanel
+                      ? 'bg-sky-500 text-white'
+                      : 'bg-slate-700 hover:bg-slate-600 text-slate-200'
+                  }`}
+                  title="Chọn nhanh Tòa nhà & Tầng để khám phá hoặc hiệu chuẩn vị trí GPS trong nhà"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" /> Chọn Tòa/Tầng
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Expandable Building & Multi-Floor Explorer / Indoor GPS Calibration Panel */}
+          {showGpsCalibrationPanel && (
+            <div className="bg-white/95 border-2 border-sky-400 rounded-2xl p-3 shadow-xl pointer-events-auto text-xs flex flex-col gap-2 max-h-[42vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                <b className="text-slate-900 flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-sky-600" />
+                  Khám phá Phân tầng Tòa nhà (X · Y · Z)
+                </b>
+                <button
+                  type="button"
+                  onClick={() => setShowGpsCalibrationPanel(false)}
+                  className="text-slate-500 hover:text-slate-800 font-extrabold cursor-pointer"
+                >
+                  Đóng ✕
+                </button>
+              </div>
+              <p className="m-0 text-[11px] text-slate-600 font-semibold">
+                Khi đi vào trong tòa nhà bê tông nhiều tầng (sóng GPS suy giảm), bạn có thể chọn đúng Tòa nhà & Tầng đang đứng để đồng bộ chính xác trục X-Y-Z:
+              </p>
+              <div className="flex flex-col gap-2">
+                {CAMPUS_BUILDINGS.map((b) => (
+                  <div
+                    key={b.id}
+                    className="bg-slate-50 border border-slate-200 rounded-xl p-2 flex flex-col gap-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-slate-800">{b.name}</span>
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[10px] font-black text-white"
+                        style={{ backgroundColor: b.color }}
+                      >
+                        {b.minFloor === -1 ? `Hầm B1 → T${b.maxFloor}` : `${b.maxFloor} Tầng`}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {b.floors.map((fl) => {
+                        const isCur =
+                          curBuilding?.id === b.id && curFloor === fl.floor;
+                        return (
+                          <button
+                            key={fl.floor}
+                            type="button"
+                            onClick={() => handlePickBuildingAndFloor(b, fl.floor)}
+                            className={`px-2 py-1 rounded-lg font-extrabold text-[11px] cursor-pointer transition-all ${
+                              isCur
+                                ? 'bg-sky-600 text-white shadow'
+                                : 'bg-white border border-slate-300 text-slate-700 hover:border-sky-400'
+                            }`}
+                            title={`${fl.label}: ${fl.departments}`}
+                          >
+                            {fl.floor === -1 ? 'Hầm B1 (-4.2m)' : `Tầng ${fl.floor} (+${fl.elevationMeters.toFixed(1)}m)`}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Quick Party & QR Action Bar */}
           <div className="flex items-center gap-1.5 pointer-events-auto">
@@ -1889,8 +2782,8 @@ export const GameHud: React.FC<GameHudProps> = ({
               type="button"
               className="rb"
               onClick={onOpenHelp}
-              title="Hướng dẫn cách chơi"
-              aria-label="Hướng dẫn cách chơi"
+              title="Hướng dẫn Định vị GPS 3D & Phân tầng"
+              aria-label="Hướng dẫn"
             >
               <HelpCircle className="w-5 h-5" />
             </button>
@@ -1907,7 +2800,36 @@ export const GameHud: React.FC<GameHudProps> = ({
         </div>
       </div>
 
-      {/* Bottom Interaction Card & Compass Guide */}
+      {/* Left-side Vertical 3D Floor Elevator Selector Bar (Z/Y Axis Explorer) */}
+      <div className="fixed left-3 bottom-20 z-20 pointer-events-auto flex flex-col items-center bg-slate-900/90 text-white p-1.5 rounded-2xl border-2 border-sky-400/60 shadow-lg gap-1 max-h-[48vh] overflow-y-auto">
+        <span className="text-[9px] font-black uppercase tracking-wider text-sky-300 px-1">
+          Tầng 3D
+        </span>
+        {floorList.map((fl) => {
+          const isSelected = curFloor === fl;
+          return (
+            <button
+              key={fl}
+              type="button"
+              onClick={() => onSelectFloor(fl)}
+              className={`w-9 h-7 rounded-xl font-black text-xs flex items-center justify-center cursor-pointer transition-all ${
+                isSelected
+                  ? 'bg-sky-500 text-white shadow-[0_0_10px_#00AEEF] scale-105'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+              title={
+                fl === -1
+                  ? 'Tầng Hầm B1 (-4.2m)'
+                  : `Tầng ${fl} (+${((fl - 1) * 4.2).toFixed(1)}m)`
+              }
+            >
+              {fl === -1 ? 'B1' : `T${fl}`}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Bottom Interaction Card & 3D GPS Compass Guide */}
       <div className="hud-bot">
         {nearStation && !dimmed && (
           <div className="act card">
@@ -1918,10 +2840,15 @@ export const GameHud: React.FC<GameHudProps> = ({
               done={isNearDone}
             />
             <div className="act-txt">
-              <b>{nearStation.name}</b>
+              <b>
+                {nearStation.name}{' '}
+                {nearStation.floor
+                  ? `(Tầng ${nearStation.floor === -1 ? 'B1' : nearStation.floor})`
+                  : ''}
+              </b>
               <span>
                 {isNearDone
-                  ? 'Đã xóa sương mù · Xem lại Fun Fact & Lộ trình'
+                  ? 'Đã xóa sương mù · Xem lại thông tin & lộ trình'
                   : `${TYPE_LABEL[nearStation.type]} · Tối đa +${nearStation.pts} điểm`}
               </span>
             </div>
@@ -1935,7 +2862,12 @@ export const GameHud: React.FC<GameHudProps> = ({
           </div>
         )}
 
-        <button type="button" className="guide" onClick={onNavigateGuide}>
+        <button
+          type="button"
+          className="guide"
+          onClick={onNavigateGuide}
+          title="Bấm để đồng bộ định vị GPS 3D tới trạm mục tiêu gần nhất"
+        >
           <span
             className="arr"
             style={{
@@ -1946,32 +2878,26 @@ export const GameHud: React.FC<GameHudProps> = ({
           </span>
           <span>
             {guide.allDone
-              ? `Đã mở khóa ${activeStations.length}/${activeStations.length} trạm · Săn tiếp sao nhé!`
+              ? `Đã định vị & mở khóa 100% (${activeStations.length}/${activeStations.length}) trạm khuôn viên TDC!`
               : guide.station
-                ? guide.distance < 6.8
-                  ? `Bạn đang đứng tại ${guide.station.name}`
-                  : `${guide.station.name} · cách ${Math.round(guide.distance)} m (Bấm để tự đi tới)`
-                : 'Đang định vị trạm gần nhất...'}
+                ? guide.distance < 9.5
+                  ? `Đã định vị tại ${guide.station.name} (Tầng ${guide.station.floor || 1})`
+                  : `${guide.station.name} (Tầng ${guide.station.floor || 1}) · cách ${Math.round(guide.distance)}m 3D (${
+                      guide.deltaFloor === 0
+                        ? 'Cùng tầng'
+                        : guide.deltaFloor > 0
+                          ? `Lên ${guide.deltaFloor} tầng`
+                          : `Xuống ${Math.abs(guide.deltaFloor)} tầng`
+                    }) · Bấm để định vị tới`
+                : 'Đang quét tọa độ GPS trạm gần nhất...'}
           </span>
         </button>
       </div>
 
-      {/* Mobile Touch Joystick */}
-      <div
-        id="joy"
-        ref={joyRef}
-        aria-hidden="true"
-        onPointerDown={handleJoyDown}
-        onPointerMove={handleJoyMove}
-        onPointerUp={handleJoyEnd}
-        onPointerCancel={handleJoyEnd}
-      >
-        <i ref={knobRef} />
-      </div>
-
-      {/* Desktop Keyboard Hints */}
+      {/* Desktop / Mobile 3D Camera & GPS Hint */}
       <p className="keys">
-        <b>W A S D</b> hoặc phím mũi tên để đi · <b>Q E</b> xoay · kéo chuột để xoay, cuộn để phóng to · bấm xuống đất để tự đi tới đó
+        <Compass className="w-3.5 h-3.5 inline mr-1 text-sky-600" />
+        <b>Định vị GPS 3 Trục (X-Y-Z):</b> Tự động bám theo vị trí & cao độ GPS · Chọn <b>Tầng 3D (B1 → T11)</b> ở thanh bên trái · Kéo để xoay góc nhìn 3D, cuộn để thu phóng
       </p>
 
       {/* Floating 3D Score Texts */}
@@ -2079,25 +3005,37 @@ export const MiniMap: React.FC<MiniMapProps> = ({
         }
       });
 
-    // 3. Station dots
+    // 3. Station dots with Floor tags
     stations
       .filter((st) => st.active !== false)
       .forEach((st) => {
         const d = unlocked[st.id] != null;
+        const sx = X(st.x);
+        const sz = Z(st.z);
+        const sameFloor = (st.floor || 1) === (snapshot.playerFloor || 1);
         mg.fillStyle = '#fff';
         mg.beginPath();
-        mg.arc(X(st.x), Z(st.z), 8.5, 0, Math.PI * 2);
+        mg.arc(sx, sz, sameFloor ? 9 : 7, 0, Math.PI * 2);
         mg.fill();
         mg.fillStyle = d ? '#3DAA5C' : st.col;
         mg.beginPath();
-        mg.arc(X(st.x), Z(st.z), 6, 0, Math.PI * 2);
+        mg.arc(sx, sz, sameFloor ? 6.5 : 4.8, 0, Math.PI * 2);
         mg.fill();
       });
 
-    // 4. Player Cone & Arrow
+    // 4. GPS Accuracy Halo & Player Cone / Arrow
     const a = snapshot.playerRotY;
     const px = X(snapshot.playerX);
     const pz = Z(snapshot.playerZ);
+
+    const accRadiusPx = Math.max(8, Math.min(45, (snapshot.accuracyMeters || 3) * sc * 2.2));
+    mg.fillStyle = 'rgba(0, 240, 255, 0.18)';
+    mg.strokeStyle = 'rgba(0, 174, 239, 0.55)';
+    mg.lineWidth = 1.5;
+    mg.beginPath();
+    mg.arc(px, pz, accRadiusPx, 0, Math.PI * 2);
+    mg.fill();
+    mg.stroke();
 
     mg.fillStyle = 'rgba(0,174,239,.22)';
     mg.beginPath();
@@ -3381,8 +4319,8 @@ export const TYPE_LABEL: Record<string, string> = {
 export const QUESTS: Quest[] = [
   {
     id: 'visit3',
-    name: 'Khởi đầu Thám hiểm',
-    description: 'Mở khóa sương mù tại 3 trạm bất kỳ trong khuôn viên TDC',
+    name: 'Khởi đầu Định vị GPS',
+    description: 'Mở khóa sương mù tại 3 trạm thực địa bất kỳ trong khuôn viên TDC',
     need: 3,
     reward: 60,
     icon: 'checkin',
@@ -3390,19 +4328,19 @@ export const QUESTS: Quest[] = [
     getValue: (p) => Object.keys(p.done || {}).length,
   },
   {
-    id: 'star15',
-    name: 'Thợ săn Ngôi sao',
-    description: 'Thu thập đủ 15 ngôi sao năng lượng trên các lối đi',
-    need: 15,
-    reward: 80,
-    icon: 'star',
-    col: '#FFC83A',
-    getValue: (p) => p.stars || 0,
+    id: 'visit6',
+    name: 'Chinh phục Các Tầng Cao',
+    description: 'Khám phá & mở khóa 6 khu vực tòa nhà / phân tầng trong trường',
+    need: 6,
+    reward: 90,
+    icon: 'explorer',
+    col: '#2FA8F0',
+    getValue: (p) => Object.keys(p.done || {}).length,
   },
   {
     id: 'quiz2',
-    name: 'Bậc thầy Giải đố',
-    description: 'Vượt qua ít nhất 2 trạm câu đố hoặc mini-game chuyên ngành',
+    name: 'Bậc thầy Giải đố Chuyên ngành',
+    description: 'Vượt qua ít nhất 2 trạm câu đố hoặc thử thách Khoa nghề',
     need: 2,
     reward: 80,
     icon: 'quiz',
@@ -3411,8 +4349,8 @@ export const QUESTS: Quest[] = [
   },
   {
     id: 'photo1',
-    name: 'Khoảnh khắc TDC',
-    description: 'Chụp 1 bức ảnh Polaroid 3D tại Bồn cây tròn',
+    name: 'Khoảnh khắc TDC 3D',
+    description: 'Lưu 1 bức ảnh kỷ niệm 3D tại trạm Bồn cây tròn Khu A',
     need: 1,
     reward: 50,
     icon: 'photo',
@@ -3421,7 +4359,7 @@ export const QUESTS: Quest[] = [
   },
   {
     id: 'party1',
-    name: 'Tinh thần Đồng đội',
+    name: 'Tinh thần Đồng đội Liên Khoa',
     description: 'Tạo hoặc tham gia một Tổ đội thám hiểm (Co-op Party)',
     need: 1,
     reward: 100,
@@ -3431,8 +4369,8 @@ export const QUESTS: Quest[] = [
   },
   {
     id: 'all_stations',
-    name: 'Nhà Thám hiểm Toàn diện',
-    description: 'Mở khóa toàn bộ 100% các trạm và xóa tan sương mù toàn trường',
+    name: 'Nhà Thám hiểm Toàn diện TDC',
+    description: 'Định vị & xóa tan sương mù 100% các trạm trên toàn bộ khuôn viên trường',
     need: 10,
     reward: 250,
     icon: 'explorer',
@@ -3516,10 +4454,12 @@ export const DEFAULT_STATIONS: Station[] = [
   {
     id: 'g1',
     name: 'Cổng 1 · Võ Văn Ngân',
-    sub: '53 Võ Văn Ngân · Điểm xuất phát',
+    sub: '53 Võ Văn Ngân · Tầng 1 (0.0m)',
     facultyId: 'khac',
     x: -66,
+    y: 0,
     z: 104,
+    floor: 1,
     fogRadius: 28,
     col: '#FFAA1F',
     type: 'checkin',
@@ -3539,10 +4479,12 @@ export const DEFAULT_STATIONS: Station[] = [
   {
     id: 'bcs',
     name: 'Bồn cây tròn',
-    sub: 'Góc check-in & Giao lộ Khu A',
+    sub: 'Giao lộ Khu A · Tầng 1 (0.0m)',
     facultyId: 'du_lich',
     x: -85,
+    y: 0,
     z: 76,
+    floor: 1,
     fogRadius: 24,
     col: '#FF6FA5',
     type: 'photo',
@@ -3550,7 +4492,7 @@ export const DEFAULT_STATIONS: Station[] = [
     badge: 'Nhiếp ảnh gia TDC',
     info: 'Bồn cây cổ thụ tròn nằm ngay trước hành lang cầu nối giữa dãy A1 và A2 là tọa độ hẹn hò, chụp ảnh kỷ yếu quen thuộc của bao thế hệ sinh viên.',
     funFact: 'Xung quanh bồn cây tròn có đúng 10 khóm hoa sắc màu tượng trưng cho sự năng động và đa ngành nghề của sinh viên TDC.',
-    directions: 'Từ Bồn cây tròn rẽ trái (hướng Tây) dọc lối lát gạch là tới mặt tiền Dãy A1.',
+    directions: 'Từ Bồn cây tròn rẽ trái (hướng Tây) và đi lên Tầng 2 Dãy A1 để khám phá Khu Hành chính.',
     qrSecretToken: 'TDC-QR-BCS-PHOTO',
     riddle: {
       prompt: 'Đứng tại Bồn cây tròn nhìn về phía Bắc, hành lang cầu nối phía trước mặt bạn có mấy tầng lầu phía trên?',
@@ -3562,18 +4504,21 @@ export const DEFAULT_STATIONS: Station[] = [
   {
     id: 'a',
     name: 'Tòa A · Khu Hành chính',
-    sub: 'Dãy A1 · A2 & Phòng Đào tạo',
+    sub: 'Dãy A1 · A2 (3 Tầng) · Trạm Tầng 2 (+4.2m)',
     facultyId: 'kinh_te',
     x: -121,
-    z: 72,
+    y: 4.2,
+    z: 60,
+    floor: 2,
+    buildingId: 'bld_a1',
     fogRadius: 34,
     col: '#FF8A4C',
     type: 'quiz',
     pts: 100,
     badge: 'Thạo mã phòng',
-    info: 'Khu A gồm dãy A1 mái ngói, dãy A2 và hành lang cầu nối ở giữa. Đây là nơi đặt nhiều phòng ban hành chính, Phòng Đào tạo, Công tác HSSV và các phòng học lý thuyết.',
-    funFact: 'Cách đọc mã phòng tại TDC cực kỳ khoa học: Chữ cái đầu là Tên Tòa, chữ số tiếp theo là Tầng, và 2 số cuối là Số Phòng!',
-    directions: 'Đi xuyên qua gầm cầu nối Khu A về phía Bắc để tiến vào quảng trường Hội trường H và sân bóng chuyền.',
+    info: 'Khu A gồm dãy A1 mái ngói (3 tầng), dãy A2 (3 tầng) và hành lang cầu nối ở Tầng 2–3. Đây là nơi đặt Ban Giám hiệu, Phòng Đào tạo, Công tác HSSV và các phòng học lý thuyết.',
+    funFact: 'Cách đọc mã phòng tại TDC cực kỳ khoa học: Chữ cái đầu là Tên Tòa, chữ số tiếp theo là Tầng (trục Y/Z), và 2 số cuối là Số Phòng!',
+    directions: 'Đi xuống tầng trệt và xuyên qua gầm cầu nối Khu A về phía Bắc để tiến vào Hội trường H.',
     qrSecretToken: 'TDC-QR-TOAA-A1A2',
     riddle: {
       prompt: 'Mái ngói truyền thống của dãy nhà A1 có màu sắc chủ đạo là màu gì?',
@@ -3582,9 +4527,9 @@ export const DEFAULT_STATIONS: Station[] = [
     },
     questions: [
       {
-        q: 'Mã phòng A205 trong hệ thống giảng đường TDC có ý nghĩa là gì?',
+        q: 'Mã phòng A205 trong hệ thống giảng đường 3D phân tầng TDC có ý nghĩa là gì?',
         opts: [
-          'Tòa A, tầng 2, phòng số 05',
+          'Tòa A, tầng 2 (cao độ +4.2m), phòng số 05',
           'Tòa A, phòng 205 ở tầng trệt',
           'Khu A, dãy 2, bàn số 5',
           'Tòa A, tầng 20, phòng 5',
@@ -3595,13 +4540,13 @@ export const DEFAULT_STATIONS: Station[] = [
       {
         q: 'Khi cần hỗ trợ thủ tục học vụ, giấy xác nhận sinh viên, bạn sẽ liên hệ đơn vị nào tại Khu A?',
         opts: [
-          'Phòng Đào tạo / Công tác Chính trị HSSV',
+          'Phòng Đào tạo / Công tác Chính trị HSSV (Tầng 1 Khu A)',
           'Xưởng thực hành Cơ khí',
           'Ban quản lý Ký túc xá',
           'Tổ bảo vệ Cổng 2',
         ],
         ans: 0,
-        ex: 'Phòng Đào tạo và Phòng Công tác Chính trị HSSV là nơi giải quyết các thủ tục học tập và quyền lợi sinh viên.',
+        ex: 'Phòng Đào tạo và Phòng Công tác Chính trị HSSV đặt tại Tầng 1 Khu A là nơi giải quyết các thủ tục học tập và quyền lợi sinh viên.',
       },
     ],
     active: true,
@@ -3609,18 +4554,21 @@ export const DEFAULT_STATIONS: Station[] = [
   {
     id: 'h',
     name: 'Hội trường H',
-    sub: 'Trung tâm Sự kiện & Khẩu hiệu TDC',
+    sub: 'Tòa H (3 Tầng) · Khán phòng Tầng 2 (+4.2m)',
     facultyId: 'ngoai_ngu',
-    x: -68,
-    z: 17,
+    x: -82,
+    y: 4.2,
+    z: 24,
+    floor: 2,
+    buildingId: 'bld_h',
     fogRadius: 32,
     col: '#9B6BFF',
     type: 'quiz',
     pts: 100,
     badge: 'Khắc ghi khẩu hiệu',
-    info: 'Tòa H sở hữu hội trường lớn có trần cao gấp đôi tầng thường, mặt tiền có bậc tam cấp rộng nhìn thẳng ra cụm sân bóng chuyền và cột cờ trung tâm.',
-    funFact: 'Trên đỉnh mặt tiền Tòa H là khẩu hiệu triết lý giáo dục của TDC cùng biểu tượng chứng nhận quản lý chất lượng quốc tế ISO 9001:2015.',
-    directions: 'Từ sảnh Hội trường H đi thẳng về hướng Bắc vài bước chân là tới dãy Tòa B (Khoa CNTT & Khoa Điện – Điện tử).',
+    info: 'Tòa H cao 3 tầng sở hữu hội trường lớn ở Tầng 2–3 có trần cao thoáng đãng, mặt tiền có bậc tam cấp rộng nhìn thẳng ra cụm sân bóng chuyền và cột cờ trung tâm.',
+    funFact: 'Trên đỉnh mặt tiền Tầng 3 Tòa H là khẩu hiệu triết lý giáo dục của TDC cùng biểu tượng chứng nhận quản lý chất lượng quốc tế ISO 9001:2015.',
+    directions: 'Từ Hội trường H đi thẳng về hướng Bắc vài bước chân là tới dãy Tòa B (Khoa CNTT 4 tầng & Khoa Điện – Điện tử 5 tầng).',
     qrSecretToken: 'TDC-QR-HALL-H',
     riddle: {
       prompt: 'Trên mặt tiền Tòa H có dòng khẩu hiệu 3 cụm từ: "Đạo đức – Tri thức – ...". Cụm từ thứ 3 là gì?',
@@ -3651,18 +4599,21 @@ export const DEFAULT_STATIONS: Station[] = [
   {
     id: 'b_it',
     name: 'Tòa B · Khoa CNTT',
-    sub: 'Cánh Tây Tòa B · Trung tâm Máy tính',
+    sub: 'Cánh Tây Tòa B (4 Tầng) · Lab Tầng 3 (+8.4m)',
     facultyId: 'cntt',
     x: -108,
-    z: 5,
+    y: 8.4,
+    z: -7,
+    floor: 3,
+    buildingId: 'bld_b_west',
     fogRadius: 28,
     col: '#2FA8F0',
     type: 'it_debug',
     pts: 140,
     badge: 'Kỹ sư Phần mềm',
-    info: 'Cánh Tây Tòa B (cao 4 tầng) là đại bản doanh của Khoa Công nghệ thông tin với hệ thống phòng Lab cấu hình cao cho Lập trình, Mạng máy tính, Đồ họa và AI.',
+    info: 'Cánh Tây Tòa B (cao 4 tầng) là đại bản doanh của Khoa Công nghệ thông tin với Phòng Y tế ở Tầng 1 và hệ thống phòng Lab Lập trình, Mạng, Đồ họa, AI từ Tầng 2 đến Tầng 4.',
     funFact: 'Khoa CNTT là một trong những khoa có số lượng câu lạc bộ học thuật, cuộc thi Hackathon và dự án chuyển đổi số sôi nổi nhất tại TDC.',
-    directions: 'Di chuyển dọc hành lang mặt trước Tòa B sang phía Đông khoảng 28m để tới khu vực Khoa Điện – Điện tử.',
+    directions: 'Di chuyển sang Cánh Đông Tòa B (cao 5 tầng) để khám phá khu vực Khoa Điện – Điện tử ở Tầng 4.',
     qrSecretToken: 'TDC-QR-TOAB-CNTT',
     riddle: {
       prompt: 'Ở tầng trệt đầu phía Tây của Tòa B (gần biển Khoa CNTT) có đặt phòng chức năng chăm sóc sức khỏe nào?',
@@ -3674,18 +4625,21 @@ export const DEFAULT_STATIONS: Station[] = [
   {
     id: 'b_elec',
     name: 'Tòa B · Khoa Điện – Điện tử',
-    sub: 'Cánh Đông Tòa B · Tự động hóa & IoT',
+    sub: 'Cánh Đông Tòa B (5 Tầng) · Lab PLC Tầng 4 (+12.6m)',
     facultyId: 'dien_dt',
-    x: -78,
-    z: 2,
+    x: -72,
+    y: 12.6,
+    z: -8,
+    floor: 4,
+    buildingId: 'bld_b_east',
     fogRadius: 28,
     col: '#FFAA1F',
     type: 'electric_circuit',
     pts: 140,
     badge: 'Bậc thầy Mạch điện',
-    info: 'Cánh Đông Tòa B (cao 5 tầng) là nơi đặt các phòng thực hành Điện công nghiệp, Điện tử viễn thông, Vi điều khiển, PLC và Tự động hóa.',
-    funFact: 'Sinh viên Khoa Điện – Điện tử thường xuyên chế tạo các mô hình nhà thông minh, robot dò đường và hệ thống năng lượng mặt trời ngay tại xưởng tầng trệt.',
-    directions: 'Từ Tòa B đi về hướng Bắc qua lối rẽ trung tâm sẽ tới Khu phức hợp 6 sân bóng đá mini.',
+    info: 'Cánh Đông Tòa B (cao 5 tầng) là nơi đặt Xưởng Điện công nghiệp ở Tầng 1, các phòng Lab Vi điều khiển ở Tầng 3, Tự động hóa PLC ở Tầng 4 và Điện mặt trời ở Tầng 5.',
+    funFact: 'Sinh viên Khoa Điện – Điện tử thường xuyên chế tạo các mô hình nhà thông minh, robot dò đường và hệ thống năng lượng mặt trời ngay tại tòa nhà 5 tầng này.',
+    directions: 'Từ Tòa B đi xuống tầng trệt và hướng về phía Bắc qua lối rẽ trung tâm sẽ tới Khu phức hợp 6 sân bóng đá mini.',
     qrSecretToken: 'TDC-QR-TOAB-DIENDT',
     riddle: {
       prompt: 'Khối nhà phía Đông của Tòa B (nơi treo biển Khoa Điện – Điện tử) cao bao nhiêu tầng?',
@@ -3697,10 +4651,12 @@ export const DEFAULT_STATIONS: Station[] = [
   {
     id: 'sb',
     name: 'Cụm Sân bóng Mini',
-    sub: 'Khu Thể thao Sinh viên phía Bắc',
+    sub: 'Khu Thể thao Phía Bắc · Tầng 1 (0.0m)',
     facultyId: 'khac',
     x: -48,
+    y: 0,
     z: -34,
+    floor: 1,
     fogRadius: 38,
     col: '#38B865',
     type: 'kick',
@@ -3720,10 +4676,13 @@ export const DEFAULT_STATIONS: Station[] = [
   {
     id: 'ck',
     name: 'Xưởng Cơ khí – Ô tô',
-    sub: 'Khu Thực hành Máy & Động cơ',
+    sub: 'Nhà xưởng Mái răng cưa · Tầng 1 (0.0m)',
     facultyId: 'co_khi_oto',
     x: 11,
-    z: 54,
+    y: 0,
+    z: 46,
+    floor: 1,
+    buildingId: 'bld_workshop',
     fogRadius: 28,
     col: '#FF6F59',
     type: 'auto_engine',
@@ -3731,7 +4690,7 @@ export const DEFAULT_STATIONS: Station[] = [
     badge: 'Kỹ sư Động cơ',
     info: 'Xưởng thực hành Cơ khí – Ô tô nổi bật với kiến trúc mái răng cưa thông gió lấy sáng tự nhiên, bên trong trang bị máy tiện CNC, cầu nâng và động cơ ô tô thực tế.',
     funFact: 'Thiết kế mái răng cưa (Sawtooth Roof) gồm 3 nhịp giúp xưởng luôn thoáng mát và đón ánh sáng tự nhiên đồng đều mà không bị chói nắng trực tiếp.',
-    directions: 'Rời Xưởng Cơ khí đi về hướng Đông Bắc qua hành lang mái che để khám phá Tòa C và Ký túc xá.',
+    directions: 'Rời Xưởng Cơ khí đi về hướng Đông Bắc qua hành lang mái che để khám phá Tòa C (3 tầng) và Ký túc xá (3 tầng).',
     qrSecretToken: 'TDC-QR-WORKSHOP-AUTO',
     riddle: {
       prompt: 'Phần mái đặc trưng của Xưởng cơ khí được ghép từ mấy nhịp mái hình lăng trụ tam giác (mái răng cưa)?',
@@ -3743,18 +4702,21 @@ export const DEFAULT_STATIONS: Station[] = [
   {
     id: 'c',
     name: 'Tòa C & Ký túc xá',
-    sub: 'Giảng đường Khu Đông & Nội trú',
+    sub: 'Tòa C (3 Tầng) & KTX (3 Tầng) · Trạm Tầng 2 (+4.2m)',
     facultyId: 'co_khi_ctm',
-    x: 82,
-    z: -1,
+    x: 84,
+    y: 4.2,
+    z: -11,
+    floor: 2,
+    buildingId: 'bld_c',
     fogRadius: 36,
     col: '#6F8CF0',
     type: 'quiz',
     pts: 110,
     badge: 'Công dân Khu Đông',
-    info: 'Tòa C mang sắc xanh lam nhẹ nhàng được kết nối trực tiếp với Khu B qua dãy hành lang có mái che dài gần 100m. Phía sau Tòa C là khu Ký túc xá sinh viên màu hồng ấm áp.',
+    info: 'Tòa C (cao 3 tầng) mang sắc xanh lam nhẹ nhàng được kết nối trực tiếp với Khu B qua dãy hành lang có mái che dài gần 100m. Phía Bắc Tòa C là khu Ký túc xá sinh viên (3 tầng) màu hồng ấm áp.',
     funFact: 'Hành lang có mái che nối Khu B sang Tòa C giúp sinh viên di chuyển giữa hai khu giảng đường Đông – Tây mà không sợ nắng mưa thất thường của Sài Gòn!',
-    directions: 'Từ Tòa C đi về phía Nam vài chục mét sẽ đứng dưới chân Tòa D 11 tầng đồ sộ nhất trường.',
+    directions: 'Từ Tòa C đi về phía Nam vài chục mét sẽ tới Tòa D (11 tầng nổi + 1 tầng hầm) đồ sộ nhất trường.',
     qrSecretToken: 'TDC-QR-TOAC-KTX',
     riddle: {
       prompt: 'Tòa nhà nội trú nằm ngay phía Bắc của Tòa C có sơn tường màu hồng và tấm biển ghi 3 từ gì?',
@@ -3789,19 +4751,22 @@ export const DEFAULT_STATIONS: Station[] = [
   },
   {
     id: 'd',
-    name: 'Tòa D (11 tầng) & Cổng 2',
-    sub: 'Biểu tượng Hiện đại · Đường Chương Dương',
+    name: 'Tòa D (11 Tầng + 1 Hầm) & Cổng 2',
+    sub: 'Đỉnh Khối Đế Tầng 7 (+25.2m) · Đường Chương Dương',
     facultyId: 'khac',
-    x: 66,
-    z: 55,
+    x: 56,
+    y: 25.2,
+    z: 28,
+    floor: 7,
+    buildingId: 'bld_d',
     fogRadius: 42,
     col: '#00AEEF',
     type: 'quiz',
     pts: 120,
     badge: 'Chinh phục Đỉnh TDC',
-    info: 'Tòa D là công trình kiến trúc hiện đại biểu tượng của TDC với kết cấu chữ L cao 11 tầng nổi, khối đế bo cong 7 tầng mềm mại và tháp lõi gắn Logo TDC tỏa sáng. Sát bên là Cổng 2 mở ra đường Chương Dương.',
-    funFact: 'Từ tầng 11 của Tòa D, bạn có thể phóng tầm mắt ngắm trọn vẹn toàn cảnh khu vực trung tâm TP. Thủ Đức và đoàn tàu Metro số 1!',
-    directions: 'Chúc mừng! Bạn đã kết nối trọn vẹn trục đường từ Cổng 1 (Võ Văn Ngân) sang tới Tòa D và Cổng 2 (Chương Dương).',
+    info: 'Tòa D là công trình kiến trúc hiện đại biểu tượng của TDC với kết cấu chữ L cao 11 tầng nổi (+42m), 1 tầng hầm (-4.2m), khối đế bo cong 7 tầng (+25.2m) và tháp lõi gắn Logo TDC.',
+    funFact: 'Từ tầng 7 đến tầng 11 của Tòa D, bạn có thể bật chế độ Cắt lớp Phân tầng 3D để quan sát từng mặt sàn hoặc phóng tầm mắt ngắm toàn cảnh TP. Thủ Đức!',
+    directions: 'Chúc mừng! Bạn đã hoàn thành định vị GPS 3 trục X-Y-Z xuyên suốt từ Cổng 1 (Võ Văn Ngân) sang tới đỉnh Tòa D và Cổng 2 (Chương Dương).',
     qrSecretToken: 'TDC-QR-TOAD-11FL',
     riddle: {
       prompt: 'Tòa nhà D cao nhất khuôn viên TDC có bao nhiêu tầng nổi?',
@@ -3810,15 +4775,15 @@ export const DEFAULT_STATIONS: Station[] = [
     },
     questions: [
       {
-        q: 'Tòa D – công trình cao tầng hiện đại nhất khuôn viên TDC – có quy mô bao nhiêu tầng?',
+        q: 'Tòa D – công trình cao tầng hiện đại nhất khuôn viên TDC – có quy mô phân tầng như thế nào?',
         opts: [
-          '11 tầng nổi (kèm khối đế bo cong 7 tầng)',
-          '5 tầng nổi',
+          '11 tầng nổi, 1 tầng hầm B1 và khối đế bo cong 7 tầng',
+          '5 tầng nổi không có tầng hầm',
           '18 tầng nổi',
           '3 tầng nổi',
         ],
         ans: 0,
-        ex: 'Tòa D gồm khối tháp chữ L cao 11 tầng nổi, 1 tầng hầm và khối đế bo cong 7 tầng.',
+        ex: 'Tòa D gồm khối tháp chữ L cao 11 tầng nổi, 1 tầng hầm (-4.2m) và khối đế bo cong 7 tầng.',
       },
       {
         q: 'Cổng 2 nằm ở phía Đông khuôn viên trường (gần Tòa D và Tòa C) mở ra tuyến đường nào?',
@@ -3955,6 +4920,7 @@ export const audioSfx = new AudioSfxManager();
 
 <file path="src/engine/campusBuilder.ts">
 import * as THREE from 'three';
+import { CAMPUS_BUILDINGS } from '../data/campusBuildings';
 import { LAKE, PATHS, ROADS, TDC_LOGO } from '../data/campusLayout';
 import {
   AABB,
@@ -3978,7 +4944,15 @@ export interface CampusBuildContext {
   rng: () => number;
 }
 
-export function buildCampusEnvironment(ctx: CampusBuildContext): { flag: THREE.Mesh } {
+export interface FloorHighlightController {
+  setFloorView: (buildingId: string | null, floor: number | null, cutaway: boolean) => void;
+  getClippingPlanes: () => THREE.Plane[];
+}
+
+export function buildCampusEnvironment(ctx: CampusBuildContext): {
+  flag: THREE.Mesh;
+  floorController: FloorHighlightController;
+} {
   const { scene, col, mat, rng } = ctx;
 
   const addCol = (x0: number, z0: number, x1: number, z1: number) =>
@@ -5046,7 +6020,168 @@ export function buildCampusEnvironment(ctx: CampusBuildContext): { flag: THREE.M
   addLabel(pill('Xưởng cơ khí', { h: 3 }), 11, 12, 46);
   addLabel(pill('Sân bóng chuyền', { h: 3 }), -50, 4, 12.5);
 
-  return { flag };
+  /* ---- Hệ thống Phân tầng 3D (Floor Slabs, Tầng hầm B1 Tòa D & Mặt cắt Cutaway) ---- */
+  const floorHighlightGroup = new THREE.Group();
+  scene.add(floorHighlightGroup);
+
+  // Tầng hầm B1 của Tòa D (-4.2m -> 0m) hiển thị dạng khung kính kỹ thuật ngầm dưới khối đế
+  {
+    const b1Geo = new THREE.BoxGeometry(62, FH - 0.3, 44);
+    const b1Mat = new THREE.MeshPhongMaterial({
+      color: '#00AEEF',
+      transparent: true,
+      opacity: 0.24,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const b1Mesh = new THREE.Mesh(b1Geo, b1Mat);
+    b1Mesh.position.set(54.8, -FH / 2, 27.8);
+    floorHighlightGroup.add(b1Mesh);
+  }
+
+  // Tạo lưới phân tầng & mặt sàn sáng (Floor Slab) cho từng tầng của tất cả các tòa nhà
+  const slabRecords: {
+    buildingId: string;
+    floor: number;
+    group: THREE.Group;
+    plate: THREE.Mesh;
+    wire: THREE.LineSegments;
+    label: THREE.Sprite;
+  }[] = [];
+
+  CAMPUS_BUILDINGS.forEach((b) => {
+    const [x0, z0, x1, z1] = b.bounds;
+    const w = x1 - x0;
+    const d = z1 - z0;
+    const cx = (x0 + x1) / 2;
+    const cz = (z0 + z1) / 2;
+    const fh = b.floorHeightMeters || FH;
+
+    b.floors.forEach((flSpec) => {
+      const yBase = flSpec.elevationMeters;
+      const g = new THREE.Group();
+      g.position.set(cx, yBase + 0.14, cz);
+
+      const plateGeo = new THREE.BoxGeometry(w + 1.2, 0.32, d + 1.2);
+      const plateMat = new THREE.MeshBasicMaterial({
+        color: b.color,
+        transparent: true,
+        opacity: 0.12,
+        depthWrite: false,
+      });
+      const plate = new THREE.Mesh(plateGeo, plateMat);
+      g.add(plate);
+
+      const boxGeo = new THREE.BoxGeometry(w + 1.3, fh - 0.15, d + 1.3);
+      const edges = new THREE.EdgesGeometry(boxGeo);
+      const wireMat = new THREE.LineBasicMaterial({
+        color: b.color,
+        transparent: true,
+        opacity: 0.25,
+      });
+      const wire = new THREE.LineSegments(edges, wireMat);
+      wire.position.y = fh / 2;
+      g.add(wire);
+
+      const flTag = pill(`${b.code} · ${flSpec.label} (${yBase >= 0 ? '+' : ''}${yBase.toFixed(1)}m)`, {
+        h: 1.75,
+        fs: 36,
+        bg: '#0F172A',
+        fg: '#38BDF8',
+        dot: b.color,
+      });
+      flTag.position.set(0, fh * 0.65, d / 2 + 2.2);
+      flTag.visible = false;
+      g.add(flTag);
+
+      floorHighlightGroup.add(g);
+      slabRecords.push({
+        buildingId: b.id,
+        floor: flSpec.floor,
+        group: g,
+        plate,
+        wire,
+        label: flTag,
+      });
+    });
+  });
+
+  const clipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 200);
+  let activeClippingPlanes: THREE.Plane[] = [];
+
+  const isExemptFromClipping = (o: THREE.Object3D | null): boolean => {
+    let cur = o;
+    while (cur) {
+      if (cur === floorHighlightGroup || cur === sky) return true;
+      cur = cur.parent;
+    }
+    return false;
+  };
+
+  const applyLocalClipping = (planes: THREE.Plane[]) => {
+    scene.traverse((obj) => {
+      if (isExemptFromClipping(obj)) return;
+      const m = obj as THREE.Mesh;
+      if (!m.isMesh || !m.material) return;
+      if (m.position.y <= 0.25 && m.geometry.boundingBox == null) {
+        m.geometry.computeBoundingBox();
+      }
+      const maxY =
+        m.position.y + (m.geometry.boundingBox ? m.geometry.boundingBox.max.y : 1);
+      if (maxY <= 0.35) return;
+
+      const mats = Array.isArray(m.material) ? m.material : [m.material];
+      mats.forEach((matItem) => {
+        matItem.clippingPlanes = planes.length > 0 ? planes : null;
+        matItem.clipShadows = true;
+        matItem.needsUpdate = true;
+      });
+    });
+  };
+
+  const floorController: FloorHighlightController = {
+    setFloorView: (buildingId: string | null, floor: number | null, cutaway: boolean) => {
+      slabRecords.forEach((rec) => {
+        const isTargetBuilding = !buildingId || rec.buildingId === buildingId;
+        const isTargetFloor = floor !== null && rec.floor === floor && isTargetBuilding;
+
+        const pMat = rec.plate.material as THREE.MeshBasicMaterial;
+        const wMat = rec.wire.material as THREE.LineBasicMaterial;
+
+        if (isTargetFloor) {
+          pMat.opacity = 0.55;
+          pMat.color.set('#00F0FF');
+          wMat.opacity = 0.95;
+          wMat.color.set('#00F0FF');
+          rec.label.visible = true;
+        } else if (floor !== null && rec.floor === floor) {
+          // Cùng cao độ tầng ở các tòa nhà khác
+          pMat.opacity = 0.28;
+          pMat.color.set('#38BDF8');
+          wMat.opacity = 0.55;
+          wMat.color.set('#38BDF8');
+          rec.label.visible = false;
+        } else {
+          pMat.opacity = 0.04;
+          wMat.opacity = 0.14;
+          rec.label.visible = false;
+        }
+      });
+
+      if (cutaway && floor !== null) {
+        const cutY = floor === -1 ? 0.3 : floor * FH + 0.35;
+        clipPlane.constant = cutY;
+        activeClippingPlanes = [clipPlane];
+        applyLocalClipping(activeClippingPlanes);
+      } else {
+        activeClippingPlanes = [];
+        applyLocalClipping([]);
+      }
+    },
+    getClippingPlanes: () => activeClippingPlanes,
+  };
+
+  return { flag, floorController };
 }
 </file>
 
@@ -5361,7 +6496,8 @@ export class FogOfWarSystem {
     stations.forEach((st, idx) => {
       const isUnlocked = unlockedIds[st.id] != null;
       const group = new THREE.Group();
-      group.position.set(st.x, 0, st.z);
+      const baseY = st.y || 0;
+      group.position.set(st.x, baseY, st.z);
 
       const radius = st.fogRadius || 30;
       const groundVeil = new THREE.Mesh(
@@ -5461,13 +6597,10 @@ export class FogOfWarSystem {
 import * as THREE from 'three';
 import { CAMP, LAKE, PATHS, ROADS, ZONES } from '../data/campusLayout';
 import { Station } from '../types/game';
-import { AABB, canvasTex, ell, heightAt, mesh, rr, segDist, signTex } from './threeHelpers';
+import { AABB, ell, heightAt, segDist } from './threeHelpers';
 
 export interface NatureAndTrainState {
   clouds: THREE.Group[];
-  balloons: THREE.Group[];
-  train: THREE.Group[];
-  puffs: { m: THREE.Mesh; life: number }[];
   animate: (dt: number, t: number) => void;
 }
 
@@ -5480,19 +6613,6 @@ export function buildNatureAndTrain(ctx: {
 }): NatureAndTrainState {
   const { scene, col, stations, mat, rng } = ctx;
   const clouds: THREE.Group[] = [];
-  const balloons: THREE.Group[] = [];
-  const train: THREE.Group[] = [];
-  const puffs: { m: THREE.Mesh; life: number }[] = [];
-
-  const box = (
-    w: number,
-    h: number,
-    d: number,
-    c: string,
-    x?: number,
-    y?: number,
-    z?: number
-  ) => mesh(new THREE.BoxGeometry(w, h, d), mat(c), x, y, z);
 
   const freeSpot = (x: number, z: number, pad: number): boolean => {
     for (const c of col) {
@@ -5687,258 +6807,14 @@ export function buildNatureAndTrain(ctx: {
     clouds.push(g);
   }
 
-  // Hot-air balloons
-  (
-    [
-      [['#00AEEF', '#FFFFFF', '#FFC83A', '#FFFFFF'], -160, 85, -120],
-      [['#FF6F59', '#FFC83A', '#FF6F59', '#FFFFFF'], 190, 95, 60],
-      [['#38B865', '#FFFFFF', '#9B6BFF', '#FFFFFF'], 40, 110, -210],
-    ] as [string[], number, number, number][]
-  ).forEach(([cols, x, y, z], i) => {
-    const g = new THREE.Group();
-    const tex = canvasTex(
-      256,
-      64,
-      (c, W, H) => {
-        cols.forEach((cl, k) => {
-          for (let j = k; j < 16; j += cols.length) {
-            c.fillStyle = cl;
-            c.fillRect((j * W) / 16, 0, W / 16 + 1, H);
-          }
-        });
-      },
-      true
-    );
-    const env = new THREE.Mesh(
-      new THREE.SphereGeometry(6, 16, 12),
-      new THREE.MeshPhongMaterial({ map: tex, flatShading: true, shininess: 10 })
-    );
-    env.scale.y = 1.18;
-    env.castShadow = true;
-    g.add(env);
-    g.add(box(2, 1.4, 2, '#B07A48', 0, -9.6, 0));
-    [
-      [-0.8, -0.8],
-      [0.8, -0.8],
-      [0.8, 0.8],
-      [-0.8, 0.8],
-    ].forEach(([a, b]) => g.add(box(0.08, 3.2, 0.08, '#6B4B2A', a, -7.6, b)));
-    g.position.set(x, y, z);
-    g.userData = { y, ph: i * 2 };
-    scene.add(g);
-    balloons.push(g);
-  });
-
-  // 2. TDC Express Train & Railway Track
-  const trackPts: THREE.Vector3[] = [];
-  for (let i = 0; i < 72; i++) {
-    const a = (i / 72) * Math.PI * 2;
-    const w = 1 + 0.035 * Math.sin(3 * a + 0.7);
-    trackPts.push(
-      new THREE.Vector3(
-        CAMP.cx + CAMP.rx * 1.2 * w * Math.cos(a),
-        0,
-        CAMP.cz + CAMP.rz * 1.2 * w * Math.sin(a)
-      )
-    );
-  }
-  const track = new THREE.CatmullRomCurve3(trackPts, true, 'catmullrom', 0.5);
-  const TL = track.getLength();
-
-  const ribbon = (N: number, w: number, off: number, y: number, color: string) => {
-    const pos: number[] = [];
-    const idx: number[] = [];
-    for (let i = 0; i <= N; i++) {
-      const u = (i / N) % 1;
-      const p = track.getPointAt(u);
-      const t = track.getTangentAt(u);
-      const l = Math.hypot(t.x, t.z) || 1;
-      const nx = -t.z / l;
-      const nz = t.x / l;
-      const a = off - w / 2;
-      const b = off + w / 2;
-      pos.push(p.x + nx * a, y, p.z + nz * a, p.x + nx * b, y, p.z + nz * b);
-      if (i < N) {
-        const k = i * 2;
-        idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3);
-      }
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setIndex(idx);
-    g.computeVertexNormals();
-    const m = new THREE.Mesh(
-      g,
-      new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide, shininess: 4 })
-    );
-    m.receiveShadow = true;
-    scene.add(m);
-  };
-
-  ribbon(700, 4, 0, 0.1, '#B65A3F');
-  const nSl = Math.floor(TL / 1.3);
-  const sl = new THREE.InstancedMesh(new THREE.BoxGeometry(3.2, 0.2, 0.5), mat('#6E3E2C'), nSl);
-  for (let i = 0; i < nSl; i++) {
-    const u = i / nSl;
-    const p = track.getPointAt(u);
-    const t = track.getTangentAt(u);
-    o.position.set(p.x, 0.24, p.z);
-    o.rotation.set(0, Math.atan2(t.x, t.z) + Math.PI / 2, 0);
-    o.scale.set(1, 1, 1);
-    o.updateMatrix();
-    sl.setMatrixAt(i, o.matrix);
-  }
-  sl.receiveShadow = true;
-  scene.add(sl);
-  ribbon(700, 0.24, -0.78, 0.38, '#E9E1D4');
-  ribbon(700, 0.24, 0.78, 0.38, '#E9E1D4');
-
-  const winT = canvasTex(128, 64, (g, W, H) => {
-    g.fillStyle = '#FFFFFF';
-    g.fillRect(0, 0, W, H);
-    g.fillStyle = '#7FCBEE';
-    rr(g, 16, 12, 96, 36, 10);
-    g.fill();
-    g.fillStyle = 'rgba(255,255,255,.6)';
-    g.fillRect(24, 16, 8, 26);
-  });
-  const banner = signTex([['TUYỂN SINH 2027 · TDC', 96]], '#FFC83A', '#3D2A00', 1200, 170);
-  const wheels = (g: THREE.Group) =>
-    [
-      [-1.2, -2.4],
-      [1.2, -2.4],
-      [-1.2, 2.4],
-      [1.2, 2.4],
-    ].forEach(([x, z]) => {
-      const w = mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.3, 12), mat('#2D3238'), x, 0.6, z);
-      w.rotation.z = Math.PI / 2;
-      g.add(w);
-    });
-
-  // Locomotive
-  {
-    const g = new THREE.Group();
-    g.add(box(2.7, 0.6, 7.2, '#3A4046', 0, 0.95, 0));
-    wheels(g);
-    const boil = mesh(new THREE.CylinderGeometry(1.15, 1.15, 4, 14), mat('#00AEEF'), 0, 2.4, 1.2);
-    boil.rotation.x = Math.PI / 2;
-    g.add(boil);
-    g.add(
-      mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.3, 14), mat('#FFC83A'), 0, 2.4, 3.2).rotateX(
-        Math.PI / 2
-      )
-    );
-    g.add(box(2.6, 2.8, 2.6, '#0A7FC2', 0, 2.6, -2));
-    g.add(box(3, 0.35, 3, '#FF6F59', 0, 4.15, -2));
-    const ch = mesh(new THREE.CylinderGeometry(0.42, 0.3, 1.5, 10), mat('#30343A'), 0, 4, 2.2);
-    g.add(ch);
-    g.userData.chim = ch;
-    g.add(
-      mesh(new THREE.SphereGeometry(0.38, 10, 8), mat('#FFF3B0', { emissive: 0x997700 }), 0, 2.4, 3.45)
-    );
-    const cw = mesh(new THREE.ConeGeometry(1.2, 1.2, 4), mat('#FF6F59'), 0, 0.9, 3.9);
-    cw.rotation.x = Math.PI / 2;
-    cw.rotation.y = Math.PI / 4;
-    g.add(cw);
-    scene.add(g);
-    train.push(g);
-  }
-
-  // Carriages
-  ['#FF6F59', '#FFC83A', '#38B865', '#9B6BFF'].forEach((c, i) => {
-    const g = new THREE.Group();
-    g.add(box(2.7, 0.6, 7, '#3A4046', 0, 0.95, 0));
-    wheels(g);
-    const t = winT.clone();
-    t.needsUpdate = true;
-    t.repeat.set(3, 1);
-    const wm = new THREE.MeshPhongMaterial({ map: t });
-    g.add(
-      mesh(
-        new THREE.BoxGeometry(2.6, 2.3, 6.6),
-        [wm, wm, mat(c), mat(c), mat(c), mat(c)],
-        0,
-        2.4,
-        0
-      )
-    );
-    g.add(box(2.95, 0.35, 6.9, c, 0, 3.7, 0));
-    if (i === 1) {
-      [1.33, -1.33].forEach((x) => {
-        const b = new THREE.Mesh(
-          new THREE.PlaneGeometry(6, 0.8),
-          new THREE.MeshPhongMaterial({ map: banner, shininess: 4, side: THREE.FrontSide })
-        );
-        b.position.set(x, 1.5, 0);
-        b.rotation.y = x > 0 ? Math.PI / 2 : -Math.PI / 2;
-        g.add(b);
-      });
-    }
-    scene.add(g);
-    train.push(g);
-  });
-
-  const pm = new THREE.MeshLambertMaterial({
-    color: 0xffffff,
-    emissive: 0x777777,
-    transparent: true,
-  });
-  for (let i = 0; i < 16; i++) {
-    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 1), pm.clone());
-    m.visible = false;
-    scene.add(m);
-    puffs.push({ m, life: 0 });
-  }
-
-  let trainU = 0.12;
-  let puffT = 0;
-  const tmpQ = new THREE.Vector3();
-
-  const animate = (dt: number, t: number) => {
+  const animate = (dt: number) => {
     clouds.forEach((c, i) => {
       c.position.x += dt * (2 + (i % 3));
       if (c.position.x > 520) c.position.x = -520;
     });
-    balloons.forEach((b) => {
-      b.position.y = b.userData.y + Math.sin(t * 0.4 + b.userData.ph) * 3;
-      b.rotation.y += dt * 0.05;
-      b.position.x += Math.sin(t * 0.05 + b.userData.ph) * dt * 2;
-    });
-
-    trainU = (trainU + (dt * 7.5) / TL) % 1;
-    const gap = 8.4 / TL;
-    train.forEach((g, i) => {
-      const u = (((trainU - i * gap) % 1) + 1) % 1;
-      const p = track.getPointAt(u);
-      g.position.copy(p);
-      track.getPointAt((u + 0.002) % 1, tmpQ);
-      g.lookAt(tmpQ.x, p.y, tmpQ.z);
-    });
-
-    puffT -= dt;
-    const loco = train[0];
-    if (puffT <= 0 && loco) {
-      puffT = 0.35;
-      const f = puffs.find((q) => q.life <= 0);
-      if (f) {
-        (loco.userData.chim as THREE.Object3D).getWorldPosition(f.m.position);
-        f.m.position.y += 1;
-        f.life = 1;
-        f.m.visible = true;
-        f.m.scale.setScalar(0.6);
-      }
-    }
-    puffs.forEach((q) => {
-      if (q.life <= 0) return;
-      q.life -= dt * 0.55;
-      q.m.position.y += dt * 2.6;
-      q.m.scale.multiplyScalar(1 + dt * 1.1);
-      (q.m.material as THREE.MeshLambertMaterial).opacity = Math.max(0, q.life);
-      if (q.life <= 0) q.m.visible = false;
-    });
   };
 
-  return { clouds, balloons, train, puffs, animate };
+  return { clouds, animate };
 }
 </file>
 
@@ -6698,10 +7574,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                   <div>
                     <label className="text-xs font-black uppercase text-slate-500">
-                      Tọa độ X (Đông)
+                      Tọa độ X (Đông/Tây)
                     </label>
                     <input
                       type="number"
+                      step="0.1"
                       value={editingStation.x}
                       onChange={(e) =>
                         setEditingStation({
@@ -6714,10 +7591,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                   <div>
                     <label className="text-xs font-black uppercase text-slate-500">
-                      Tọa độ Z (Nam)
+                      Tọa độ Z (Nam/Bắc)
                     </label>
                     <input
                       type="number"
+                      step="0.1"
                       value={editingStation.z}
                       onChange={(e) =>
                         setEditingStation({
@@ -6730,17 +7608,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                   <div>
                     <label className="text-xs font-black uppercase text-slate-500">
-                      Bán kính Sương mù (m)
+                      Tầng (B1=-1, T1..11)
                     </label>
                     <input
                       type="number"
-                      value={editingStation.fogRadius}
-                      onChange={(e) =>
+                      min={-1}
+                      max={11}
+                      value={editingStation.floor ?? 1}
+                      onChange={(e) => {
+                        const fl = Number(e.target.value) || 1;
+                        const yElev = fl === -1 ? -4.2 : Math.max(0, (fl - 1) * 4.2);
                         setEditingStation({
                           ...editingStation,
-                          fogRadius: Number(e.target.value) || 28,
-                        })
-                      }
+                          floor: fl,
+                          y: +yElev.toFixed(1),
+                        });
+                      }}
                       className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold text-sm"
                     />
                   </div>
@@ -6875,7 +7758,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <div>
                         <h3 className="m-0 font-black text-base">{st.name}</h3>
                         <p className="m-0 text-xs font-bold text-slate-500">
-                          {st.sub} · Tọa độ ({st.x}, {st.z}) · Sương mù R={st.fogRadius}m
+                          {st.sub} · 3D ({st.x}, {st.y || 0}m, {st.z}) · Tầng {st.floor === -1 ? 'B1' : st.floor || 1}
                         </p>
                       </div>
                     </div>
@@ -7195,8 +8078,8 @@ import { getLocalPublicUsers } from './authService';
 import { db, isFirebaseConfigured } from './firebase';
 import { loadLocalCheckinLogs, loadLocalEvents } from './gameService';
 
-const LOCAL_STATIONS_KEY = 'tdc_go_stations_v2';
-const LOCAL_EVENTS_KEY = 'tdc_go_events_v2';
+const LOCAL_STATIONS_KEY = 'tdc_go_stations_v3_3d';
+const LOCAL_EVENTS_KEY = 'tdc_go_events_v3_3d';
 
 export function loadStations(): Station[] {
   try {
@@ -7787,7 +8670,10 @@ export interface Station {
   sub: string;
   facultyId: string;
   x: number;
+  y?: number;
   z: number;
+  floor?: number;
+  buildingId?: string;
   fogRadius: number;
   col: string;
   type: StationType;
@@ -7800,6 +8686,44 @@ export interface Station {
   riddle?: StationRiddle;
   questions?: QuizItem[];
   active: boolean;
+}
+
+export interface BuildingFloorSpec {
+  floor: number;
+  label: string;
+  elevationMeters: number;
+  departments: string;
+  highlights: string;
+}
+
+export interface CampusBuildingZone {
+  id: string;
+  code: string;
+  name: string;
+  bounds: [number, number, number, number]; // [x0, z0, x1, z1]
+  minFloor: number;
+  maxFloor: number;
+  floorHeightMeters: number;
+  color: string;
+  floors: BuildingFloorSpec[];
+}
+
+export interface GpsTelemetry3D {
+  lat: number;
+  lng: number;
+  altitudeAsl: number | null;
+  accuracyMeters: number;
+  altitudeAccuracyMeters: number | null;
+  headingDeg: number | null;
+  speedMps: number | null;
+  x: number;
+  y: number;
+  z: number;
+  detectedFloor: number;
+  detectedBuilding: CampusBuildingZone | null;
+  insideCampus: boolean;
+  source: 'gps_hardware' | 'gps_calibrated' | 'manual_override';
+  timestamp: number;
 }
 
 export type VerificationMethod = 'qr' | 'riddle' | 'demo';
@@ -7826,7 +8750,7 @@ export interface UserProfile {
   done: Record<string, UnlockedStationRecord>;
   bonus: Record<string, boolean>;
   partyId?: string;
-  pos?: [number, number] | null;
+  pos?: [number, number] | [number, number, number] | null;
   certClaimed?: boolean;
   updatedAt: number;
 }
@@ -9291,6 +10215,14 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=
 VITE_FIREBASE_APP_ID=
 </file>
 
+<file path=".firebaserc">
+{
+  "projects": {
+    "default": "tdc-go-2026"
+  }
+}
+</file>
+
 <file path=".gitignore">
 node_modules
 dist
@@ -9301,41 +10233,6 @@ dist-ssr
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
-</file>
-
-<file path="firebase.json">
-{
-  "auth": {
-    "providers": {
-      "anonymous": true,
-      "emailPassword": true,
-      "googleSignIn": {
-        "oAuthBrandDisplayName": "TDC GO",
-        "supportEmail": "kuganagia@gmail.com"
-      }
-    }
-  },
-  "firestore": {
-    "database": "(default)",
-    "location": "asia-southeast1",
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  },
-  "hosting": {
-    "public": "dist",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
-  }
-}
 </file>
 
 <file path="firestore.indexes.json">
@@ -9822,7 +10719,7 @@ npm run build
 </file>
 
 <file path="tsconfig.tsbuildinfo">
-{"root":["./src/app.tsx","./src/game.test.ts","./src/main.tsx","./src/vite-env.d.ts","./src/components/gamehud.tsx","./src/components/minimap.tsx","./src/components/qrscannermodal.tsx","./src/components/startscreen.tsx","./src/components/stationmodal.tsx","./src/components/stationsticker.tsx","./src/components/minigames/autoenginegame.tsx","./src/components/minigames/electriccircuitgame.tsx","./src/components/minigames/itdebuggame.tsx","./src/components/minigames/kickgame.tsx","./src/components/minigames/viewfinder.tsx","./src/components/modals/certificatemodal.tsx","./src/components/modals/helpmodal.tsx","./src/components/modals/leaderboardmodal.tsx","./src/components/modals/partymodal.tsx","./src/components/modals/profilebadgesmodal.tsx","./src/components/modals/questsmodal.tsx","./src/data/campuslayout.ts","./src/data/faculties.ts","./src/data/stations.ts","./src/engine/tdccampusengine.ts","./src/engine/audiosfx.ts","./src/engine/campusbuilder.ts","./src/engine/chibibuilder.ts","./src/engine/fogofwar.ts","./src/engine/natureandtrain.ts","./src/engine/threehelpers.ts","./src/pages/admindashboard.tsx","./src/services/adminservice.ts","./src/services/authservice.ts","./src/services/firebase.ts","./src/services/gameservice.ts","./src/services/partyservice.ts","./src/types/game.ts"],"version":"5.7.3"}
+{"root":["./src/app.tsx","./src/game.test.ts","./src/main.tsx","./src/vite-env.d.ts","./src/components/gamehud.tsx","./src/components/minimap.tsx","./src/components/qrscannermodal.tsx","./src/components/startscreen.tsx","./src/components/stationmodal.tsx","./src/components/stationsticker.tsx","./src/components/minigames/autoenginegame.tsx","./src/components/minigames/electriccircuitgame.tsx","./src/components/minigames/itdebuggame.tsx","./src/components/minigames/kickgame.tsx","./src/components/minigames/viewfinder.tsx","./src/components/modals/certificatemodal.tsx","./src/components/modals/helpmodal.tsx","./src/components/modals/leaderboardmodal.tsx","./src/components/modals/partymodal.tsx","./src/components/modals/profilebadgesmodal.tsx","./src/components/modals/questsmodal.tsx","./src/data/campusbuildings.ts","./src/data/campuslayout.ts","./src/data/faculties.ts","./src/data/stations.ts","./src/engine/tdccampusengine.ts","./src/engine/audiosfx.ts","./src/engine/campusbuilder.ts","./src/engine/chibibuilder.ts","./src/engine/fogofwar.ts","./src/engine/natureandtrain.ts","./src/engine/threehelpers.ts","./src/pages/admindashboard.tsx","./src/services/adminservice.ts","./src/services/authservice.ts","./src/services/firebase.ts","./src/services/gameservice.ts","./src/services/gpsservice.ts","./src/services/partyservice.ts","./src/types/game.ts"],"version":"5.7.3"}
 </file>
 
 <file path="vite.config.ts">
@@ -9841,11 +10738,11 @@ export default defineConfig({
 
 <file path="src/engine/TdcCampusEngine.ts">
 import * as THREE from 'three';
-import { AVATARS, CAMP, PATHS } from '../data/campusLayout';
-import { Station, UnlockedStationRecord } from '../types/game';
+import { AVATARS } from '../data/campusLayout';
+import { GpsTelemetry3D, Station, UnlockedStationRecord } from '../types/game';
 import { audioSfx } from './audioSfx';
-import { buildCampusEnvironment } from './campusBuilder';
-import { animChibi, buildPathGraphAndNpcs, makeChibi } from './chibiBuilder';
+import { buildCampusEnvironment, FloorHighlightController } from './campusBuilder';
+import { animChibi, makeChibi } from './chibiBuilder';
 import { FogOfWarSystem } from './fogOfWar';
 import { buildNatureAndTrain } from './natureAndTrain';
 import {
@@ -9855,11 +10752,22 @@ import {
   coinTex,
   createMaterialCache,
   createRng,
-  ell,
+  FH,
   lerpAngle,
   mesh,
   pill,
 } from './threeHelpers';
+import {
+  buildTelemetryFromCampus3D,
+  clampToCampusBoundary,
+  detectBuildingAtPosition,
+  distance3D,
+  floorToElevationMeters,
+  GpsKalmanFilter3D,
+  gpsToCampus3D,
+  resolveFloorFromElevation,
+} from '../services/gpsService';
+import { TDC_GEO_ANCHORS } from '../data/campusBuildings';
 
 export interface FloatingTextItem {
   id: number;
@@ -9874,13 +10782,18 @@ export interface FloatingTextItem {
 export interface GuideState {
   station: Station | null;
   distance: number;
+  horizDistance: number;
+  deltaFloor: number;
   angleRad: number;
   allDone: boolean;
 }
 
 export interface MinimapSnapshot {
   playerX: number;
+  playerY: number;
   playerZ: number;
+  playerFloor: number;
+  accuracyMeters: number;
   playerRotY: number;
   camYaw: number;
   col: AABB[];
@@ -9889,18 +10802,11 @@ export interface MinimapSnapshot {
 export interface EngineCallbacks {
   onNearStationChange: (st: Station | null) => void;
   onOpenStationRequest: (st: Station) => void;
-  onStarCollected: () => void;
-  onPlayerMoveSave: (pos: [number, number]) => void;
+  onPlayerMoveSave: (pos: [number, number, number]) => void;
   onFloatingTextsUpdate: (items: FloatingTextItem[]) => void;
   onGuideUpdate: (guide: GuideState) => void;
   onMinimapUpdate: (snap: MinimapSnapshot) => void;
-}
-
-interface StarObject {
-  m: THREE.Mesh;
-  alive: boolean;
-  timer: number;
-  ph: number;
+  onGpsTelemetryUpdate?: (telemetry: GpsTelemetry3D) => void;
 }
 
 interface Station3DNode {
@@ -9908,8 +10814,10 @@ interface Station3DNode {
   ring: THREE.Mesh;
   disc: THREE.Mesh;
   beam: THREE.Mesh;
+  stem: THREE.Line | null;
   icon: THREE.Sprite;
   lab: THREE.Sprite;
+  baseY: number;
 }
 
 export class TdcCampusEngine {
@@ -9923,11 +10831,11 @@ export class TdcCampusEngine {
   private mat = createMaterialCache();
   private rng = createRng(20261021);
   private fogOfWar: FogOfWarSystem;
+  private floorController?: FloorHighlightController;
 
   private stations: Station[] = [];
   private unlockedMap: Record<string, UnlockedStationRecord> = {};
   private st3d: Record<string, Station3DNode> = {};
-  private stars: StarObject[] = [];
   private parts: { m: THREE.Mesh; v: THREE.Vector3; life: number }[] = [];
   private fxList: {
     id: number;
@@ -9938,17 +10846,34 @@ export class TdcCampusEngine {
   }[] = [];
   private fxSeq = 1;
 
+  // Player & 3D GPS Marker (X, Y, Z)
   private player = {
     obj: null as THREE.Group | null,
-    pos: new THREE.Vector3(-66, 0, 100),
+    pos: new THREE.Vector3(-66, 0, 104),
+    targetPos: new THREE.Vector3(-66, 0, 104),
     ph: 0,
     tag: null as THREE.Sprite | null,
+    gpsAccuracyDisc: null as THREE.Mesh | null,
+    gpsVerticalLine: null as THREE.Line | null,
+    gpsGroundShadowRing: null as THREE.Mesh | null,
   };
+
+  // Real-time 3-Axis GPS & Floor state
+  private kalman = new GpsKalmanFilter3D();
+  private gpsWatchId: number | null = null;
+  private gpsActive = false;
+  private groundAltitudeRefAsl = TDC_GEO_ANCHORS.GROUND_ALTITUDE_ASL_M;
+  private rawAltitudeAsl: number | null = null;
+  private lockedFloor: number | null = null;
+  private inspectedBuildingId: string | null = null;
+  private inspectedFloor: number | null = null;
+  private cutawayEnabled = false;
+  private currentTelemetry: GpsTelemetry3D;
 
   private cam = {
     yaw: 0.25,
-    pitch: 0.92,
-    dist: 40,
+    pitch: 0.86,
+    dist: 48,
     curD: null as number | null,
     curP: null as number | null,
     tgt: new THREE.Vector3(-5, 0, -5),
@@ -9958,20 +10883,13 @@ export class TdcCampusEngine {
   private paused = false;
   private photoStation: Station | null = null;
   private nearStation: Station | null = null;
-  private moveTarget: THREE.Vector3 | null = null;
-  private tMark: THREE.Mesh | null = null;
   private flagMesh: THREE.Mesh | null = null;
 
-  private keys = new Set<string>();
-  private joy = { x: 0, y: 0 };
   private disposed = false;
   private rafId = 0;
   private resizeObs: ResizeObserver;
-
   private cleanupWindowListeners?: () => void;
-
   private animateNatureAndTrain?: (dt: number, t: number) => void;
-  private animateNpcs?: (dt: number, t: number) => void;
 
   constructor(
     container: HTMLElement,
@@ -9984,10 +10902,19 @@ export class TdcCampusEngine {
     this.unlockedMap = initialUnlocked;
     this.callbacks = callbacks;
 
+    this.currentTelemetry = buildTelemetryFromCampus3D({
+      x: -66,
+      y: 0,
+      z: 104,
+      accuracyMeters: 2.4,
+      source: 'gps_calibrated',
+    });
+
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.localClippingEnabled = true;
     this.container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
@@ -10022,13 +10949,14 @@ export class TdcCampusEngine {
   }
 
   private initWorld(): void {
-    const { flag } = buildCampusEnvironment({
+    const { flag, floorController } = buildCampusEnvironment({
       scene: this.scene,
       col: this.col,
       mat: this.mat,
       rng: this.rng,
     });
     this.flagMesh = flag;
+    this.floorController = floorController;
 
     const nat = buildNatureAndTrain({
       scene: this.scene,
@@ -10039,54 +10967,53 @@ export class TdcCampusEngine {
     });
     this.animateNatureAndTrain = nat.animate;
 
-    const npcState = buildPathGraphAndNpcs({
-      scene: this.scene,
-      mat: this.mat,
-      rng: this.rng,
-    });
-    this.animateNpcs = npcState.animateNpcs;
-
-    // Stars
-    const sh = new THREE.Shape();
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
-      const r = i % 2 ? 0.45 : 1;
-      if (i) sh.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-      else sh.moveTo(Math.cos(a) * r, Math.sin(a) * r);
-    }
-    const sg = new THREE.ExtrudeGeometry(sh, {
-      depth: 0.32,
-      bevelEnabled: true,
-      bevelSize: 0.1,
-      bevelThickness: 0.1,
-      bevelSegments: 1,
-    });
-    sg.center();
-    const sm = new THREE.MeshPhongMaterial({
-      color: '#FFD23F',
-      emissive: '#7A5200',
-      shininess: 60,
-      flatShading: true,
-    });
-    for (let i = 0; i < 34; i++) {
-      const m = mesh(sg, sm, 0, 1.7, 0);
-      this.scene.add(m);
-      const s: StarObject = { m, alive: true, timer: 0, ph: this.rng() * 6 };
-      this.placeStar(s);
-      this.stars.push(s);
-    }
-
-    // Build 3D station markers & Fog of War
+    // Build 3D station markers (at X, Y, Z elevation) & Fog of War
     this.rebuildStations3D();
 
-    // Ground tap marker & particles
-    this.tMark = new THREE.Mesh(
-      new THREE.RingGeometry(0.9, 1.3, 28).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: '#FFFFFF', transparent: true, opacity: 0.9 })
+    // GPS Accuracy Sphere/Disc & 3-Axis Z-Elevation Drop Line
+    const accDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 36).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({
+        color: '#00AEEF',
+        transparent: true,
+        opacity: 0.22,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      })
     );
-    this.tMark.visible = false;
-    this.scene.add(this.tMark);
+    accDisc.position.y = 0.14;
+    accDisc.visible = false;
+    this.scene.add(accDisc);
+    this.player.gpsAccuracyDisc = accDisc;
 
+    const shadowRing = new THREE.Mesh(
+      new THREE.RingGeometry(1.1, 1.55, 32).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({
+        color: '#00F0FF',
+        transparent: true,
+        opacity: 0.75,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      })
+    );
+    shadowRing.position.y = 0.15;
+    shadowRing.visible = false;
+    this.scene.add(shadowRing);
+    this.player.gpsGroundShadowRing = shadowRing;
+
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 1, 0),
+    ]);
+    const vertLine = new THREE.Line(
+      lineGeo,
+      new THREE.LineBasicMaterial({ color: '#00F0FF', transparent: true, opacity: 0.9 })
+    );
+    vertLine.visible = false;
+    this.scene.add(vertLine);
+    this.player.gpsVerticalLine = vertLine;
+
+    // Celebration particles
     const pg = new THREE.OctahedronGeometry(0.28, 0);
     for (let i = 0; i < 60; i++) {
       const m = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ color: '#FFD23F' }));
@@ -10118,26 +11045,37 @@ export class TdcCampusEngine {
     this.stations
       .filter((st) => st.active !== false)
       .forEach((st) => {
+        const baseY = st.y || 0;
         const g = new THREE.Group();
-        g.position.set(st.x, 0, st.z);
+        g.position.set(st.x, baseY, st.z);
         this.scene.add(g);
 
         const ring = new THREE.Mesh(
           new THREE.RingGeometry(2.6, 3.3, 40).rotateX(-Math.PI / 2),
-          new THREE.MeshBasicMaterial({ color: st.col, transparent: true, opacity: 0.9 })
+          new THREE.MeshBasicMaterial({
+            color: st.col,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide,
+          })
         );
         ring.position.y = 0.16;
         g.add(ring);
 
         const disc = new THREE.Mesh(
           new THREE.CircleGeometry(2.6, 40).rotateX(-Math.PI / 2),
-          new THREE.MeshBasicMaterial({ color: st.col, transparent: true, opacity: 0.22 })
+          new THREE.MeshBasicMaterial({
+            color: st.col,
+            transparent: true,
+            opacity: 0.22,
+            side: THREE.DoubleSide,
+          })
         );
         disc.position.y = 0.15;
         g.add(disc);
 
         const beam = new THREE.Mesh(
-          new THREE.CylinderGeometry(1.4, 2.2, 22, 20, 1, true),
+          new THREE.CylinderGeometry(1.4, 2.2, 20, 20, 1, true),
           new THREE.MeshBasicMaterial({
             color: st.col,
             map: beamT,
@@ -10147,10 +11085,30 @@ export class TdcCampusEngine {
             opacity: 0.55,
           })
         );
-        beam.position.y = 11;
+        beam.position.y = 10;
         g.add(beam);
 
-        const ped = mesh(new THREE.CylinderGeometry(0.9, 1.2, 0.8, 12), this.mat('#FFFFFF'), 0, 0.4, 0);
+        // Nếu trạm nằm ở tầng cao (baseY > 0.5) hoặc tầng hầm (baseY < -0.5), vẽ trục đứng nối xuống mặt đất
+        let stem: THREE.Line | null = null;
+        if (Math.abs(baseY) > 0.5) {
+          const stemGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, -baseY, 0),
+            new THREE.Vector3(0, 0.2, 0),
+          ]);
+          stem = new THREE.Line(
+            stemGeo,
+            new THREE.LineBasicMaterial({ color: st.col, transparent: true, opacity: 0.75 })
+          );
+          g.add(stem);
+        }
+
+        const ped = mesh(
+          new THREE.CylinderGeometry(0.9, 1.2, 0.8, 12),
+          this.mat('#FFFFFF'),
+          0,
+          0.4,
+          0
+        );
         g.add(ped);
 
         const isDone = this.unlockedMap[st.id] != null;
@@ -10161,11 +11119,16 @@ export class TdcCampusEngine {
         icon.position.y = 5.5;
         g.add(icon);
 
-        const lab = pill(st.name, { h: 2.2, dot: st.col });
-        lab.position.y = 9;
+        const floorBadge = st.floor
+          ? st.floor === -1
+            ? ' [Hầm B1]'
+            : ` [Tầng ${st.floor}]`
+          : '';
+        const lab = pill(`${st.name}${floorBadge}`, { h: 2.2, dot: st.col });
+        lab.position.y = 9.2;
         g.add(lab);
 
-        this.st3d[st.id] = { g, ring, disc, beam, icon, lab };
+        this.st3d[st.id] = { g, ring, disc, beam, stem, icon, lab, baseY };
         this.applyStationVisualState(st);
       });
 
@@ -10191,10 +11154,16 @@ export class TdcCampusEngine {
     unlocked: Record<string, UnlockedStationRecord>
   ): void {
     const prevKey = this.stations
-      .map((s) => `${s.id}:${s.x}:${s.z}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`)
+      .map(
+        (s) =>
+          `${s.id}:${s.x}:${s.y || 0}:${s.z}:${s.floor || 1}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`
+      )
       .join('|');
     const nextKey = stations
-      .map((s) => `${s.id}:${s.x}:${s.z}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`)
+      .map(
+        (s) =>
+          `${s.id}:${s.x}:${s.y || 0}:${s.z}:${s.floor || 1}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`
+      )
       .join('|');
     const structureChanged = prevKey !== nextKey;
 
@@ -10212,7 +11181,7 @@ export class TdcCampusEngine {
   public startPlayer(
     name: string,
     avatarIdx: number,
-    savedPos?: [number, number] | null,
+    savedPos?: [number, number] | [number, number, number] | null,
     hasProgress?: boolean
   ): void {
     audioSfx.init();
@@ -10224,36 +11193,235 @@ export class TdcCampusEngine {
     this.player.obj.traverse((m) => {
       if ((m as THREE.Mesh).isMesh) m.castShadow = true;
     });
-    this.player.tag = pill(name || 'Bạn', { h: 1.25, fs: 40, bg: '#1E3528', fg: '#FFFFFF' });
-    this.player.tag.position.y = 3.9;
+    this.player.tag = pill(`${name || 'Bạn'} · GPS 3D`, {
+      h: 1.3,
+      fs: 40,
+      bg: '#0F172A',
+      fg: '#38BDF8',
+    });
+    this.player.tag.position.y = 4.0;
     this.player.obj.add(this.player.tag);
     this.scene.add(this.player.obj);
 
     if (savedPos && hasProgress) {
-      this.player.pos.set(savedPos[0], 0, savedPos[1]);
+      const sx = savedPos[0];
+      const sy = savedPos.length === 3 ? savedPos[1] : 0;
+      const sz = savedPos.length === 3 ? savedPos[2] : savedPos[1];
+      this.player.pos.set(sx, sy, sz);
+      this.player.targetPos.set(sx, sy, sz);
     } else {
-      this.player.pos.set(-66, 0, 98);
+      this.player.pos.set(-66, 0, 102);
+      this.player.targetPos.set(-66, 0, 102);
     }
+    this.kalman.reset(this.player.pos.x, this.player.pos.y, this.player.pos.z);
+
     this.player.obj.position.copy(this.player.pos);
     this.player.obj.rotation.y = Math.PI;
     this.cam.yaw = 0;
-    this.cam.tgt.set(this.player.pos.x, 1.6, this.player.pos.z);
+    this.cam.tgt.set(this.player.pos.x, this.player.pos.y + 1.8, this.player.pos.z);
     this.running = true;
     this.paused = false;
+
+    if (this.player.gpsAccuracyDisc) this.player.gpsAccuracyDisc.visible = true;
+    if (this.player.gpsGroundShadowRing) this.player.gpsGroundShadowRing.visible = true;
+    if (this.player.gpsVerticalLine) this.player.gpsVerticalLine.visible = true;
+
+    this.syncTelemetryFromCurrentTarget('gps_calibrated', 2.2);
+    this.startGpsHardwareTracking();
+  }
+
+  /**
+   * Bật định vị GPS phần cứng thực tế theo chuẩn HTML5 Geolocation API (`enableHighAccuracy: true`)
+   * Tự động tính toán 3 trục (X, Y, Z) bao gồm cả Altitude (trục cao độ phân tầng) và Kalman Filter.
+   */
+  public startGpsHardwareTracking(): void {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      return;
+    }
+    if (this.gpsWatchId !== null) {
+      navigator.geolocation.clearWatch(this.gpsWatchId);
+    }
+    this.gpsActive = true;
+    this.gpsWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (!this.gpsActive || this.disposed) return;
+        const { latitude, longitude, altitude, accuracy, altitudeAccuracy, heading, speed } =
+          pos.coords;
+
+        this.rawAltitudeAsl = altitude;
+        const projected = gpsToCampus3D({
+          lat: latitude,
+          lng: longitude,
+          altitudeAsl: altitude,
+          groundAltitudeReferenceAsl: this.groundAltitudeRefAsl,
+        });
+
+        // Nếu người dùng đang đứng thực tế trong khuôn viên trường hoặc lân cận (< 450m), cập nhật vị trí GPS thực
+        if (Math.hypot(projected.x, projected.z) < 450) {
+          const clamped = clampToCampusBoundary(projected.x, projected.z);
+          const filtered = this.kalman.filter(
+            clamped.x,
+            projected.y,
+            clamped.z,
+            accuracy || 6,
+            altitudeAccuracy || 10
+          );
+
+          const bld = detectBuildingAtPosition(filtered.x, filtered.z);
+          const resolved =
+            this.lockedFloor !== null
+              ? {
+                  floor: this.lockedFloor,
+                  clampedY: floorToElevationMeters(this.lockedFloor, bld),
+                }
+              : resolveFloorFromElevation(filtered.y, bld);
+
+          this.player.targetPos.set(filtered.x, resolved.clampedY, filtered.z);
+          this.currentTelemetry = {
+            lat: +latitude.toFixed(6),
+            lng: +longitude.toFixed(6),
+            altitudeAsl: altitude != null ? +altitude.toFixed(2) : null,
+            accuracyMeters: +(accuracy || 4.0).toFixed(1),
+            altitudeAccuracyMeters:
+              altitudeAccuracy != null ? +altitudeAccuracy.toFixed(1) : null,
+            headingDeg: heading != null && Number.isFinite(heading) ? Math.round(heading) : null,
+            speedMps: speed != null && Number.isFinite(speed) ? +speed.toFixed(2) : null,
+            x: filtered.x,
+            y: resolved.clampedY,
+            z: filtered.z,
+            detectedFloor: resolved.floor,
+            detectedBuilding: bld,
+            insideCampus: projected.insideCampus,
+            source: 'gps_hardware',
+            timestamp: Date.now(),
+          };
+          this.updateFloorHighlightState();
+          this.callbacks.onGpsTelemetryUpdate?.(this.currentTelemetry);
+        } else {
+          // Người dùng đang mở web từ ngoài khuôn viên trường (> 450m): vẫn ghi nhận tọa độ GPS thật nhưng giữ mô hình ở chế độ Hiệu chuẩn Khuôn viên để khám phá
+          this.currentTelemetry = {
+            ...this.currentTelemetry,
+            lat: +latitude.toFixed(6),
+            lng: +longitude.toFixed(6),
+            altitudeAsl: altitude != null ? +altitude.toFixed(2) : this.currentTelemetry.altitudeAsl,
+            accuracyMeters: +(accuracy || 5.0).toFixed(1),
+            insideCampus: false,
+            timestamp: Date.now(),
+          };
+          this.callbacks.onGpsTelemetryUpdate?.(this.currentTelemetry);
+        }
+      },
+      () => {
+        // Khi thiết bị từ chối quyền GPS hoặc mất sóng trong nhà kín, giữ chế độ Định vị Hiệu chuẩn 3D
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 10000,
+      }
+    );
+  }
+
+  /**
+   * Hiệu chuẩn áp kế / cao độ mặt đất (Tare Ground Altitude = 0.0m / Tầng 1)
+   * Giúp loại bỏ sai số độ cao GPS giữa các dòng điện thoại khác nhau.
+   */
+  public calibrateGroundZeroAltitude(): void {
+    if (this.rawAltitudeAsl != null && Number.isFinite(this.rawAltitudeAsl)) {
+      this.groundAltitudeRefAsl = this.rawAltitudeAsl;
+    }
+    this.lockedFloor = 1;
+    this.setTargetPosition3D(this.player.targetPos.x, 0, this.player.targetPos.z, 'gps_calibrated');
+  }
+
+  /**
+   * Đặt tọa độ 3 trục (X, Y, Z) trực tiếp từ bộ định vị GPS / Chọn Tòa nhà & Tầng để khám phá
+   */
+  public setTargetPosition3D(
+    x: number,
+    y: number,
+    z: number,
+    source: GpsTelemetry3D['source'] = 'gps_calibrated'
+  ): void {
+    const clamped = clampToCampusBoundary(x, z);
+    const bld = detectBuildingAtPosition(clamped.x, clamped.z);
+    const resolved = resolveFloorFromElevation(y, bld);
+    const effectiveY = resolved.clampedY;
+
+    this.lockedFloor = resolved.floor;
+    this.player.targetPos.set(clamped.x, effectiveY, clamped.z);
+    this.kalman.reset(clamped.x, effectiveY, clamped.z);
+    this.inspectedBuildingId = bld?.id || null;
+    this.inspectedFloor = resolved.floor;
+
+    this.syncTelemetryFromCurrentTarget(source, source === 'gps_hardware' ? 3.2 : 1.5);
+  }
+
+  /**
+   * Chọn tầng cụ thể (Trục cao độ Y/Z: Tầng Hầm B1 = -1, Tầng 1..11) để khám phá mặt sàn phân tầng
+   */
+  public selectFloorLevel(floor: number | null, enableCutaway?: boolean): void {
+    this.lockedFloor = floor;
+    if (enableCutaway !== undefined) {
+      this.cutawayEnabled = enableCutaway;
+    }
+    if (floor !== null) {
+      const bld = detectBuildingAtPosition(this.player.targetPos.x, this.player.targetPos.z);
+      const validFloor = bld
+        ? clamp(floor, bld.minFloor, bld.maxFloor)
+        : clamp(floor, -1, 11);
+      this.lockedFloor = validFloor;
+      const nextY = floorToElevationMeters(validFloor, bld);
+      this.player.targetPos.y = nextY;
+      this.inspectedFloor = validFloor;
+      this.inspectedBuildingId = bld?.id || null;
+    } else {
+      this.inspectedFloor = null;
+    }
+    this.syncTelemetryFromCurrentTarget('manual_override', 1.5);
+  }
+
+  /**
+   * Bật / Tắt chế độ Cắt lớp Phân tầng 3D (3D Floor Cutaway) để nhìn xuyên vào bên trong tầng đang chọn
+   */
+  public setCutawayMode(enabled: boolean): void {
+    this.cutawayEnabled = enabled;
+    this.updateFloorHighlightState();
+  }
+
+  public getCutawayMode(): boolean {
+    return this.cutawayEnabled;
+  }
+
+  private updateFloorHighlightState(): void {
+    if (!this.floorController) return;
+    const activeFloor =
+      this.lockedFloor ?? this.inspectedFloor ?? this.currentTelemetry.detectedFloor;
+    const activeBldId =
+      this.inspectedBuildingId ?? this.currentTelemetry.detectedBuilding?.id ?? null;
+
+    this.floorController.setFloorView(activeBldId, activeFloor, this.cutawayEnabled);
+  }
+
+  private syncTelemetryFromCurrentTarget(
+    source: GpsTelemetry3D['source'],
+    accuracyMeters: number
+  ): void {
+    this.currentTelemetry = buildTelemetryFromCampus3D({
+      x: this.player.targetPos.x,
+      y: this.player.targetPos.y,
+      z: this.player.targetPos.z,
+      accuracyMeters,
+      source,
+      lockedFloor: this.lockedFloor,
+      groundAltitudeReferenceAsl: this.groundAltitudeRefAsl,
+    });
+    this.updateFloorHighlightState();
+    this.callbacks.onGpsTelemetryUpdate?.(this.currentTelemetry);
   }
 
   public setPaused(p: boolean): void {
     this.paused = p;
-    if (p) {
-      this.keys.clear();
-      this.joy.x = 0;
-      this.joy.y = 0;
-    }
-  }
-
-  public setJoystick(x: number, y: number): void {
-    this.joy.x = x;
-    this.joy.y = y;
   }
 
   public enterPhotoMode(st: Station): void {
@@ -10289,27 +11457,24 @@ export class TdcCampusEngine {
     }
   }
 
+  /**
+   * Định vị / Đồng bộ ngay tới tọa độ 3D (X, Y, Z) của một trạm hoặc tòa nhà
+   */
   public navigateToStation(st: Station): void {
     if (!this.running) return;
-    this.moveTarget = new THREE.Vector3(
-      st.x,
-      0,
-      st.z + (st.z > this.player.pos.z ? -3 : 3)
-    );
-    if (this.tMark) {
-      this.tMark.position.set(this.moveTarget.x, 0.2, this.moveTarget.z);
-      this.tMark.visible = true;
-      this.tMark.scale.setScalar(1.6);
-    }
+    const targetY = st.y ?? (st.floor ? floorToElevationMeters(st.floor) : 0);
+    this.lockedFloor = st.floor ?? 1;
+    this.setTargetPosition3D(st.x, targetY, st.z, 'gps_calibrated');
   }
 
   public celebrateStationUnlock(st: Station, ptsText: string): void {
+    const sy = st.y || 0;
     this.burst(
-      new THREE.Vector3(st.x, 5, st.z),
+      new THREE.Vector3(st.x, sy + 5, st.z),
       ['#FFD23F', '#FF6F59', '#00AEEF', '#38B865', '#FF8FB1', '#9B6BFF'],
       42
     );
-    this.spawnFloatText(ptsText, new THREE.Vector3(st.x, 4, st.z));
+    this.spawnFloatText(ptsText, new THREE.Vector3(st.x, sy + 4, st.z));
   }
 
   public spawnFloatText(text: string, worldPos: THREE.Vector3, color?: string): void {
@@ -10339,53 +11504,8 @@ export class TdcCampusEngine {
     }
   }
 
-  private placeStar(s: StarObject): void {
-    for (let k = 0; k < 40; k++) {
-      const p = PATHS[Math.floor(this.rng() * PATHS.length)];
-      const t = this.rng();
-      const x = p[0] + (p[2] - p[0]) * t + (this.rng() - 0.5) * 1.6;
-      const z = p[1] + (p[3] - p[1]) * t + (this.rng() - 0.5) * 1.6;
-      if (this.stations.some((st) => Math.hypot(st.x - x, st.z - z) < 6)) continue;
-      if (
-        this.col.some((c) => x > c[0] - 1 && x < c[2] + 1 && z > c[1] - 1 && z < c[3] + 1)
-      )
-        continue;
-      if (
-        Math.hypot(x - this.player.pos.x, z - this.player.pos.z) < 10 &&
-        this.running
-      )
-        continue;
-      s.m.position.set(x, 1.7, z);
-      s.m.visible = true;
-      s.alive = true;
-      return;
-    }
-  }
-
-  private resolveCollision(p: THREE.Vector3): void {
-    const r = 0.7;
-    for (const c of this.col) {
-      if (p.x > c[0] - r && p.x < c[2] + r && p.z > c[1] - r && p.z < c[3] + r) {
-        const dl = p.x - (c[0] - r);
-        const dr = c[2] + r - p.x;
-        const dt = p.z - (c[1] - r);
-        const db = c[3] + r - p.z;
-        const m = Math.min(dl, dr, dt, db);
-        if (m === dl) p.x = c[0] - r;
-        else if (m === dr) p.x = c[2] + r;
-        else if (m === dt) p.z = c[1] - r;
-        else p.z = c[3] + r;
-      }
-    }
-    const d = ell(p.x, p.z);
-    if (d > 0.985) {
-      const k = 0.985 / d;
-      p.x = CAMP.cx + (p.x - CAMP.cx) * k;
-      p.z = CAMP.cz + (p.z - CAMP.cz) * k;
-    }
-  }
-
   private bindEvents(): void {
+    // Chỉ giữ phím tắt xoay/zoom camera (+ / - / Enter mở trạm), loại bỏ hoàn toàn điều khiển nhân vật bằng WASD/click đất kiểu game giả lập
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -10396,42 +11516,13 @@ export class TdcCampusEngine {
         this.callbacks.onOpenStationRequest(this.nearStation);
         return;
       }
-      if (
-        [
-          'w',
-          'a',
-          's',
-          'd',
-          'q',
-          'e',
-          'arrowup',
-          'arrowdown',
-          'arrowleft',
-          'arrowright',
-        ].includes(k)
-      ) {
-        e.preventDefault();
-        this.keys.add(k);
-      }
-      if (k === '+' || k === '=') this.cam.dist = clamp(this.cam.dist * 0.85, 16, 130);
-      if (k === '-') this.cam.dist = clamp(this.cam.dist / 0.85, 16, 130);
-    };
-
-    const onKeyUp = (e: KeyboardEvent) => {
-      this.keys.delete(e.key.toLowerCase());
-    };
-
-    const onBlur = () => {
-      this.keys.clear();
+      if (k === '+' || k === '=') this.cam.dist = clamp(this.cam.dist * 0.85, 16, 160);
+      if (k === '-') this.cam.dist = clamp(this.cam.dist / 0.85, 16, 160);
     };
 
     window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('blur', onBlur);
     this.cleanupWindowListeners = () => {
       window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('blur', onBlur);
     };
 
     const cv = this.renderer.domElement;
@@ -10444,29 +11535,6 @@ export class TdcCampusEngine {
       moved: boolean;
     } | null = null;
     let pinch: number | null = null;
-    const ray = new THREE.Raycaster();
-    const GROUND = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-
-    const tapMove = (e: PointerEvent) => {
-      const r = cv.getBoundingClientRect();
-      ray.setFromCamera(
-        new THREE.Vector2(
-          ((e.clientX - r.left) / r.width) * 2 - 1,
-          -((e.clientY - r.top) / r.height) * 2 + 1
-        ),
-        this.camera
-      );
-      const p = new THREE.Vector3();
-      if (!ray.ray.intersectPlane(GROUND, p)) return;
-      if (ell(p.x, p.z) > 0.985) return;
-      this.moveTarget = p;
-      if (this.tMark) {
-        this.tMark.position.set(p.x, 0.2, p.z);
-        this.tMark.visible = true;
-        this.tMark.scale.setScalar(1.6);
-      }
-      audioSfx.play('tap');
-    };
 
     cv.addEventListener('pointerdown', (e) => {
       ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -10497,7 +11565,7 @@ export class TdcCampusEngine {
       if (pinch && ptrs.size === 2) {
         const [a, b] = [...ptrs.values()];
         const d = Math.hypot(a.x - b.x, a.y - b.y);
-        this.cam.dist = clamp((this.cam.dist * pinch) / d, 16, 130);
+        this.cam.dist = clamp((this.cam.dist * pinch) / d, 16, 160);
         pinch = d;
         return;
       }
@@ -10506,24 +11574,14 @@ export class TdcCampusEngine {
       const dy = e.clientY - drag.y;
       drag.x = e.clientX;
       drag.y = e.clientY;
-      if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 8) drag.moved = true;
+      if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 6) drag.moved = true;
       if (drag.moved) {
         this.cam.yaw -= dx * 0.006;
-        this.cam.pitch = clamp(this.cam.pitch + dy * 0.004, 0.32, 1.38);
+        this.cam.pitch = clamp(this.cam.pitch + dy * 0.004, 0.25, 1.42);
       }
     });
 
     const endPtr = (e: PointerEvent) => {
-      if (
-        drag &&
-        !drag.moved &&
-        ptrs.size === 1 &&
-        this.running &&
-        !this.paused &&
-        !this.photoStation
-      ) {
-        tapMove(e);
-      }
       ptrs.delete(e.pointerId);
       if (ptrs.size < 2) pinch = null;
       if (!ptrs.size) drag = null;
@@ -10540,7 +11598,7 @@ export class TdcCampusEngine {
       (e) => {
         if (!this.running) return;
         e.preventDefault();
-        this.cam.dist = clamp(this.cam.dist * (1 + e.deltaY * 0.0012), 16, 130);
+        this.cam.dist = clamp(this.cam.dist * (1 + e.deltaY * 0.0012), 16, 160);
       },
       { passive: false }
     );
@@ -10572,12 +11630,13 @@ export class TdcCampusEngine {
       T += dt;
 
       if (this.running && !this.paused && !this.photoStation) {
-        this.updatePlayer(dt, T);
+        this.updateGpsAvatar3D(dt, T);
         saveT -= dt;
         if (saveT <= 0) {
           saveT = 2.0;
           this.callbacks.onPlayerMoveSave([
             +this.player.pos.x.toFixed(1),
+            +this.player.pos.y.toFixed(1),
             +this.player.pos.z.toFixed(1),
           ]);
         }
@@ -10585,12 +11644,12 @@ export class TdcCampusEngine {
         animChibi(this.player.obj, this.player.ph, 0, T);
       }
 
-      // Camera update
+      // Camera tracks full 3D position (X, Y, Z) so rising to Floor 7 or Floor 11 smoothly elevates camera
       let d: number;
       let p: number;
       if (this.running) {
         this.cam.tgt.lerp(
-          tmpV.set(this.player.pos.x, 1.6, this.player.pos.z),
+          tmpV.set(this.player.pos.x, this.player.pos.y + 1.8, this.player.pos.z),
           1 - Math.exp(-dt * 7)
         );
         d = this.photoStation ? 15 : this.cam.dist;
@@ -10641,106 +11700,80 @@ export class TdcCampusEngine {
     this.rafId = requestAnimationFrame(frame);
   }
 
-  private updatePlayer(dt: number, t: number): void {
-    let ix = 0;
-    let iy = 0;
-    if (this.keys.has('w') || this.keys.has('arrowup')) iy += 1;
-    if (this.keys.has('s') || this.keys.has('arrowdown')) iy -= 1;
-    if (this.keys.has('a') || this.keys.has('arrowleft')) ix -= 1;
-    if (this.keys.has('d') || this.keys.has('arrowright')) ix += 1;
-    if (this.keys.has('q')) this.cam.yaw += 1.7 * dt;
-    if (this.keys.has('e')) this.cam.yaw -= 1.7 * dt;
-    ix += this.joy.x;
-    iy += this.joy.y;
+  /**
+   * Nội suy mượt vị trí nhân vật 3D theo tín hiệu GPS 3 trục (X, Y, Z)
+   * và cập nhật bán kính sai số GPS, đường chiếu đứng từ tầng cao xuống mặt đất.
+   */
+  private updateGpsAvatar3D(dt: number, t: number): void {
+    const dx = this.player.targetPos.x - this.player.pos.x;
+    const dy = this.player.targetPos.y - this.player.pos.y;
+    const dz = this.player.targetPos.z - this.player.pos.z;
+    const distHoriz = Math.hypot(dx, dz);
+    const dist3D = Math.hypot(dx, dy, dz);
 
-    const fx = -Math.sin(this.cam.yaw);
-    const fz = -Math.cos(this.cam.yaw);
-    const rx = Math.cos(this.cam.yaw);
-    const rz = -Math.sin(this.cam.yaw);
-    let mx = fx * iy + rx * ix;
-    let mz = fz * iy + rz * ix;
-    let amt = Math.hypot(mx, mz);
+    const lerpFactor = 1 - Math.exp(-dt * 8.5);
+    this.player.pos.x += dx * lerpFactor;
+    this.player.pos.y += dy * lerpFactor;
+    this.player.pos.z += dz * lerpFactor;
 
-    if (amt > 0.08) {
-      this.moveTarget = null;
-      if (this.tMark) this.tMark.visible = false;
-      mx /= amt;
-      mz /= amt;
-      if (amt > 1) amt = 1;
-    } else if (this.moveTarget) {
-      mx = this.moveTarget.x - this.player.pos.x;
-      mz = this.moveTarget.z - this.player.pos.z;
-      const d = Math.hypot(mx, mz);
-      if (d < 0.7) {
-        this.moveTarget = null;
-        if (this.tMark) this.tMark.visible = false;
-        amt = 0;
-      } else {
-        mx /= d;
-        mz /= d;
-        amt = 1;
-      }
-    } else {
-      amt = 0;
+    const moveAmt = clamp(dist3D * 0.45, 0, 1);
+    if (distHoriz > 0.08 && this.player.obj) {
+      this.player.obj.rotation.y = lerpAngle(
+        this.player.obj.rotation.y,
+        Math.atan2(dx, dz),
+        1 - Math.exp(-dt * 10)
+      );
     }
-
-    const sp = 10 * amt;
-    if (amt > 0) {
-      const ox = this.player.pos.x;
-      const oz = this.player.pos.z;
-      this.player.pos.x += mx * sp * dt;
-      this.player.pos.z += mz * sp * dt;
-      this.resolveCollision(this.player.pos);
-      if (
-        this.moveTarget &&
-        Math.hypot(this.player.pos.x - ox, this.player.pos.z - oz) < sp * dt * 0.15
-      ) {
-        this.moveTarget = null;
-        if (this.tMark) this.tMark.visible = false;
-      }
-      if (this.player.obj) {
-        this.player.obj.rotation.y = lerpAngle(
-          this.player.obj.rotation.y,
-          Math.atan2(mx, mz),
-          1 - Math.exp(-dt * 12)
-        );
-      }
-      this.player.ph += dt * sp * 1.1;
-    }
+    this.player.ph += dt * (2.5 + moveAmt * 9);
 
     if (this.player.obj) {
-      animChibi(this.player.obj, this.player.ph, amt, t);
-      this.player.obj.position.set(this.player.pos.x, 0, this.player.pos.z);
+      animChibi(this.player.obj, this.player.ph, moveAmt > 0.05 ? moveAmt : 0, t);
+      this.player.obj.position.copy(this.player.pos);
     }
 
-    // Collect stars
-    for (const s of this.stars) {
-      if (!s.alive) continue;
-      if (
-        Math.hypot(
-          s.m.position.x - this.player.pos.x,
-          s.m.position.z - this.player.pos.z
-        ) < 2.4
-      ) {
-        s.alive = false;
-        s.m.visible = false;
-        s.timer = 45;
-        this.burst(s.m.position, ['#FFD23F', '#FFF3B0', '#FFAA1F'], 10);
-        this.spawnFloatText('+10', s.m.position);
-        audioSfx.play('coin');
-        this.callbacks.onStarCollected();
-      }
+    // Cập nhật vòng tròn sai số GPS tại độ cao Y của người dùng
+    if (this.player.gpsAccuracyDisc) {
+      const r = clamp(this.currentTelemetry.accuracyMeters, 1.8, 18);
+      const pulse = 1 + Math.sin(t * 3.2) * 0.08;
+      this.player.gpsAccuracyDisc.position.set(
+        this.player.pos.x,
+        this.player.pos.y + 0.14,
+        this.player.pos.z
+      );
+      this.player.gpsAccuracyDisc.scale.set(r * pulse, 1, r * pulse);
     }
 
-    // Check near station
+    // Cập nhật hình chiếu trên mặt sân trường (y = 0.15) và trục đứng Z-Elevation
+    if (this.player.gpsGroundShadowRing) {
+      this.player.gpsGroundShadowRing.position.set(
+        this.player.pos.x,
+        0.15,
+        this.player.pos.z
+      );
+    }
+
+    if (this.player.gpsVerticalLine) {
+      const posAttr = this.player.gpsVerticalLine.geometry.getAttribute(
+        'position'
+      ) as THREE.BufferAttribute;
+      posAttr.setXYZ(0, this.player.pos.x, 0.15, this.player.pos.z);
+      posAttr.setXYZ(1, this.player.pos.x, this.player.pos.y + 0.2, this.player.pos.z);
+      posAttr.needsUpdate = true;
+      this.player.gpsVerticalLine.visible = Math.abs(this.player.pos.y) > 0.35;
+    }
+
+    // Kiểm tra khoảng cách không gian 3 chiều (X, Y, Z) tới các trạm
     let near: Station | null = null;
-    let best = 6.8;
+    let best = 9.5; // Bán kính nhận diện GPS 3D tại trạm
     this.stations
       .filter((st) => st.active !== false)
       .forEach((st) => {
-        const d = Math.hypot(st.x - this.player.pos.x, st.z - this.player.pos.z);
-        if (d < best) {
-          best = d;
+        const d3 = distance3D(
+          { x: st.x, y: st.y || 0, z: st.z },
+          { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z }
+        );
+        if (d3 < best) {
+          best = d3;
           near = st;
         }
       });
@@ -10753,21 +11786,10 @@ export class TdcCampusEngine {
 
   private animateWorld(dt: number, t: number): void {
     this.animateNatureAndTrain?.(dt, t);
-    this.animateNpcs?.(dt, t);
 
     if (this.flagMesh) {
       this.flagMesh.rotation.y = Math.sin(t * 3) * 0.25;
     }
-
-    this.stars.forEach((s) => {
-      if (!s.alive) {
-        s.timer -= dt;
-        if (s.timer <= 0) this.placeStar(s);
-        return;
-      }
-      s.m.rotation.y = t * 2 + s.ph;
-      s.m.position.y = 1.7 + Math.sin(t * 2.4 + s.ph) * 0.3;
-    });
 
     this.stations.forEach((st, i) => {
       const s = this.st3d[st.id];
@@ -10788,11 +11810,6 @@ export class TdcCampusEngine {
       p.m.scale.setScalar(Math.max(0.05, p.life * 1.3));
       if (p.life <= 0) p.m.visible = false;
     });
-
-    if (this.tMark && this.tMark.visible) {
-      this.tMark.scale.multiplyScalar(1 - dt * 1.4);
-      if (this.tMark.scale.x < 0.9) this.tMark.scale.setScalar(1.6);
-    }
   }
 
   private updateFloatingTexts(dt: number, tmpV: THREE.Vector3): void {
@@ -10825,18 +11842,24 @@ export class TdcCampusEngine {
 
   private emitGuideAndMinimap(): void {
     let best: Station | null = null;
-    let bd = 1e9;
+    let bd3 = 1e9;
+    let bHoriz = 0;
     const activeStations = this.stations.filter((st) => st.active !== false);
     activeStations.forEach((st) => {
       if (this.unlockedMap[st.id] != null) return;
-      const d = Math.hypot(st.x - this.player.pos.x, st.z - this.player.pos.z);
-      if (d < bd) {
-        bd = d;
+      const d3 = distance3D(
+        { x: st.x, y: st.y || 0, z: st.z },
+        { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z }
+      );
+      if (d3 < bd3) {
+        bd3 = d3;
+        bHoriz = Math.hypot(st.x - this.player.pos.x, st.z - this.player.pos.z);
         best = st;
       }
     });
 
     let angleRad = 0;
+    let deltaFloor = 0;
     if (best) {
       const target = best as Station;
       const vx = target.x - this.player.pos.x;
@@ -10846,18 +11869,25 @@ export class TdcCampusEngine {
       const rx = Math.cos(this.cam.yaw);
       const rz = -Math.sin(this.cam.yaw);
       angleRad = Math.atan2(vx * rx + vz * rz, vx * fx + vz * fz);
+      const targetFloor = target.floor || 1;
+      deltaFloor = targetFloor - this.currentTelemetry.detectedFloor;
     }
 
     this.callbacks.onGuideUpdate({
       station: best,
-      distance: best ? bd : 0,
+      distance: best ? bd3 : 0,
+      horizDistance: best ? bHoriz : 0,
+      deltaFloor,
       angleRad,
       allDone: best === null && activeStations.length > 0,
     });
 
     this.callbacks.onMinimapUpdate({
       playerX: this.player.pos.x,
+      playerY: this.player.pos.y,
       playerZ: this.player.pos.z,
+      playerFloor: this.currentTelemetry.detectedFloor,
+      accuracyMeters: this.currentTelemetry.accuracyMeters,
       playerRotY: this.player.obj ? this.player.obj.rotation.y : 0,
       camYaw: this.cam.yaw,
       col: this.col,
@@ -10866,6 +11896,10 @@ export class TdcCampusEngine {
 
   public dispose(): void {
     this.disposed = true;
+    this.gpsActive = false;
+    if (this.gpsWatchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.clearWatch(this.gpsWatchId);
+    }
     cancelAnimationFrame(this.rafId);
     this.cleanupWindowListeners?.();
     this.resizeObs.disconnect();
@@ -11661,7 +12695,6 @@ import {
 } from './services/authService';
 import {
   checkAntiCheatCooldown,
-  recordStarPickup,
   recordStationUnlock,
   verifyStationQrPayload,
 } from './services/gameService';
@@ -11674,6 +12707,7 @@ import {
 } from './services/partyService';
 import {
   FacultyId,
+  GpsTelemetry3D,
   PartyRoom,
   Station,
   UserProfile,
@@ -11713,10 +12747,14 @@ export const App: React.FC = () => {
   const [guide, setGuide] = useState<GuideState>({
     station: null,
     distance: 0,
+    horizDistance: 0,
+    deltaFloor: 0,
     angleRad: 0,
     allDone: false,
   });
   const [minimapSnap, setMinimapSnap] = useState<MinimapSnapshot | null>(null);
+  const [gpsTelemetry, setGpsTelemetry] = useState<GpsTelemetry3D | null>(null);
+  const [cutawayMode, setCutawayMode] = useState(false);
   const [floatingTexts, setFloatingTexts] = useState<FloatingTextItem[]>([]);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
 
@@ -11776,26 +12814,6 @@ export const App: React.FC = () => {
           audioSfx.play('tap');
           setActiveModal({ type: 'station', station: st });
         },
-        onStarCollected: () => {
-          const cur = profileRef.current;
-          if (!cur) return;
-          const prevLevel = 1 + Math.floor(cur.points / 300);
-          const activeCount = stationsRef.current.filter((s) => s.active !== false).length;
-          void recordStarPickup(cur, activeCount).then(
-            ({ updatedProfile, newlyCompletedQuests }) => {
-              setProfile(updatedProfile);
-              triggerPointsBump();
-              const nextLevel = 1 + Math.floor(updatedProfile.points / 300);
-              if (nextLevel > prevLevel) {
-                pushToast(`🎉 Thăng cấp ${nextLevel}!`, true);
-                audioSfx.play('badge');
-              }
-              newlyCompletedQuests.forEach((q) => {
-                pushToast(`Hoàn thành nhiệm vụ: ${q.name} · +${q.reward}đ`, true);
-              });
-            }
-          );
-        },
         onPlayerMoveSave: (pos) => {
           const cur = profileRef.current;
           if (!cur) return;
@@ -11806,6 +12824,7 @@ export const App: React.FC = () => {
         onFloatingTextsUpdate: (items) => setFloatingTexts(items),
         onGuideUpdate: (g) => setGuide(g),
         onMinimapUpdate: (snap) => setMinimapSnap(snap),
+        onGpsTelemetryUpdate: (telemetry) => setGpsTelemetry(telemetry),
       }
     );
 
@@ -12023,6 +13042,8 @@ export const App: React.FC = () => {
           nearStation={nearStation}
           guide={guide}
           minimapSnap={minimapSnap}
+          gpsTelemetry={gpsTelemetry}
+          cutawayMode={cutawayMode}
           floatingTexts={floatingTexts}
           muted={muted}
           dimmed={Boolean(photoMode)}
@@ -12038,7 +13059,9 @@ export const App: React.FC = () => {
           onNavigateGuide={() => {
             if (guide.station) {
               engineRef.current?.navigateToStation(guide.station);
-              pushToast(`Đang di chuyển tới ${guide.station.name}...`);
+              pushToast(
+                `📡 Đã đồng bộ định vị GPS 3D tới ${guide.station.name} (Tầng ${guide.station.floor || 1})!`
+              );
             }
           }}
           onOpenQuests={() => setActiveModal({ type: 'quests' })}
@@ -12050,7 +13073,35 @@ export const App: React.FC = () => {
           }
           onOpenHelp={() => setActiveModal({ type: 'help' })}
           onOpenAdmin={() => setShowAdmin(true)}
-          onJoystickChange={(x, y) => engineRef.current?.setJoystick(x, y)}
+          onSelectFloor={(floor) => {
+            audioSfx.play('tap');
+            engineRef.current?.selectFloorLevel(floor);
+            pushToast(
+              floor === -1
+                ? 'Đang chuyển cao độ Z/Y xuống Tầng Hầm B1 (-4.2m)'
+                : `Đang chuyển cao độ Z/Y lên Tầng ${floor} (+${(((floor || 1) - 1) * 4.2).toFixed(1)}m)`
+            );
+          }}
+          onToggleCutaway={(enabled) => {
+            audioSfx.play('tap');
+            setCutawayMode(enabled);
+            engineRef.current?.setCutawayMode(enabled);
+            pushToast(
+              enabled
+                ? 'Đã bật Cắt lớp Phân tầng 3D (Floor Cutaway)'
+                : 'Đã tắt Cắt lớp Phân tầng 3D'
+            );
+          }}
+          onCalibrateGroundZero={() => {
+            audioSfx.play('ok');
+            engineRef.current?.calibrateGroundZeroAltitude();
+            pushToast('Đã hiệu chuẩn cao độ GPS mặt đất về 0.0m (Tầng 1)!', true);
+          }}
+          onTeleportGps3D={(x, y, z, label) => {
+            audioSfx.play('tap');
+            engineRef.current?.setTargetPosition3D(x, y, z, 'gps_calibrated');
+            pushToast(`📡 Đã định vị 3 trục (X:${x}, Y:${y}m, Z:${z}) tại ${label}!`);
+          }}
         />
       )}
 
@@ -12241,6 +13292,17 @@ import {
   joinPartyRoom,
   leavePartyRoom,
 } from './services/partyService';
+import {
+  buildTelemetryFromCampus3D,
+  campus3DToGps,
+  detectBuildingAtPosition,
+  distance3D,
+  floorToElevationMeters,
+  GpsKalmanFilter3D,
+  gpsToCampus3D,
+  resolveFloorFromElevation,
+} from './services/gpsService';
+import { TDC_GEO_ANCHORS } from './data/campusBuildings';
 import { PartyMember, PartyRoom, UserProfile } from './types/game';
 
 describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
@@ -12370,7 +13432,7 @@ describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
 
     const csv = generateAnalyticsCsv(summary);
     expect(csv).toContain('BAO CAO THONG KE HE THONG TDC GO');
-    expect(csv).toContain('Tòa D (11 tầng) & Cổng 2');
+    expect(csv).toContain('Tòa D');
   });
 
   it('8. Removes departing member and recalculates party totalPoints & cross-faculty status on leavePartyRoom', async () => {
@@ -12412,7 +13474,145 @@ describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
     expect(afterLeave!.isCrossFaculty).toBe(false);
     expect(afterLeave!.totalPoints).toBe(200);
   });
+
+  it('9. Converts 3-Axis GPS (WGS84 Lat/Lng/Altitude) to Campus 3D (X, Y, Z) and back with sub-meter precision', () => {
+    // Test round-trip conversion at Building D Floor 7 (x=56, y=25.2, z=28)
+    const gps = campus3DToGps({ x: 56, y: 25.2, z: 28 });
+    expect(gps.altitudeAsl).toBeCloseTo(TDC_GEO_ANCHORS.GROUND_ALTITUDE_ASL_M + 25.2, 2);
+
+    const back3D = gpsToCampus3D({
+      lat: gps.lat,
+      lng: gps.lng,
+      altitudeAsl: gps.altitudeAsl,
+    });
+    expect(back3D.x).toBeCloseTo(56, 0);
+    expect(back3D.y).toBeCloseTo(25.2, 1);
+    expect(back3D.z).toBeCloseTo(28, 0);
+    expect(back3D.insideCampus).toBe(true);
+  });
+
+  it('10. Detects campus buildings and resolves multi-floor levels (B1 Basement to Floor 11) from 3D coordinates', () => {
+    // Building D at (56, 28) supports Basement B1 (-1) up to Floor 11
+    const bldD = detectBuildingAtPosition(56, 28);
+    expect(bldD).not.toBeNull();
+    expect(bldD!.id).toBe('bld_d');
+    expect(bldD!.minFloor).toBe(-1);
+    expect(bldD!.maxFloor).toBe(11);
+
+    // Basement B1 (-4.2m)
+    const floorB1 = resolveFloorFromElevation(-4.2, bldD);
+    expect(floorB1.floor).toBe(-1);
+    expect(floorB1.clampedY).toBeCloseTo(-4.2, 1);
+
+    // Ground Floor 1 (0m)
+    const floor1 = resolveFloorFromElevation(0.2, bldD);
+    expect(floor1.floor).toBe(1);
+    expect(floor1.clampedY).toBe(0);
+
+    // Curved Podium Roof Floor 7 (+25.2m)
+    const floor7 = resolveFloorFromElevation(25.2, bldD);
+    expect(floor7.floor).toBe(7);
+    expect(floor7.clampedY).toBeCloseTo(25.2, 1);
+
+    // Top Floor 11 (+42.0m) - even if noisy GPS says +49m, clamps to maxFloor=11
+    const floor11 = resolveFloorFromElevation(49.0, bldD);
+    expect(floor11.floor).toBe(11);
+    expect(floor11.clampedY).toBeCloseTo(42.0, 1);
+
+    // Building B West Wing (IT Faculty) supports up to Floor 4
+    const bldBWest = detectBuildingAtPosition(-108, -7);
+    expect(bldBWest?.id).toBe('bld_b_west');
+    expect(resolveFloorFromElevation(8.4, bldBWest).floor).toBe(3);
+    expect(resolveFloorFromElevation(30.0, bldBWest).floor).toBe(4); // clamped to 4 floors
+  });
+
+  it('11. Filters 3-axis GPS noise with GpsKalmanFilter3D and computes 3D Euclidean distance across floors', () => {
+    const kf = new GpsKalmanFilter3D();
+    const first = kf.filter(56, 25.2, 28, 3, 4);
+    expect(first).toEqual({ x: 56, y: 25.2, z: 28 });
+
+    // Sudden GPS spike (+20m error) with poor accuracy (25m) should be strongly damped
+    const damped = kf.filter(76, 45.2, 48, 25, 25);
+    expect(damped.x).toBeLessThan(65);
+    expect(damped.y).toBeLessThan(33);
+
+    // 3D Euclidean distance between Floor 1 (y=0) and Floor 7 (y=25.2) at same (x, z)
+    const d3 = distance3D({ x: 56, y: 0, z: 28 }, { x: 56, y: floorToElevationMeters(7), z: 28 });
+    expect(d3).toBeCloseTo(25.2, 2);
+
+    const telemetry = buildTelemetryFromCampus3D({
+      x: -72,
+      y: 12.6,
+      z: -8,
+      source: 'gps_calibrated',
+    });
+    expect(telemetry.detectedBuilding?.id).toBe('bld_b_east');
+    expect(telemetry.detectedFloor).toBe(4);
+  });
+
+  it('12. Clamps lockedFloor to the detected building minFloor..maxFloor when moving between multi-floor buildings', () => {
+    // If lockedFloor was 11 at Building D, and user moves to Building A1 (maxFloor = 3),
+    // buildTelemetryFromCampus3D must clamp detectedFloor to 3 (+8.4m) instead of leaving avatar floating at Floor 11 (+42.0m)
+    const telemetryAtA1 = buildTelemetryFromCampus3D({
+      x: -109,
+      y: 42.0,
+      z: 58,
+      lockedFloor: 11,
+      source: 'gps_calibrated',
+    });
+    expect(telemetryAtA1.detectedBuilding?.id).toBe('bld_a1');
+    expect(telemetryAtA1.detectedFloor).toBe(3);
+    expect(telemetryAtA1.y).toBeCloseTo(8.4, 1);
+
+    // If lockedFloor was -1 (Basement B1 at Building D), and user moves to Building C (minFloor = 1),
+    // buildTelemetryFromCampus3D must clamp detectedFloor to 1 (0.0m)
+    const telemetryAtC = buildTelemetryFromCampus3D({
+      x: 84,
+      y: -4.2,
+      z: -11,
+      lockedFloor: -1,
+      source: 'gps_calibrated',
+    });
+    expect(telemetryAtC.detectedBuilding?.id).toBe('bld_c');
+    expect(telemetryAtC.detectedFloor).toBe(1);
+    expect(telemetryAtC.y).toBe(0);
+  });
 });
+</file>
+
+<file path="firebase.json">
+{
+  "auth": {
+    "providers": {
+      "anonymous": true,
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "TDC GO",
+        "supportEmail": "kuganagia@gmail.com"
+      }
+    }
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "asia-southeast1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
 </file>
 
 </files>

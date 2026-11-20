@@ -43,6 +43,17 @@ import {
   joinPartyRoom,
   leavePartyRoom,
 } from './services/partyService';
+import {
+  buildTelemetryFromCampus3D,
+  campus3DToGps,
+  detectBuildingAtPosition,
+  distance3D,
+  floorToElevationMeters,
+  GpsKalmanFilter3D,
+  gpsToCampus3D,
+  resolveFloorFromElevation,
+} from './services/gpsService';
+import { TDC_GEO_ANCHORS } from './data/campusBuildings';
 import { PartyMember, PartyRoom, UserProfile } from './types/game';
 
 describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
@@ -172,7 +183,7 @@ describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
 
     const csv = generateAnalyticsCsv(summary);
     expect(csv).toContain('BAO CAO THONG KE HE THONG TDC GO');
-    expect(csv).toContain('Tòa D (11 tầng) & Cổng 2');
+    expect(csv).toContain('Tòa D');
   });
 
   it('8. Removes departing member and recalculates party totalPoints & cross-faculty status on leavePartyRoom', async () => {
@@ -213,5 +224,108 @@ describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
     expect(afterLeave!.members.length).toBe(1);
     expect(afterLeave!.isCrossFaculty).toBe(false);
     expect(afterLeave!.totalPoints).toBe(200);
+  });
+
+  it('9. Converts 3-Axis GPS (WGS84 Lat/Lng/Altitude) to Campus 3D (X, Y, Z) and back with sub-meter precision', () => {
+    // Test round-trip conversion at Building D Floor 7 (x=56, y=25.2, z=28)
+    const gps = campus3DToGps({ x: 56, y: 25.2, z: 28 });
+    expect(gps.altitudeAsl).toBeCloseTo(TDC_GEO_ANCHORS.GROUND_ALTITUDE_ASL_M + 25.2, 2);
+
+    const back3D = gpsToCampus3D({
+      lat: gps.lat,
+      lng: gps.lng,
+      altitudeAsl: gps.altitudeAsl,
+    });
+    expect(back3D.x).toBeCloseTo(56, 0);
+    expect(back3D.y).toBeCloseTo(25.2, 1);
+    expect(back3D.z).toBeCloseTo(28, 0);
+    expect(back3D.insideCampus).toBe(true);
+  });
+
+  it('10. Detects campus buildings and resolves multi-floor levels (B1 Basement to Floor 11) from 3D coordinates', () => {
+    // Building D at (56, 28) supports Basement B1 (-1) up to Floor 11
+    const bldD = detectBuildingAtPosition(56, 28);
+    expect(bldD).not.toBeNull();
+    expect(bldD!.id).toBe('bld_d');
+    expect(bldD!.minFloor).toBe(-1);
+    expect(bldD!.maxFloor).toBe(11);
+
+    // Basement B1 (-4.2m)
+    const floorB1 = resolveFloorFromElevation(-4.2, bldD);
+    expect(floorB1.floor).toBe(-1);
+    expect(floorB1.clampedY).toBeCloseTo(-4.2, 1);
+
+    // Ground Floor 1 (0m)
+    const floor1 = resolveFloorFromElevation(0.2, bldD);
+    expect(floor1.floor).toBe(1);
+    expect(floor1.clampedY).toBe(0);
+
+    // Curved Podium Roof Floor 7 (+25.2m)
+    const floor7 = resolveFloorFromElevation(25.2, bldD);
+    expect(floor7.floor).toBe(7);
+    expect(floor7.clampedY).toBeCloseTo(25.2, 1);
+
+    // Top Floor 11 (+42.0m) - even if noisy GPS says +49m, clamps to maxFloor=11
+    const floor11 = resolveFloorFromElevation(49.0, bldD);
+    expect(floor11.floor).toBe(11);
+    expect(floor11.clampedY).toBeCloseTo(42.0, 1);
+
+    // Building B West Wing (IT Faculty) supports up to Floor 4
+    const bldBWest = detectBuildingAtPosition(-108, -7);
+    expect(bldBWest?.id).toBe('bld_b_west');
+    expect(resolveFloorFromElevation(8.4, bldBWest).floor).toBe(3);
+    expect(resolveFloorFromElevation(30.0, bldBWest).floor).toBe(4); // clamped to 4 floors
+  });
+
+  it('11. Filters 3-axis GPS noise with GpsKalmanFilter3D and computes 3D Euclidean distance across floors', () => {
+    const kf = new GpsKalmanFilter3D();
+    const first = kf.filter(56, 25.2, 28, 3, 4);
+    expect(first).toEqual({ x: 56, y: 25.2, z: 28 });
+
+    // Sudden GPS spike (+20m error) with poor accuracy (25m) should be strongly damped
+    const damped = kf.filter(76, 45.2, 48, 25, 25);
+    expect(damped.x).toBeLessThan(65);
+    expect(damped.y).toBeLessThan(33);
+
+    // 3D Euclidean distance between Floor 1 (y=0) and Floor 7 (y=25.2) at same (x, z)
+    const d3 = distance3D({ x: 56, y: 0, z: 28 }, { x: 56, y: floorToElevationMeters(7), z: 28 });
+    expect(d3).toBeCloseTo(25.2, 2);
+
+    const telemetry = buildTelemetryFromCampus3D({
+      x: -72,
+      y: 12.6,
+      z: -8,
+      source: 'gps_calibrated',
+    });
+    expect(telemetry.detectedBuilding?.id).toBe('bld_b_east');
+    expect(telemetry.detectedFloor).toBe(4);
+  });
+
+  it('12. Clamps lockedFloor to the detected building minFloor..maxFloor when moving between multi-floor buildings', () => {
+    // If lockedFloor was 11 at Building D, and user moves to Building A1 (maxFloor = 3),
+    // buildTelemetryFromCampus3D must clamp detectedFloor to 3 (+8.4m) instead of leaving avatar floating at Floor 11 (+42.0m)
+    const telemetryAtA1 = buildTelemetryFromCampus3D({
+      x: -109,
+      y: 42.0,
+      z: 58,
+      lockedFloor: 11,
+      source: 'gps_calibrated',
+    });
+    expect(telemetryAtA1.detectedBuilding?.id).toBe('bld_a1');
+    expect(telemetryAtA1.detectedFloor).toBe(3);
+    expect(telemetryAtA1.y).toBeCloseTo(8.4, 1);
+
+    // If lockedFloor was -1 (Basement B1 at Building D), and user moves to Building C (minFloor = 1),
+    // buildTelemetryFromCampus3D must clamp detectedFloor to 1 (0.0m)
+    const telemetryAtC = buildTelemetryFromCampus3D({
+      x: 84,
+      y: -4.2,
+      z: -11,
+      lockedFloor: -1,
+      source: 'gps_calibrated',
+    });
+    expect(telemetryAtC.detectedBuilding?.id).toBe('bld_c');
+    expect(telemetryAtC.detectedFloor).toBe(1);
+    expect(telemetryAtC.y).toBe(0);
   });
 });

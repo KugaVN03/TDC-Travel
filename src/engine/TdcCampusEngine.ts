@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { AVATARS, CAMP, PATHS } from '../data/campusLayout';
-import { Station, UnlockedStationRecord } from '../types/game';
+import { AVATARS } from '../data/campusLayout';
+import { GpsTelemetry3D, Station, UnlockedStationRecord } from '../types/game';
 import { audioSfx } from './audioSfx';
-import { buildCampusEnvironment } from './campusBuilder';
-import { animChibi, buildPathGraphAndNpcs, makeChibi } from './chibiBuilder';
+import { buildCampusEnvironment, FloorHighlightController } from './campusBuilder';
+import { animChibi, makeChibi } from './chibiBuilder';
 import { FogOfWarSystem } from './fogOfWar';
 import { buildNatureAndTrain } from './natureAndTrain';
 import {
@@ -13,11 +13,22 @@ import {
   coinTex,
   createMaterialCache,
   createRng,
-  ell,
+  FH,
   lerpAngle,
   mesh,
   pill,
 } from './threeHelpers';
+import {
+  buildTelemetryFromCampus3D,
+  clampToCampusBoundary,
+  detectBuildingAtPosition,
+  distance3D,
+  floorToElevationMeters,
+  GpsKalmanFilter3D,
+  gpsToCampus3D,
+  resolveFloorFromElevation,
+} from '../services/gpsService';
+import { TDC_GEO_ANCHORS } from '../data/campusBuildings';
 
 export interface FloatingTextItem {
   id: number;
@@ -32,13 +43,18 @@ export interface FloatingTextItem {
 export interface GuideState {
   station: Station | null;
   distance: number;
+  horizDistance: number;
+  deltaFloor: number;
   angleRad: number;
   allDone: boolean;
 }
 
 export interface MinimapSnapshot {
   playerX: number;
+  playerY: number;
   playerZ: number;
+  playerFloor: number;
+  accuracyMeters: number;
   playerRotY: number;
   camYaw: number;
   col: AABB[];
@@ -47,18 +63,11 @@ export interface MinimapSnapshot {
 export interface EngineCallbacks {
   onNearStationChange: (st: Station | null) => void;
   onOpenStationRequest: (st: Station) => void;
-  onStarCollected: () => void;
-  onPlayerMoveSave: (pos: [number, number]) => void;
+  onPlayerMoveSave: (pos: [number, number, number]) => void;
   onFloatingTextsUpdate: (items: FloatingTextItem[]) => void;
   onGuideUpdate: (guide: GuideState) => void;
   onMinimapUpdate: (snap: MinimapSnapshot) => void;
-}
-
-interface StarObject {
-  m: THREE.Mesh;
-  alive: boolean;
-  timer: number;
-  ph: number;
+  onGpsTelemetryUpdate?: (telemetry: GpsTelemetry3D) => void;
 }
 
 interface Station3DNode {
@@ -66,8 +75,10 @@ interface Station3DNode {
   ring: THREE.Mesh;
   disc: THREE.Mesh;
   beam: THREE.Mesh;
+  stem: THREE.Line | null;
   icon: THREE.Sprite;
   lab: THREE.Sprite;
+  baseY: number;
 }
 
 export class TdcCampusEngine {
@@ -81,11 +92,11 @@ export class TdcCampusEngine {
   private mat = createMaterialCache();
   private rng = createRng(20261021);
   private fogOfWar: FogOfWarSystem;
+  private floorController?: FloorHighlightController;
 
   private stations: Station[] = [];
   private unlockedMap: Record<string, UnlockedStationRecord> = {};
   private st3d: Record<string, Station3DNode> = {};
-  private stars: StarObject[] = [];
   private parts: { m: THREE.Mesh; v: THREE.Vector3; life: number }[] = [];
   private fxList: {
     id: number;
@@ -96,17 +107,34 @@ export class TdcCampusEngine {
   }[] = [];
   private fxSeq = 1;
 
+  // Player & 3D GPS Marker (X, Y, Z)
   private player = {
     obj: null as THREE.Group | null,
-    pos: new THREE.Vector3(-66, 0, 100),
+    pos: new THREE.Vector3(-66, 0, 104),
+    targetPos: new THREE.Vector3(-66, 0, 104),
     ph: 0,
     tag: null as THREE.Sprite | null,
+    gpsAccuracyDisc: null as THREE.Mesh | null,
+    gpsVerticalLine: null as THREE.Line | null,
+    gpsGroundShadowRing: null as THREE.Mesh | null,
   };
+
+  // Real-time 3-Axis GPS & Floor state
+  private kalman = new GpsKalmanFilter3D();
+  private gpsWatchId: number | null = null;
+  private gpsActive = false;
+  private groundAltitudeRefAsl = TDC_GEO_ANCHORS.GROUND_ALTITUDE_ASL_M;
+  private rawAltitudeAsl: number | null = null;
+  private lockedFloor: number | null = null;
+  private inspectedBuildingId: string | null = null;
+  private inspectedFloor: number | null = null;
+  private cutawayEnabled = false;
+  private currentTelemetry: GpsTelemetry3D;
 
   private cam = {
     yaw: 0.25,
-    pitch: 0.92,
-    dist: 40,
+    pitch: 0.86,
+    dist: 48,
     curD: null as number | null,
     curP: null as number | null,
     tgt: new THREE.Vector3(-5, 0, -5),
@@ -116,20 +144,13 @@ export class TdcCampusEngine {
   private paused = false;
   private photoStation: Station | null = null;
   private nearStation: Station | null = null;
-  private moveTarget: THREE.Vector3 | null = null;
-  private tMark: THREE.Mesh | null = null;
   private flagMesh: THREE.Mesh | null = null;
 
-  private keys = new Set<string>();
-  private joy = { x: 0, y: 0 };
   private disposed = false;
   private rafId = 0;
   private resizeObs: ResizeObserver;
-
   private cleanupWindowListeners?: () => void;
-
   private animateNatureAndTrain?: (dt: number, t: number) => void;
-  private animateNpcs?: (dt: number, t: number) => void;
 
   constructor(
     container: HTMLElement,
@@ -142,10 +163,19 @@ export class TdcCampusEngine {
     this.unlockedMap = initialUnlocked;
     this.callbacks = callbacks;
 
+    this.currentTelemetry = buildTelemetryFromCampus3D({
+      x: -66,
+      y: 0,
+      z: 104,
+      accuracyMeters: 2.4,
+      source: 'gps_calibrated',
+    });
+
     this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.localClippingEnabled = true;
     this.container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
@@ -180,13 +210,14 @@ export class TdcCampusEngine {
   }
 
   private initWorld(): void {
-    const { flag } = buildCampusEnvironment({
+    const { flag, floorController } = buildCampusEnvironment({
       scene: this.scene,
       col: this.col,
       mat: this.mat,
       rng: this.rng,
     });
     this.flagMesh = flag;
+    this.floorController = floorController;
 
     const nat = buildNatureAndTrain({
       scene: this.scene,
@@ -197,54 +228,53 @@ export class TdcCampusEngine {
     });
     this.animateNatureAndTrain = nat.animate;
 
-    const npcState = buildPathGraphAndNpcs({
-      scene: this.scene,
-      mat: this.mat,
-      rng: this.rng,
-    });
-    this.animateNpcs = npcState.animateNpcs;
-
-    // Stars
-    const sh = new THREE.Shape();
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
-      const r = i % 2 ? 0.45 : 1;
-      if (i) sh.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-      else sh.moveTo(Math.cos(a) * r, Math.sin(a) * r);
-    }
-    const sg = new THREE.ExtrudeGeometry(sh, {
-      depth: 0.32,
-      bevelEnabled: true,
-      bevelSize: 0.1,
-      bevelThickness: 0.1,
-      bevelSegments: 1,
-    });
-    sg.center();
-    const sm = new THREE.MeshPhongMaterial({
-      color: '#FFD23F',
-      emissive: '#7A5200',
-      shininess: 60,
-      flatShading: true,
-    });
-    for (let i = 0; i < 34; i++) {
-      const m = mesh(sg, sm, 0, 1.7, 0);
-      this.scene.add(m);
-      const s: StarObject = { m, alive: true, timer: 0, ph: this.rng() * 6 };
-      this.placeStar(s);
-      this.stars.push(s);
-    }
-
-    // Build 3D station markers & Fog of War
+    // Build 3D station markers (at X, Y, Z elevation) & Fog of War
     this.rebuildStations3D();
 
-    // Ground tap marker & particles
-    this.tMark = new THREE.Mesh(
-      new THREE.RingGeometry(0.9, 1.3, 28).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: '#FFFFFF', transparent: true, opacity: 0.9 })
+    // GPS Accuracy Sphere/Disc & 3-Axis Z-Elevation Drop Line
+    const accDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 36).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({
+        color: '#00AEEF',
+        transparent: true,
+        opacity: 0.22,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      })
     );
-    this.tMark.visible = false;
-    this.scene.add(this.tMark);
+    accDisc.position.y = 0.14;
+    accDisc.visible = false;
+    this.scene.add(accDisc);
+    this.player.gpsAccuracyDisc = accDisc;
 
+    const shadowRing = new THREE.Mesh(
+      new THREE.RingGeometry(1.1, 1.55, 32).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({
+        color: '#00F0FF',
+        transparent: true,
+        opacity: 0.75,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      })
+    );
+    shadowRing.position.y = 0.15;
+    shadowRing.visible = false;
+    this.scene.add(shadowRing);
+    this.player.gpsGroundShadowRing = shadowRing;
+
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 1, 0),
+    ]);
+    const vertLine = new THREE.Line(
+      lineGeo,
+      new THREE.LineBasicMaterial({ color: '#00F0FF', transparent: true, opacity: 0.9 })
+    );
+    vertLine.visible = false;
+    this.scene.add(vertLine);
+    this.player.gpsVerticalLine = vertLine;
+
+    // Celebration particles
     const pg = new THREE.OctahedronGeometry(0.28, 0);
     for (let i = 0; i < 60; i++) {
       const m = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ color: '#FFD23F' }));
@@ -276,26 +306,37 @@ export class TdcCampusEngine {
     this.stations
       .filter((st) => st.active !== false)
       .forEach((st) => {
+        const baseY = st.y || 0;
         const g = new THREE.Group();
-        g.position.set(st.x, 0, st.z);
+        g.position.set(st.x, baseY, st.z);
         this.scene.add(g);
 
         const ring = new THREE.Mesh(
           new THREE.RingGeometry(2.6, 3.3, 40).rotateX(-Math.PI / 2),
-          new THREE.MeshBasicMaterial({ color: st.col, transparent: true, opacity: 0.9 })
+          new THREE.MeshBasicMaterial({
+            color: st.col,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide,
+          })
         );
         ring.position.y = 0.16;
         g.add(ring);
 
         const disc = new THREE.Mesh(
           new THREE.CircleGeometry(2.6, 40).rotateX(-Math.PI / 2),
-          new THREE.MeshBasicMaterial({ color: st.col, transparent: true, opacity: 0.22 })
+          new THREE.MeshBasicMaterial({
+            color: st.col,
+            transparent: true,
+            opacity: 0.22,
+            side: THREE.DoubleSide,
+          })
         );
         disc.position.y = 0.15;
         g.add(disc);
 
         const beam = new THREE.Mesh(
-          new THREE.CylinderGeometry(1.4, 2.2, 22, 20, 1, true),
+          new THREE.CylinderGeometry(1.4, 2.2, 20, 20, 1, true),
           new THREE.MeshBasicMaterial({
             color: st.col,
             map: beamT,
@@ -305,10 +346,30 @@ export class TdcCampusEngine {
             opacity: 0.55,
           })
         );
-        beam.position.y = 11;
+        beam.position.y = 10;
         g.add(beam);
 
-        const ped = mesh(new THREE.CylinderGeometry(0.9, 1.2, 0.8, 12), this.mat('#FFFFFF'), 0, 0.4, 0);
+        // Nếu trạm nằm ở tầng cao (baseY > 0.5) hoặc tầng hầm (baseY < -0.5), vẽ trục đứng nối xuống mặt đất
+        let stem: THREE.Line | null = null;
+        if (Math.abs(baseY) > 0.5) {
+          const stemGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, -baseY, 0),
+            new THREE.Vector3(0, 0.2, 0),
+          ]);
+          stem = new THREE.Line(
+            stemGeo,
+            new THREE.LineBasicMaterial({ color: st.col, transparent: true, opacity: 0.75 })
+          );
+          g.add(stem);
+        }
+
+        const ped = mesh(
+          new THREE.CylinderGeometry(0.9, 1.2, 0.8, 12),
+          this.mat('#FFFFFF'),
+          0,
+          0.4,
+          0
+        );
         g.add(ped);
 
         const isDone = this.unlockedMap[st.id] != null;
@@ -319,11 +380,16 @@ export class TdcCampusEngine {
         icon.position.y = 5.5;
         g.add(icon);
 
-        const lab = pill(st.name, { h: 2.2, dot: st.col });
-        lab.position.y = 9;
+        const floorBadge = st.floor
+          ? st.floor === -1
+            ? ' [Hầm B1]'
+            : ` [Tầng ${st.floor}]`
+          : '';
+        const lab = pill(`${st.name}${floorBadge}`, { h: 2.2, dot: st.col });
+        lab.position.y = 9.2;
         g.add(lab);
 
-        this.st3d[st.id] = { g, ring, disc, beam, icon, lab };
+        this.st3d[st.id] = { g, ring, disc, beam, stem, icon, lab, baseY };
         this.applyStationVisualState(st);
       });
 
@@ -349,10 +415,16 @@ export class TdcCampusEngine {
     unlocked: Record<string, UnlockedStationRecord>
   ): void {
     const prevKey = this.stations
-      .map((s) => `${s.id}:${s.x}:${s.z}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`)
+      .map(
+        (s) =>
+          `${s.id}:${s.x}:${s.y || 0}:${s.z}:${s.floor || 1}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`
+      )
       .join('|');
     const nextKey = stations
-      .map((s) => `${s.id}:${s.x}:${s.z}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`)
+      .map(
+        (s) =>
+          `${s.id}:${s.x}:${s.y || 0}:${s.z}:${s.floor || 1}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`
+      )
       .join('|');
     const structureChanged = prevKey !== nextKey;
 
@@ -370,7 +442,7 @@ export class TdcCampusEngine {
   public startPlayer(
     name: string,
     avatarIdx: number,
-    savedPos?: [number, number] | null,
+    savedPos?: [number, number] | [number, number, number] | null,
     hasProgress?: boolean
   ): void {
     audioSfx.init();
@@ -382,36 +454,235 @@ export class TdcCampusEngine {
     this.player.obj.traverse((m) => {
       if ((m as THREE.Mesh).isMesh) m.castShadow = true;
     });
-    this.player.tag = pill(name || 'Bạn', { h: 1.25, fs: 40, bg: '#1E3528', fg: '#FFFFFF' });
-    this.player.tag.position.y = 3.9;
+    this.player.tag = pill(`${name || 'Bạn'} · GPS 3D`, {
+      h: 1.3,
+      fs: 40,
+      bg: '#0F172A',
+      fg: '#38BDF8',
+    });
+    this.player.tag.position.y = 4.0;
     this.player.obj.add(this.player.tag);
     this.scene.add(this.player.obj);
 
     if (savedPos && hasProgress) {
-      this.player.pos.set(savedPos[0], 0, savedPos[1]);
+      const sx = savedPos[0];
+      const sy = savedPos.length === 3 ? savedPos[1] : 0;
+      const sz = savedPos.length === 3 ? savedPos[2] : savedPos[1];
+      this.player.pos.set(sx, sy, sz);
+      this.player.targetPos.set(sx, sy, sz);
     } else {
-      this.player.pos.set(-66, 0, 98);
+      this.player.pos.set(-66, 0, 102);
+      this.player.targetPos.set(-66, 0, 102);
     }
+    this.kalman.reset(this.player.pos.x, this.player.pos.y, this.player.pos.z);
+
     this.player.obj.position.copy(this.player.pos);
     this.player.obj.rotation.y = Math.PI;
     this.cam.yaw = 0;
-    this.cam.tgt.set(this.player.pos.x, 1.6, this.player.pos.z);
+    this.cam.tgt.set(this.player.pos.x, this.player.pos.y + 1.8, this.player.pos.z);
     this.running = true;
     this.paused = false;
+
+    if (this.player.gpsAccuracyDisc) this.player.gpsAccuracyDisc.visible = true;
+    if (this.player.gpsGroundShadowRing) this.player.gpsGroundShadowRing.visible = true;
+    if (this.player.gpsVerticalLine) this.player.gpsVerticalLine.visible = true;
+
+    this.syncTelemetryFromCurrentTarget('gps_calibrated', 2.2);
+    this.startGpsHardwareTracking();
+  }
+
+  /**
+   * Bật định vị GPS phần cứng thực tế theo chuẩn HTML5 Geolocation API (`enableHighAccuracy: true`)
+   * Tự động tính toán 3 trục (X, Y, Z) bao gồm cả Altitude (trục cao độ phân tầng) và Kalman Filter.
+   */
+  public startGpsHardwareTracking(): void {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      return;
+    }
+    if (this.gpsWatchId !== null) {
+      navigator.geolocation.clearWatch(this.gpsWatchId);
+    }
+    this.gpsActive = true;
+    this.gpsWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (!this.gpsActive || this.disposed) return;
+        const { latitude, longitude, altitude, accuracy, altitudeAccuracy, heading, speed } =
+          pos.coords;
+
+        this.rawAltitudeAsl = altitude;
+        const projected = gpsToCampus3D({
+          lat: latitude,
+          lng: longitude,
+          altitudeAsl: altitude,
+          groundAltitudeReferenceAsl: this.groundAltitudeRefAsl,
+        });
+
+        // Nếu người dùng đang đứng thực tế trong khuôn viên trường hoặc lân cận (< 450m), cập nhật vị trí GPS thực
+        if (Math.hypot(projected.x, projected.z) < 450) {
+          const clamped = clampToCampusBoundary(projected.x, projected.z);
+          const filtered = this.kalman.filter(
+            clamped.x,
+            projected.y,
+            clamped.z,
+            accuracy || 6,
+            altitudeAccuracy || 10
+          );
+
+          const bld = detectBuildingAtPosition(filtered.x, filtered.z);
+          const resolved =
+            this.lockedFloor !== null
+              ? {
+                  floor: this.lockedFloor,
+                  clampedY: floorToElevationMeters(this.lockedFloor, bld),
+                }
+              : resolveFloorFromElevation(filtered.y, bld);
+
+          this.player.targetPos.set(filtered.x, resolved.clampedY, filtered.z);
+          this.currentTelemetry = {
+            lat: +latitude.toFixed(6),
+            lng: +longitude.toFixed(6),
+            altitudeAsl: altitude != null ? +altitude.toFixed(2) : null,
+            accuracyMeters: +(accuracy || 4.0).toFixed(1),
+            altitudeAccuracyMeters:
+              altitudeAccuracy != null ? +altitudeAccuracy.toFixed(1) : null,
+            headingDeg: heading != null && Number.isFinite(heading) ? Math.round(heading) : null,
+            speedMps: speed != null && Number.isFinite(speed) ? +speed.toFixed(2) : null,
+            x: filtered.x,
+            y: resolved.clampedY,
+            z: filtered.z,
+            detectedFloor: resolved.floor,
+            detectedBuilding: bld,
+            insideCampus: projected.insideCampus,
+            source: 'gps_hardware',
+            timestamp: Date.now(),
+          };
+          this.updateFloorHighlightState();
+          this.callbacks.onGpsTelemetryUpdate?.(this.currentTelemetry);
+        } else {
+          // Người dùng đang mở web từ ngoài khuôn viên trường (> 450m): vẫn ghi nhận tọa độ GPS thật nhưng giữ mô hình ở chế độ Hiệu chuẩn Khuôn viên để khám phá
+          this.currentTelemetry = {
+            ...this.currentTelemetry,
+            lat: +latitude.toFixed(6),
+            lng: +longitude.toFixed(6),
+            altitudeAsl: altitude != null ? +altitude.toFixed(2) : this.currentTelemetry.altitudeAsl,
+            accuracyMeters: +(accuracy || 5.0).toFixed(1),
+            insideCampus: false,
+            timestamp: Date.now(),
+          };
+          this.callbacks.onGpsTelemetryUpdate?.(this.currentTelemetry);
+        }
+      },
+      () => {
+        // Khi thiết bị từ chối quyền GPS hoặc mất sóng trong nhà kín, giữ chế độ Định vị Hiệu chuẩn 3D
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 10000,
+      }
+    );
+  }
+
+  /**
+   * Hiệu chuẩn áp kế / cao độ mặt đất (Tare Ground Altitude = 0.0m / Tầng 1)
+   * Giúp loại bỏ sai số độ cao GPS giữa các dòng điện thoại khác nhau.
+   */
+  public calibrateGroundZeroAltitude(): void {
+    if (this.rawAltitudeAsl != null && Number.isFinite(this.rawAltitudeAsl)) {
+      this.groundAltitudeRefAsl = this.rawAltitudeAsl;
+    }
+    this.lockedFloor = 1;
+    this.setTargetPosition3D(this.player.targetPos.x, 0, this.player.targetPos.z, 'gps_calibrated');
+  }
+
+  /**
+   * Đặt tọa độ 3 trục (X, Y, Z) trực tiếp từ bộ định vị GPS / Chọn Tòa nhà & Tầng để khám phá
+   */
+  public setTargetPosition3D(
+    x: number,
+    y: number,
+    z: number,
+    source: GpsTelemetry3D['source'] = 'gps_calibrated'
+  ): void {
+    const clamped = clampToCampusBoundary(x, z);
+    const bld = detectBuildingAtPosition(clamped.x, clamped.z);
+    const resolved = resolveFloorFromElevation(y, bld);
+    const effectiveY = resolved.clampedY;
+
+    this.lockedFloor = resolved.floor;
+    this.player.targetPos.set(clamped.x, effectiveY, clamped.z);
+    this.kalman.reset(clamped.x, effectiveY, clamped.z);
+    this.inspectedBuildingId = bld?.id || null;
+    this.inspectedFloor = resolved.floor;
+
+    this.syncTelemetryFromCurrentTarget(source, source === 'gps_hardware' ? 3.2 : 1.5);
+  }
+
+  /**
+   * Chọn tầng cụ thể (Trục cao độ Y/Z: Tầng Hầm B1 = -1, Tầng 1..11) để khám phá mặt sàn phân tầng
+   */
+  public selectFloorLevel(floor: number | null, enableCutaway?: boolean): void {
+    this.lockedFloor = floor;
+    if (enableCutaway !== undefined) {
+      this.cutawayEnabled = enableCutaway;
+    }
+    if (floor !== null) {
+      const bld = detectBuildingAtPosition(this.player.targetPos.x, this.player.targetPos.z);
+      const validFloor = bld
+        ? clamp(floor, bld.minFloor, bld.maxFloor)
+        : clamp(floor, -1, 11);
+      this.lockedFloor = validFloor;
+      const nextY = floorToElevationMeters(validFloor, bld);
+      this.player.targetPos.y = nextY;
+      this.inspectedFloor = validFloor;
+      this.inspectedBuildingId = bld?.id || null;
+    } else {
+      this.inspectedFloor = null;
+    }
+    this.syncTelemetryFromCurrentTarget('manual_override', 1.5);
+  }
+
+  /**
+   * Bật / Tắt chế độ Cắt lớp Phân tầng 3D (3D Floor Cutaway) để nhìn xuyên vào bên trong tầng đang chọn
+   */
+  public setCutawayMode(enabled: boolean): void {
+    this.cutawayEnabled = enabled;
+    this.updateFloorHighlightState();
+  }
+
+  public getCutawayMode(): boolean {
+    return this.cutawayEnabled;
+  }
+
+  private updateFloorHighlightState(): void {
+    if (!this.floorController) return;
+    const activeFloor =
+      this.lockedFloor ?? this.inspectedFloor ?? this.currentTelemetry.detectedFloor;
+    const activeBldId =
+      this.inspectedBuildingId ?? this.currentTelemetry.detectedBuilding?.id ?? null;
+
+    this.floorController.setFloorView(activeBldId, activeFloor, this.cutawayEnabled);
+  }
+
+  private syncTelemetryFromCurrentTarget(
+    source: GpsTelemetry3D['source'],
+    accuracyMeters: number
+  ): void {
+    this.currentTelemetry = buildTelemetryFromCampus3D({
+      x: this.player.targetPos.x,
+      y: this.player.targetPos.y,
+      z: this.player.targetPos.z,
+      accuracyMeters,
+      source,
+      lockedFloor: this.lockedFloor,
+      groundAltitudeReferenceAsl: this.groundAltitudeRefAsl,
+    });
+    this.updateFloorHighlightState();
+    this.callbacks.onGpsTelemetryUpdate?.(this.currentTelemetry);
   }
 
   public setPaused(p: boolean): void {
     this.paused = p;
-    if (p) {
-      this.keys.clear();
-      this.joy.x = 0;
-      this.joy.y = 0;
-    }
-  }
-
-  public setJoystick(x: number, y: number): void {
-    this.joy.x = x;
-    this.joy.y = y;
   }
 
   public enterPhotoMode(st: Station): void {
@@ -447,27 +718,24 @@ export class TdcCampusEngine {
     }
   }
 
+  /**
+   * Định vị / Đồng bộ ngay tới tọa độ 3D (X, Y, Z) của một trạm hoặc tòa nhà
+   */
   public navigateToStation(st: Station): void {
     if (!this.running) return;
-    this.moveTarget = new THREE.Vector3(
-      st.x,
-      0,
-      st.z + (st.z > this.player.pos.z ? -3 : 3)
-    );
-    if (this.tMark) {
-      this.tMark.position.set(this.moveTarget.x, 0.2, this.moveTarget.z);
-      this.tMark.visible = true;
-      this.tMark.scale.setScalar(1.6);
-    }
+    const targetY = st.y ?? (st.floor ? floorToElevationMeters(st.floor) : 0);
+    this.lockedFloor = st.floor ?? 1;
+    this.setTargetPosition3D(st.x, targetY, st.z, 'gps_calibrated');
   }
 
   public celebrateStationUnlock(st: Station, ptsText: string): void {
+    const sy = st.y || 0;
     this.burst(
-      new THREE.Vector3(st.x, 5, st.z),
+      new THREE.Vector3(st.x, sy + 5, st.z),
       ['#FFD23F', '#FF6F59', '#00AEEF', '#38B865', '#FF8FB1', '#9B6BFF'],
       42
     );
-    this.spawnFloatText(ptsText, new THREE.Vector3(st.x, 4, st.z));
+    this.spawnFloatText(ptsText, new THREE.Vector3(st.x, sy + 4, st.z));
   }
 
   public spawnFloatText(text: string, worldPos: THREE.Vector3, color?: string): void {
@@ -497,53 +765,8 @@ export class TdcCampusEngine {
     }
   }
 
-  private placeStar(s: StarObject): void {
-    for (let k = 0; k < 40; k++) {
-      const p = PATHS[Math.floor(this.rng() * PATHS.length)];
-      const t = this.rng();
-      const x = p[0] + (p[2] - p[0]) * t + (this.rng() - 0.5) * 1.6;
-      const z = p[1] + (p[3] - p[1]) * t + (this.rng() - 0.5) * 1.6;
-      if (this.stations.some((st) => Math.hypot(st.x - x, st.z - z) < 6)) continue;
-      if (
-        this.col.some((c) => x > c[0] - 1 && x < c[2] + 1 && z > c[1] - 1 && z < c[3] + 1)
-      )
-        continue;
-      if (
-        Math.hypot(x - this.player.pos.x, z - this.player.pos.z) < 10 &&
-        this.running
-      )
-        continue;
-      s.m.position.set(x, 1.7, z);
-      s.m.visible = true;
-      s.alive = true;
-      return;
-    }
-  }
-
-  private resolveCollision(p: THREE.Vector3): void {
-    const r = 0.7;
-    for (const c of this.col) {
-      if (p.x > c[0] - r && p.x < c[2] + r && p.z > c[1] - r && p.z < c[3] + r) {
-        const dl = p.x - (c[0] - r);
-        const dr = c[2] + r - p.x;
-        const dt = p.z - (c[1] - r);
-        const db = c[3] + r - p.z;
-        const m = Math.min(dl, dr, dt, db);
-        if (m === dl) p.x = c[0] - r;
-        else if (m === dr) p.x = c[2] + r;
-        else if (m === dt) p.z = c[1] - r;
-        else p.z = c[3] + r;
-      }
-    }
-    const d = ell(p.x, p.z);
-    if (d > 0.985) {
-      const k = 0.985 / d;
-      p.x = CAMP.cx + (p.x - CAMP.cx) * k;
-      p.z = CAMP.cz + (p.z - CAMP.cz) * k;
-    }
-  }
-
   private bindEvents(): void {
+    // Chỉ giữ phím tắt xoay/zoom camera (+ / - / Enter mở trạm), loại bỏ hoàn toàn điều khiển nhân vật bằng WASD/click đất kiểu game giả lập
     const onKeyDown = (e: KeyboardEvent) => {
       const tag = document.activeElement?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -554,42 +777,13 @@ export class TdcCampusEngine {
         this.callbacks.onOpenStationRequest(this.nearStation);
         return;
       }
-      if (
-        [
-          'w',
-          'a',
-          's',
-          'd',
-          'q',
-          'e',
-          'arrowup',
-          'arrowdown',
-          'arrowleft',
-          'arrowright',
-        ].includes(k)
-      ) {
-        e.preventDefault();
-        this.keys.add(k);
-      }
-      if (k === '+' || k === '=') this.cam.dist = clamp(this.cam.dist * 0.85, 16, 130);
-      if (k === '-') this.cam.dist = clamp(this.cam.dist / 0.85, 16, 130);
-    };
-
-    const onKeyUp = (e: KeyboardEvent) => {
-      this.keys.delete(e.key.toLowerCase());
-    };
-
-    const onBlur = () => {
-      this.keys.clear();
+      if (k === '+' || k === '=') this.cam.dist = clamp(this.cam.dist * 0.85, 16, 160);
+      if (k === '-') this.cam.dist = clamp(this.cam.dist / 0.85, 16, 160);
     };
 
     window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    window.addEventListener('blur', onBlur);
     this.cleanupWindowListeners = () => {
       window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      window.removeEventListener('blur', onBlur);
     };
 
     const cv = this.renderer.domElement;
@@ -602,29 +796,6 @@ export class TdcCampusEngine {
       moved: boolean;
     } | null = null;
     let pinch: number | null = null;
-    const ray = new THREE.Raycaster();
-    const GROUND = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-
-    const tapMove = (e: PointerEvent) => {
-      const r = cv.getBoundingClientRect();
-      ray.setFromCamera(
-        new THREE.Vector2(
-          ((e.clientX - r.left) / r.width) * 2 - 1,
-          -((e.clientY - r.top) / r.height) * 2 + 1
-        ),
-        this.camera
-      );
-      const p = new THREE.Vector3();
-      if (!ray.ray.intersectPlane(GROUND, p)) return;
-      if (ell(p.x, p.z) > 0.985) return;
-      this.moveTarget = p;
-      if (this.tMark) {
-        this.tMark.position.set(p.x, 0.2, p.z);
-        this.tMark.visible = true;
-        this.tMark.scale.setScalar(1.6);
-      }
-      audioSfx.play('tap');
-    };
 
     cv.addEventListener('pointerdown', (e) => {
       ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -655,7 +826,7 @@ export class TdcCampusEngine {
       if (pinch && ptrs.size === 2) {
         const [a, b] = [...ptrs.values()];
         const d = Math.hypot(a.x - b.x, a.y - b.y);
-        this.cam.dist = clamp((this.cam.dist * pinch) / d, 16, 130);
+        this.cam.dist = clamp((this.cam.dist * pinch) / d, 16, 160);
         pinch = d;
         return;
       }
@@ -664,24 +835,14 @@ export class TdcCampusEngine {
       const dy = e.clientY - drag.y;
       drag.x = e.clientX;
       drag.y = e.clientY;
-      if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 8) drag.moved = true;
+      if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 6) drag.moved = true;
       if (drag.moved) {
         this.cam.yaw -= dx * 0.006;
-        this.cam.pitch = clamp(this.cam.pitch + dy * 0.004, 0.32, 1.38);
+        this.cam.pitch = clamp(this.cam.pitch + dy * 0.004, 0.25, 1.42);
       }
     });
 
     const endPtr = (e: PointerEvent) => {
-      if (
-        drag &&
-        !drag.moved &&
-        ptrs.size === 1 &&
-        this.running &&
-        !this.paused &&
-        !this.photoStation
-      ) {
-        tapMove(e);
-      }
       ptrs.delete(e.pointerId);
       if (ptrs.size < 2) pinch = null;
       if (!ptrs.size) drag = null;
@@ -698,7 +859,7 @@ export class TdcCampusEngine {
       (e) => {
         if (!this.running) return;
         e.preventDefault();
-        this.cam.dist = clamp(this.cam.dist * (1 + e.deltaY * 0.0012), 16, 130);
+        this.cam.dist = clamp(this.cam.dist * (1 + e.deltaY * 0.0012), 16, 160);
       },
       { passive: false }
     );
@@ -730,12 +891,13 @@ export class TdcCampusEngine {
       T += dt;
 
       if (this.running && !this.paused && !this.photoStation) {
-        this.updatePlayer(dt, T);
+        this.updateGpsAvatar3D(dt, T);
         saveT -= dt;
         if (saveT <= 0) {
           saveT = 2.0;
           this.callbacks.onPlayerMoveSave([
             +this.player.pos.x.toFixed(1),
+            +this.player.pos.y.toFixed(1),
             +this.player.pos.z.toFixed(1),
           ]);
         }
@@ -743,12 +905,12 @@ export class TdcCampusEngine {
         animChibi(this.player.obj, this.player.ph, 0, T);
       }
 
-      // Camera update
+      // Camera tracks full 3D position (X, Y, Z) so rising to Floor 7 or Floor 11 smoothly elevates camera
       let d: number;
       let p: number;
       if (this.running) {
         this.cam.tgt.lerp(
-          tmpV.set(this.player.pos.x, 1.6, this.player.pos.z),
+          tmpV.set(this.player.pos.x, this.player.pos.y + 1.8, this.player.pos.z),
           1 - Math.exp(-dt * 7)
         );
         d = this.photoStation ? 15 : this.cam.dist;
@@ -799,106 +961,80 @@ export class TdcCampusEngine {
     this.rafId = requestAnimationFrame(frame);
   }
 
-  private updatePlayer(dt: number, t: number): void {
-    let ix = 0;
-    let iy = 0;
-    if (this.keys.has('w') || this.keys.has('arrowup')) iy += 1;
-    if (this.keys.has('s') || this.keys.has('arrowdown')) iy -= 1;
-    if (this.keys.has('a') || this.keys.has('arrowleft')) ix -= 1;
-    if (this.keys.has('d') || this.keys.has('arrowright')) ix += 1;
-    if (this.keys.has('q')) this.cam.yaw += 1.7 * dt;
-    if (this.keys.has('e')) this.cam.yaw -= 1.7 * dt;
-    ix += this.joy.x;
-    iy += this.joy.y;
+  /**
+   * Nội suy mượt vị trí nhân vật 3D theo tín hiệu GPS 3 trục (X, Y, Z)
+   * và cập nhật bán kính sai số GPS, đường chiếu đứng từ tầng cao xuống mặt đất.
+   */
+  private updateGpsAvatar3D(dt: number, t: number): void {
+    const dx = this.player.targetPos.x - this.player.pos.x;
+    const dy = this.player.targetPos.y - this.player.pos.y;
+    const dz = this.player.targetPos.z - this.player.pos.z;
+    const distHoriz = Math.hypot(dx, dz);
+    const dist3D = Math.hypot(dx, dy, dz);
 
-    const fx = -Math.sin(this.cam.yaw);
-    const fz = -Math.cos(this.cam.yaw);
-    const rx = Math.cos(this.cam.yaw);
-    const rz = -Math.sin(this.cam.yaw);
-    let mx = fx * iy + rx * ix;
-    let mz = fz * iy + rz * ix;
-    let amt = Math.hypot(mx, mz);
+    const lerpFactor = 1 - Math.exp(-dt * 8.5);
+    this.player.pos.x += dx * lerpFactor;
+    this.player.pos.y += dy * lerpFactor;
+    this.player.pos.z += dz * lerpFactor;
 
-    if (amt > 0.08) {
-      this.moveTarget = null;
-      if (this.tMark) this.tMark.visible = false;
-      mx /= amt;
-      mz /= amt;
-      if (amt > 1) amt = 1;
-    } else if (this.moveTarget) {
-      mx = this.moveTarget.x - this.player.pos.x;
-      mz = this.moveTarget.z - this.player.pos.z;
-      const d = Math.hypot(mx, mz);
-      if (d < 0.7) {
-        this.moveTarget = null;
-        if (this.tMark) this.tMark.visible = false;
-        amt = 0;
-      } else {
-        mx /= d;
-        mz /= d;
-        amt = 1;
-      }
-    } else {
-      amt = 0;
+    const moveAmt = clamp(dist3D * 0.45, 0, 1);
+    if (distHoriz > 0.08 && this.player.obj) {
+      this.player.obj.rotation.y = lerpAngle(
+        this.player.obj.rotation.y,
+        Math.atan2(dx, dz),
+        1 - Math.exp(-dt * 10)
+      );
     }
-
-    const sp = 10 * amt;
-    if (amt > 0) {
-      const ox = this.player.pos.x;
-      const oz = this.player.pos.z;
-      this.player.pos.x += mx * sp * dt;
-      this.player.pos.z += mz * sp * dt;
-      this.resolveCollision(this.player.pos);
-      if (
-        this.moveTarget &&
-        Math.hypot(this.player.pos.x - ox, this.player.pos.z - oz) < sp * dt * 0.15
-      ) {
-        this.moveTarget = null;
-        if (this.tMark) this.tMark.visible = false;
-      }
-      if (this.player.obj) {
-        this.player.obj.rotation.y = lerpAngle(
-          this.player.obj.rotation.y,
-          Math.atan2(mx, mz),
-          1 - Math.exp(-dt * 12)
-        );
-      }
-      this.player.ph += dt * sp * 1.1;
-    }
+    this.player.ph += dt * (2.5 + moveAmt * 9);
 
     if (this.player.obj) {
-      animChibi(this.player.obj, this.player.ph, amt, t);
-      this.player.obj.position.set(this.player.pos.x, 0, this.player.pos.z);
+      animChibi(this.player.obj, this.player.ph, moveAmt > 0.05 ? moveAmt : 0, t);
+      this.player.obj.position.copy(this.player.pos);
     }
 
-    // Collect stars
-    for (const s of this.stars) {
-      if (!s.alive) continue;
-      if (
-        Math.hypot(
-          s.m.position.x - this.player.pos.x,
-          s.m.position.z - this.player.pos.z
-        ) < 2.4
-      ) {
-        s.alive = false;
-        s.m.visible = false;
-        s.timer = 45;
-        this.burst(s.m.position, ['#FFD23F', '#FFF3B0', '#FFAA1F'], 10);
-        this.spawnFloatText('+10', s.m.position);
-        audioSfx.play('coin');
-        this.callbacks.onStarCollected();
-      }
+    // Cập nhật vòng tròn sai số GPS tại độ cao Y của người dùng
+    if (this.player.gpsAccuracyDisc) {
+      const r = clamp(this.currentTelemetry.accuracyMeters, 1.8, 18);
+      const pulse = 1 + Math.sin(t * 3.2) * 0.08;
+      this.player.gpsAccuracyDisc.position.set(
+        this.player.pos.x,
+        this.player.pos.y + 0.14,
+        this.player.pos.z
+      );
+      this.player.gpsAccuracyDisc.scale.set(r * pulse, 1, r * pulse);
     }
 
-    // Check near station
+    // Cập nhật hình chiếu trên mặt sân trường (y = 0.15) và trục đứng Z-Elevation
+    if (this.player.gpsGroundShadowRing) {
+      this.player.gpsGroundShadowRing.position.set(
+        this.player.pos.x,
+        0.15,
+        this.player.pos.z
+      );
+    }
+
+    if (this.player.gpsVerticalLine) {
+      const posAttr = this.player.gpsVerticalLine.geometry.getAttribute(
+        'position'
+      ) as THREE.BufferAttribute;
+      posAttr.setXYZ(0, this.player.pos.x, 0.15, this.player.pos.z);
+      posAttr.setXYZ(1, this.player.pos.x, this.player.pos.y + 0.2, this.player.pos.z);
+      posAttr.needsUpdate = true;
+      this.player.gpsVerticalLine.visible = Math.abs(this.player.pos.y) > 0.35;
+    }
+
+    // Kiểm tra khoảng cách không gian 3 chiều (X, Y, Z) tới các trạm
     let near: Station | null = null;
-    let best = 6.8;
+    let best = 9.5; // Bán kính nhận diện GPS 3D tại trạm
     this.stations
       .filter((st) => st.active !== false)
       .forEach((st) => {
-        const d = Math.hypot(st.x - this.player.pos.x, st.z - this.player.pos.z);
-        if (d < best) {
-          best = d;
+        const d3 = distance3D(
+          { x: st.x, y: st.y || 0, z: st.z },
+          { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z }
+        );
+        if (d3 < best) {
+          best = d3;
           near = st;
         }
       });
@@ -911,21 +1047,10 @@ export class TdcCampusEngine {
 
   private animateWorld(dt: number, t: number): void {
     this.animateNatureAndTrain?.(dt, t);
-    this.animateNpcs?.(dt, t);
 
     if (this.flagMesh) {
       this.flagMesh.rotation.y = Math.sin(t * 3) * 0.25;
     }
-
-    this.stars.forEach((s) => {
-      if (!s.alive) {
-        s.timer -= dt;
-        if (s.timer <= 0) this.placeStar(s);
-        return;
-      }
-      s.m.rotation.y = t * 2 + s.ph;
-      s.m.position.y = 1.7 + Math.sin(t * 2.4 + s.ph) * 0.3;
-    });
 
     this.stations.forEach((st, i) => {
       const s = this.st3d[st.id];
@@ -946,11 +1071,6 @@ export class TdcCampusEngine {
       p.m.scale.setScalar(Math.max(0.05, p.life * 1.3));
       if (p.life <= 0) p.m.visible = false;
     });
-
-    if (this.tMark && this.tMark.visible) {
-      this.tMark.scale.multiplyScalar(1 - dt * 1.4);
-      if (this.tMark.scale.x < 0.9) this.tMark.scale.setScalar(1.6);
-    }
   }
 
   private updateFloatingTexts(dt: number, tmpV: THREE.Vector3): void {
@@ -983,18 +1103,24 @@ export class TdcCampusEngine {
 
   private emitGuideAndMinimap(): void {
     let best: Station | null = null;
-    let bd = 1e9;
+    let bd3 = 1e9;
+    let bHoriz = 0;
     const activeStations = this.stations.filter((st) => st.active !== false);
     activeStations.forEach((st) => {
       if (this.unlockedMap[st.id] != null) return;
-      const d = Math.hypot(st.x - this.player.pos.x, st.z - this.player.pos.z);
-      if (d < bd) {
-        bd = d;
+      const d3 = distance3D(
+        { x: st.x, y: st.y || 0, z: st.z },
+        { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z }
+      );
+      if (d3 < bd3) {
+        bd3 = d3;
+        bHoriz = Math.hypot(st.x - this.player.pos.x, st.z - this.player.pos.z);
         best = st;
       }
     });
 
     let angleRad = 0;
+    let deltaFloor = 0;
     if (best) {
       const target = best as Station;
       const vx = target.x - this.player.pos.x;
@@ -1004,18 +1130,25 @@ export class TdcCampusEngine {
       const rx = Math.cos(this.cam.yaw);
       const rz = -Math.sin(this.cam.yaw);
       angleRad = Math.atan2(vx * rx + vz * rz, vx * fx + vz * fz);
+      const targetFloor = target.floor || 1;
+      deltaFloor = targetFloor - this.currentTelemetry.detectedFloor;
     }
 
     this.callbacks.onGuideUpdate({
       station: best,
-      distance: best ? bd : 0,
+      distance: best ? bd3 : 0,
+      horizDistance: best ? bHoriz : 0,
+      deltaFloor,
       angleRad,
       allDone: best === null && activeStations.length > 0,
     });
 
     this.callbacks.onMinimapUpdate({
       playerX: this.player.pos.x,
+      playerY: this.player.pos.y,
       playerZ: this.player.pos.z,
+      playerFloor: this.currentTelemetry.detectedFloor,
+      accuracyMeters: this.currentTelemetry.accuracyMeters,
       playerRotY: this.player.obj ? this.player.obj.rotation.y : 0,
       camYaw: this.cam.yaw,
       col: this.col,
@@ -1024,6 +1157,10 @@ export class TdcCampusEngine {
 
   public dispose(): void {
     this.disposed = true;
+    this.gpsActive = false;
+    if (this.gpsWatchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.clearWatch(this.gpsWatchId);
+    }
     cancelAnimationFrame(this.rafId);
     this.cleanupWindowListeners?.();
     this.resizeObs.disconnect();

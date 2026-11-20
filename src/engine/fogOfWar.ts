@@ -43,7 +43,8 @@ export class FogOfWarSystem {
     stations.forEach((st, idx) => {
       const isUnlocked = unlockedIds[st.id] != null;
       const group = new THREE.Group();
-      group.position.set(st.x, 0, st.z);
+      const baseY = st.y || 0;
+      group.position.set(st.x, baseY, st.z);
 
       const radius = st.fogRadius || 30;
       const groundVeil = new THREE.Mesh(

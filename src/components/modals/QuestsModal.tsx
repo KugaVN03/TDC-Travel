@@ -62,8 +62,7 @@ export const QuestsModal: React.FC<QuestsModalProps> = ({
             })}
           </div>
           <p className="note text-center">
-            ⭐ Ngôi sao năng lượng tự mọc lại trên lối đi sau mỗi 45 giây. Đã nhặt:{' '}
-            <b>{profile.stars || 0}</b> ngôi sao.
+            📡 Định vị GPS 3 trục (X, Y, Z) và khám phá đủ các tòa nhà phân tầng trong trường để hoàn thành trọn bộ nhiệm vụ!
           </p>
         </div>
       </div>

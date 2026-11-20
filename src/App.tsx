@@ -30,7 +30,6 @@ import {
 } from './services/authService';
 import {
   checkAntiCheatCooldown,
-  recordStarPickup,
   recordStationUnlock,
   verifyStationQrPayload,
 } from './services/gameService';
@@ -43,6 +42,7 @@ import {
 } from './services/partyService';
 import {
   FacultyId,
+  GpsTelemetry3D,
   PartyRoom,
   Station,
   UserProfile,
@@ -82,10 +82,14 @@ export const App: React.FC = () => {
   const [guide, setGuide] = useState<GuideState>({
     station: null,
     distance: 0,
+    horizDistance: 0,
+    deltaFloor: 0,
     angleRad: 0,
     allDone: false,
   });
   const [minimapSnap, setMinimapSnap] = useState<MinimapSnapshot | null>(null);
+  const [gpsTelemetry, setGpsTelemetry] = useState<GpsTelemetry3D | null>(null);
+  const [cutawayMode, setCutawayMode] = useState(false);
   const [floatingTexts, setFloatingTexts] = useState<FloatingTextItem[]>([]);
   const [activeModal, setActiveModal] = useState<ActiveModal>(null);
 
@@ -145,26 +149,6 @@ export const App: React.FC = () => {
           audioSfx.play('tap');
           setActiveModal({ type: 'station', station: st });
         },
-        onStarCollected: () => {
-          const cur = profileRef.current;
-          if (!cur) return;
-          const prevLevel = 1 + Math.floor(cur.points / 300);
-          const activeCount = stationsRef.current.filter((s) => s.active !== false).length;
-          void recordStarPickup(cur, activeCount).then(
-            ({ updatedProfile, newlyCompletedQuests }) => {
-              setProfile(updatedProfile);
-              triggerPointsBump();
-              const nextLevel = 1 + Math.floor(updatedProfile.points / 300);
-              if (nextLevel > prevLevel) {
-                pushToast(`🎉 Thăng cấp ${nextLevel}!`, true);
-                audioSfx.play('badge');
-              }
-              newlyCompletedQuests.forEach((q) => {
-                pushToast(`Hoàn thành nhiệm vụ: ${q.name} · +${q.reward}đ`, true);
-              });
-            }
-          );
-        },
         onPlayerMoveSave: (pos) => {
           const cur = profileRef.current;
           if (!cur) return;
@@ -175,6 +159,7 @@ export const App: React.FC = () => {
         onFloatingTextsUpdate: (items) => setFloatingTexts(items),
         onGuideUpdate: (g) => setGuide(g),
         onMinimapUpdate: (snap) => setMinimapSnap(snap),
+        onGpsTelemetryUpdate: (telemetry) => setGpsTelemetry(telemetry),
       }
     );
 
@@ -392,6 +377,8 @@ export const App: React.FC = () => {
           nearStation={nearStation}
           guide={guide}
           minimapSnap={minimapSnap}
+          gpsTelemetry={gpsTelemetry}
+          cutawayMode={cutawayMode}
           floatingTexts={floatingTexts}
           muted={muted}
           dimmed={Boolean(photoMode)}
@@ -407,7 +394,9 @@ export const App: React.FC = () => {
           onNavigateGuide={() => {
             if (guide.station) {
               engineRef.current?.navigateToStation(guide.station);
-              pushToast(`Đang di chuyển tới ${guide.station.name}...`);
+              pushToast(
+                `📡 Đã đồng bộ định vị GPS 3D tới ${guide.station.name} (Tầng ${guide.station.floor || 1})!`
+              );
             }
           }}
           onOpenQuests={() => setActiveModal({ type: 'quests' })}
@@ -419,7 +408,35 @@ export const App: React.FC = () => {
           }
           onOpenHelp={() => setActiveModal({ type: 'help' })}
           onOpenAdmin={() => setShowAdmin(true)}
-          onJoystickChange={(x, y) => engineRef.current?.setJoystick(x, y)}
+          onSelectFloor={(floor) => {
+            audioSfx.play('tap');
+            engineRef.current?.selectFloorLevel(floor);
+            pushToast(
+              floor === -1
+                ? 'Đang chuyển cao độ Z/Y xuống Tầng Hầm B1 (-4.2m)'
+                : `Đang chuyển cao độ Z/Y lên Tầng ${floor} (+${(((floor || 1) - 1) * 4.2).toFixed(1)}m)`
+            );
+          }}
+          onToggleCutaway={(enabled) => {
+            audioSfx.play('tap');
+            setCutawayMode(enabled);
+            engineRef.current?.setCutawayMode(enabled);
+            pushToast(
+              enabled
+                ? 'Đã bật Cắt lớp Phân tầng 3D (Floor Cutaway)'
+                : 'Đã tắt Cắt lớp Phân tầng 3D'
+            );
+          }}
+          onCalibrateGroundZero={() => {
+            audioSfx.play('ok');
+            engineRef.current?.calibrateGroundZeroAltitude();
+            pushToast('Đã hiệu chuẩn cao độ GPS mặt đất về 0.0m (Tầng 1)!', true);
+          }}
+          onTeleportGps3D={(x, y, z, label) => {
+            audioSfx.play('tap');
+            engineRef.current?.setTargetPosition3D(x, y, z, 'gps_calibrated');
+            pushToast(`📡 Đã định vị 3 trục (X:${x}, Y:${y}m, Z:${z}) tại ${label}!`);
+          }}
         />
       )}
 

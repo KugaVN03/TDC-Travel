@@ -44,7 +44,10 @@ export interface Station {
   sub: string;
   facultyId: string;
   x: number;
+  y?: number;
   z: number;
+  floor?: number;
+  buildingId?: string;
   fogRadius: number;
   col: string;
   type: StationType;
@@ -57,6 +60,44 @@ export interface Station {
   riddle?: StationRiddle;
   questions?: QuizItem[];
   active: boolean;
+}
+
+export interface BuildingFloorSpec {
+  floor: number;
+  label: string;
+  elevationMeters: number;
+  departments: string;
+  highlights: string;
+}
+
+export interface CampusBuildingZone {
+  id: string;
+  code: string;
+  name: string;
+  bounds: [number, number, number, number]; // [x0, z0, x1, z1]
+  minFloor: number;
+  maxFloor: number;
+  floorHeightMeters: number;
+  color: string;
+  floors: BuildingFloorSpec[];
+}
+
+export interface GpsTelemetry3D {
+  lat: number;
+  lng: number;
+  altitudeAsl: number | null;
+  accuracyMeters: number;
+  altitudeAccuracyMeters: number | null;
+  headingDeg: number | null;
+  speedMps: number | null;
+  x: number;
+  y: number;
+  z: number;
+  detectedFloor: number;
+  detectedBuilding: CampusBuildingZone | null;
+  insideCampus: boolean;
+  source: 'gps_hardware' | 'gps_calibrated' | 'manual_override';
+  timestamp: number;
 }
 
 export type VerificationMethod = 'qr' | 'riddle' | 'demo';
@@ -83,7 +124,7 @@ export interface UserProfile {
   done: Record<string, UnlockedStationRecord>;
   bonus: Record<string, boolean>;
   partyId?: string;
-  pos?: [number, number] | null;
+  pos?: [number, number] | [number, number, number] | null;
   certClaimed?: boolean;
   updatedAt: number;
 }

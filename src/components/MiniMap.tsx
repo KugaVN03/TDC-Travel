@@ -81,25 +81,37 @@ export const MiniMap: React.FC<MiniMapProps> = ({
         }
       });
 
-    // 3. Station dots
+    // 3. Station dots with Floor tags
     stations
       .filter((st) => st.active !== false)
       .forEach((st) => {
         const d = unlocked[st.id] != null;
+        const sx = X(st.x);
+        const sz = Z(st.z);
+        const sameFloor = (st.floor || 1) === (snapshot.playerFloor || 1);
         mg.fillStyle = '#fff';
         mg.beginPath();
-        mg.arc(X(st.x), Z(st.z), 8.5, 0, Math.PI * 2);
+        mg.arc(sx, sz, sameFloor ? 9 : 7, 0, Math.PI * 2);
         mg.fill();
         mg.fillStyle = d ? '#3DAA5C' : st.col;
         mg.beginPath();
-        mg.arc(X(st.x), Z(st.z), 6, 0, Math.PI * 2);
+        mg.arc(sx, sz, sameFloor ? 6.5 : 4.8, 0, Math.PI * 2);
         mg.fill();
       });
 
-    // 4. Player Cone & Arrow
+    // 4. GPS Accuracy Halo & Player Cone / Arrow
     const a = snapshot.playerRotY;
     const px = X(snapshot.playerX);
     const pz = Z(snapshot.playerZ);
+
+    const accRadiusPx = Math.max(8, Math.min(45, (snapshot.accuracyMeters || 3) * sc * 2.2));
+    mg.fillStyle = 'rgba(0, 240, 255, 0.18)';
+    mg.strokeStyle = 'rgba(0, 174, 239, 0.55)';
+    mg.lineWidth = 1.5;
+    mg.beginPath();
+    mg.arc(px, pz, accRadiusPx, 0, Math.PI * 2);
+    mg.fill();
+    mg.stroke();
 
     mg.fillStyle = 'rgba(0,174,239,.22)';
     mg.beginPath();

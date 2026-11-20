@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CAMPUS_BUILDINGS } from '../data/campusBuildings';
 import { LAKE, PATHS, ROADS, TDC_LOGO } from '../data/campusLayout';
 import {
   AABB,
@@ -22,7 +23,15 @@ export interface CampusBuildContext {
   rng: () => number;
 }
 
-export function buildCampusEnvironment(ctx: CampusBuildContext): { flag: THREE.Mesh } {
+export interface FloorHighlightController {
+  setFloorView: (buildingId: string | null, floor: number | null, cutaway: boolean) => void;
+  getClippingPlanes: () => THREE.Plane[];
+}
+
+export function buildCampusEnvironment(ctx: CampusBuildContext): {
+  flag: THREE.Mesh;
+  floorController: FloorHighlightController;
+} {
   const { scene, col, mat, rng } = ctx;
 
   const addCol = (x0: number, z0: number, x1: number, z1: number) =>
@@ -1090,5 +1099,166 @@ export function buildCampusEnvironment(ctx: CampusBuildContext): { flag: THREE.M
   addLabel(pill('Xưởng cơ khí', { h: 3 }), 11, 12, 46);
   addLabel(pill('Sân bóng chuyền', { h: 3 }), -50, 4, 12.5);
 
-  return { flag };
+  /* ---- Hệ thống Phân tầng 3D (Floor Slabs, Tầng hầm B1 Tòa D & Mặt cắt Cutaway) ---- */
+  const floorHighlightGroup = new THREE.Group();
+  scene.add(floorHighlightGroup);
+
+  // Tầng hầm B1 của Tòa D (-4.2m -> 0m) hiển thị dạng khung kính kỹ thuật ngầm dưới khối đế
+  {
+    const b1Geo = new THREE.BoxGeometry(62, FH - 0.3, 44);
+    const b1Mat = new THREE.MeshPhongMaterial({
+      color: '#00AEEF',
+      transparent: true,
+      opacity: 0.24,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const b1Mesh = new THREE.Mesh(b1Geo, b1Mat);
+    b1Mesh.position.set(54.8, -FH / 2, 27.8);
+    floorHighlightGroup.add(b1Mesh);
+  }
+
+  // Tạo lưới phân tầng & mặt sàn sáng (Floor Slab) cho từng tầng của tất cả các tòa nhà
+  const slabRecords: {
+    buildingId: string;
+    floor: number;
+    group: THREE.Group;
+    plate: THREE.Mesh;
+    wire: THREE.LineSegments;
+    label: THREE.Sprite;
+  }[] = [];
+
+  CAMPUS_BUILDINGS.forEach((b) => {
+    const [x0, z0, x1, z1] = b.bounds;
+    const w = x1 - x0;
+    const d = z1 - z0;
+    const cx = (x0 + x1) / 2;
+    const cz = (z0 + z1) / 2;
+    const fh = b.floorHeightMeters || FH;
+
+    b.floors.forEach((flSpec) => {
+      const yBase = flSpec.elevationMeters;
+      const g = new THREE.Group();
+      g.position.set(cx, yBase + 0.14, cz);
+
+      const plateGeo = new THREE.BoxGeometry(w + 1.2, 0.32, d + 1.2);
+      const plateMat = new THREE.MeshBasicMaterial({
+        color: b.color,
+        transparent: true,
+        opacity: 0.12,
+        depthWrite: false,
+      });
+      const plate = new THREE.Mesh(plateGeo, plateMat);
+      g.add(plate);
+
+      const boxGeo = new THREE.BoxGeometry(w + 1.3, fh - 0.15, d + 1.3);
+      const edges = new THREE.EdgesGeometry(boxGeo);
+      const wireMat = new THREE.LineBasicMaterial({
+        color: b.color,
+        transparent: true,
+        opacity: 0.25,
+      });
+      const wire = new THREE.LineSegments(edges, wireMat);
+      wire.position.y = fh / 2;
+      g.add(wire);
+
+      const flTag = pill(`${b.code} · ${flSpec.label} (${yBase >= 0 ? '+' : ''}${yBase.toFixed(1)}m)`, {
+        h: 1.75,
+        fs: 36,
+        bg: '#0F172A',
+        fg: '#38BDF8',
+        dot: b.color,
+      });
+      flTag.position.set(0, fh * 0.65, d / 2 + 2.2);
+      flTag.visible = false;
+      g.add(flTag);
+
+      floorHighlightGroup.add(g);
+      slabRecords.push({
+        buildingId: b.id,
+        floor: flSpec.floor,
+        group: g,
+        plate,
+        wire,
+        label: flTag,
+      });
+    });
+  });
+
+  const clipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 200);
+  let activeClippingPlanes: THREE.Plane[] = [];
+
+  const isExemptFromClipping = (o: THREE.Object3D | null): boolean => {
+    let cur = o;
+    while (cur) {
+      if (cur === floorHighlightGroup || cur === sky) return true;
+      cur = cur.parent;
+    }
+    return false;
+  };
+
+  const applyLocalClipping = (planes: THREE.Plane[]) => {
+    scene.traverse((obj) => {
+      if (isExemptFromClipping(obj)) return;
+      const m = obj as THREE.Mesh;
+      if (!m.isMesh || !m.material) return;
+      if (m.position.y <= 0.25 && m.geometry.boundingBox == null) {
+        m.geometry.computeBoundingBox();
+      }
+      const maxY =
+        m.position.y + (m.geometry.boundingBox ? m.geometry.boundingBox.max.y : 1);
+      if (maxY <= 0.35) return;
+
+      const mats = Array.isArray(m.material) ? m.material : [m.material];
+      mats.forEach((matItem) => {
+        matItem.clippingPlanes = planes.length > 0 ? planes : null;
+        matItem.clipShadows = true;
+        matItem.needsUpdate = true;
+      });
+    });
+  };
+
+  const floorController: FloorHighlightController = {
+    setFloorView: (buildingId: string | null, floor: number | null, cutaway: boolean) => {
+      slabRecords.forEach((rec) => {
+        const isTargetBuilding = !buildingId || rec.buildingId === buildingId;
+        const isTargetFloor = floor !== null && rec.floor === floor && isTargetBuilding;
+
+        const pMat = rec.plate.material as THREE.MeshBasicMaterial;
+        const wMat = rec.wire.material as THREE.LineBasicMaterial;
+
+        if (isTargetFloor) {
+          pMat.opacity = 0.55;
+          pMat.color.set('#00F0FF');
+          wMat.opacity = 0.95;
+          wMat.color.set('#00F0FF');
+          rec.label.visible = true;
+        } else if (floor !== null && rec.floor === floor) {
+          // Cùng cao độ tầng ở các tòa nhà khác
+          pMat.opacity = 0.28;
+          pMat.color.set('#38BDF8');
+          wMat.opacity = 0.55;
+          wMat.color.set('#38BDF8');
+          rec.label.visible = false;
+        } else {
+          pMat.opacity = 0.04;
+          wMat.opacity = 0.14;
+          rec.label.visible = false;
+        }
+      });
+
+      if (cutaway && floor !== null) {
+        const cutY = floor === -1 ? 0.3 : floor * FH + 0.35;
+        clipPlane.constant = cutY;
+        activeClippingPlanes = [clipPlane];
+        applyLocalClipping(activeClippingPlanes);
+      } else {
+        activeClippingPlanes = [];
+        applyLocalClipping([]);
+      }
+    },
+    getClippingPlanes: () => activeClippingPlanes,
+  };
+
+  return { flag, floorController };
 }

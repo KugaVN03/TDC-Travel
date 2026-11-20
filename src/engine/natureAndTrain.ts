@@ -1,13 +1,10 @@
 import * as THREE from 'three';
 import { CAMP, LAKE, PATHS, ROADS, ZONES } from '../data/campusLayout';
 import { Station } from '../types/game';
-import { AABB, canvasTex, ell, heightAt, mesh, rr, segDist, signTex } from './threeHelpers';
+import { AABB, ell, heightAt, segDist } from './threeHelpers';
 
 export interface NatureAndTrainState {
   clouds: THREE.Group[];
-  balloons: THREE.Group[];
-  train: THREE.Group[];
-  puffs: { m: THREE.Mesh; life: number }[];
   animate: (dt: number, t: number) => void;
 }
 
@@ -20,19 +17,6 @@ export function buildNatureAndTrain(ctx: {
 }): NatureAndTrainState {
   const { scene, col, stations, mat, rng } = ctx;
   const clouds: THREE.Group[] = [];
-  const balloons: THREE.Group[] = [];
-  const train: THREE.Group[] = [];
-  const puffs: { m: THREE.Mesh; life: number }[] = [];
-
-  const box = (
-    w: number,
-    h: number,
-    d: number,
-    c: string,
-    x?: number,
-    y?: number,
-    z?: number
-  ) => mesh(new THREE.BoxGeometry(w, h, d), mat(c), x, y, z);
 
   const freeSpot = (x: number, z: number, pad: number): boolean => {
     for (const c of col) {
@@ -227,256 +211,12 @@ export function buildNatureAndTrain(ctx: {
     clouds.push(g);
   }
 
-  // Hot-air balloons
-  (
-    [
-      [['#00AEEF', '#FFFFFF', '#FFC83A', '#FFFFFF'], -160, 85, -120],
-      [['#FF6F59', '#FFC83A', '#FF6F59', '#FFFFFF'], 190, 95, 60],
-      [['#38B865', '#FFFFFF', '#9B6BFF', '#FFFFFF'], 40, 110, -210],
-    ] as [string[], number, number, number][]
-  ).forEach(([cols, x, y, z], i) => {
-    const g = new THREE.Group();
-    const tex = canvasTex(
-      256,
-      64,
-      (c, W, H) => {
-        cols.forEach((cl, k) => {
-          for (let j = k; j < 16; j += cols.length) {
-            c.fillStyle = cl;
-            c.fillRect((j * W) / 16, 0, W / 16 + 1, H);
-          }
-        });
-      },
-      true
-    );
-    const env = new THREE.Mesh(
-      new THREE.SphereGeometry(6, 16, 12),
-      new THREE.MeshPhongMaterial({ map: tex, flatShading: true, shininess: 10 })
-    );
-    env.scale.y = 1.18;
-    env.castShadow = true;
-    g.add(env);
-    g.add(box(2, 1.4, 2, '#B07A48', 0, -9.6, 0));
-    [
-      [-0.8, -0.8],
-      [0.8, -0.8],
-      [0.8, 0.8],
-      [-0.8, 0.8],
-    ].forEach(([a, b]) => g.add(box(0.08, 3.2, 0.08, '#6B4B2A', a, -7.6, b)));
-    g.position.set(x, y, z);
-    g.userData = { y, ph: i * 2 };
-    scene.add(g);
-    balloons.push(g);
-  });
-
-  // 2. TDC Express Train & Railway Track
-  const trackPts: THREE.Vector3[] = [];
-  for (let i = 0; i < 72; i++) {
-    const a = (i / 72) * Math.PI * 2;
-    const w = 1 + 0.035 * Math.sin(3 * a + 0.7);
-    trackPts.push(
-      new THREE.Vector3(
-        CAMP.cx + CAMP.rx * 1.2 * w * Math.cos(a),
-        0,
-        CAMP.cz + CAMP.rz * 1.2 * w * Math.sin(a)
-      )
-    );
-  }
-  const track = new THREE.CatmullRomCurve3(trackPts, true, 'catmullrom', 0.5);
-  const TL = track.getLength();
-
-  const ribbon = (N: number, w: number, off: number, y: number, color: string) => {
-    const pos: number[] = [];
-    const idx: number[] = [];
-    for (let i = 0; i <= N; i++) {
-      const u = (i / N) % 1;
-      const p = track.getPointAt(u);
-      const t = track.getTangentAt(u);
-      const l = Math.hypot(t.x, t.z) || 1;
-      const nx = -t.z / l;
-      const nz = t.x / l;
-      const a = off - w / 2;
-      const b = off + w / 2;
-      pos.push(p.x + nx * a, y, p.z + nz * a, p.x + nx * b, y, p.z + nz * b);
-      if (i < N) {
-        const k = i * 2;
-        idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3);
-      }
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setIndex(idx);
-    g.computeVertexNormals();
-    const m = new THREE.Mesh(
-      g,
-      new THREE.MeshPhongMaterial({ color, side: THREE.DoubleSide, shininess: 4 })
-    );
-    m.receiveShadow = true;
-    scene.add(m);
-  };
-
-  ribbon(700, 4, 0, 0.1, '#B65A3F');
-  const nSl = Math.floor(TL / 1.3);
-  const sl = new THREE.InstancedMesh(new THREE.BoxGeometry(3.2, 0.2, 0.5), mat('#6E3E2C'), nSl);
-  for (let i = 0; i < nSl; i++) {
-    const u = i / nSl;
-    const p = track.getPointAt(u);
-    const t = track.getTangentAt(u);
-    o.position.set(p.x, 0.24, p.z);
-    o.rotation.set(0, Math.atan2(t.x, t.z) + Math.PI / 2, 0);
-    o.scale.set(1, 1, 1);
-    o.updateMatrix();
-    sl.setMatrixAt(i, o.matrix);
-  }
-  sl.receiveShadow = true;
-  scene.add(sl);
-  ribbon(700, 0.24, -0.78, 0.38, '#E9E1D4');
-  ribbon(700, 0.24, 0.78, 0.38, '#E9E1D4');
-
-  const winT = canvasTex(128, 64, (g, W, H) => {
-    g.fillStyle = '#FFFFFF';
-    g.fillRect(0, 0, W, H);
-    g.fillStyle = '#7FCBEE';
-    rr(g, 16, 12, 96, 36, 10);
-    g.fill();
-    g.fillStyle = 'rgba(255,255,255,.6)';
-    g.fillRect(24, 16, 8, 26);
-  });
-  const banner = signTex([['TUYỂN SINH 2027 · TDC', 96]], '#FFC83A', '#3D2A00', 1200, 170);
-  const wheels = (g: THREE.Group) =>
-    [
-      [-1.2, -2.4],
-      [1.2, -2.4],
-      [-1.2, 2.4],
-      [1.2, 2.4],
-    ].forEach(([x, z]) => {
-      const w = mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.3, 12), mat('#2D3238'), x, 0.6, z);
-      w.rotation.z = Math.PI / 2;
-      g.add(w);
-    });
-
-  // Locomotive
-  {
-    const g = new THREE.Group();
-    g.add(box(2.7, 0.6, 7.2, '#3A4046', 0, 0.95, 0));
-    wheels(g);
-    const boil = mesh(new THREE.CylinderGeometry(1.15, 1.15, 4, 14), mat('#00AEEF'), 0, 2.4, 1.2);
-    boil.rotation.x = Math.PI / 2;
-    g.add(boil);
-    g.add(
-      mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.3, 14), mat('#FFC83A'), 0, 2.4, 3.2).rotateX(
-        Math.PI / 2
-      )
-    );
-    g.add(box(2.6, 2.8, 2.6, '#0A7FC2', 0, 2.6, -2));
-    g.add(box(3, 0.35, 3, '#FF6F59', 0, 4.15, -2));
-    const ch = mesh(new THREE.CylinderGeometry(0.42, 0.3, 1.5, 10), mat('#30343A'), 0, 4, 2.2);
-    g.add(ch);
-    g.userData.chim = ch;
-    g.add(
-      mesh(new THREE.SphereGeometry(0.38, 10, 8), mat('#FFF3B0', { emissive: 0x997700 }), 0, 2.4, 3.45)
-    );
-    const cw = mesh(new THREE.ConeGeometry(1.2, 1.2, 4), mat('#FF6F59'), 0, 0.9, 3.9);
-    cw.rotation.x = Math.PI / 2;
-    cw.rotation.y = Math.PI / 4;
-    g.add(cw);
-    scene.add(g);
-    train.push(g);
-  }
-
-  // Carriages
-  ['#FF6F59', '#FFC83A', '#38B865', '#9B6BFF'].forEach((c, i) => {
-    const g = new THREE.Group();
-    g.add(box(2.7, 0.6, 7, '#3A4046', 0, 0.95, 0));
-    wheels(g);
-    const t = winT.clone();
-    t.needsUpdate = true;
-    t.repeat.set(3, 1);
-    const wm = new THREE.MeshPhongMaterial({ map: t });
-    g.add(
-      mesh(
-        new THREE.BoxGeometry(2.6, 2.3, 6.6),
-        [wm, wm, mat(c), mat(c), mat(c), mat(c)],
-        0,
-        2.4,
-        0
-      )
-    );
-    g.add(box(2.95, 0.35, 6.9, c, 0, 3.7, 0));
-    if (i === 1) {
-      [1.33, -1.33].forEach((x) => {
-        const b = new THREE.Mesh(
-          new THREE.PlaneGeometry(6, 0.8),
-          new THREE.MeshPhongMaterial({ map: banner, shininess: 4, side: THREE.FrontSide })
-        );
-        b.position.set(x, 1.5, 0);
-        b.rotation.y = x > 0 ? Math.PI / 2 : -Math.PI / 2;
-        g.add(b);
-      });
-    }
-    scene.add(g);
-    train.push(g);
-  });
-
-  const pm = new THREE.MeshLambertMaterial({
-    color: 0xffffff,
-    emissive: 0x777777,
-    transparent: true,
-  });
-  for (let i = 0; i < 16; i++) {
-    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 1), pm.clone());
-    m.visible = false;
-    scene.add(m);
-    puffs.push({ m, life: 0 });
-  }
-
-  let trainU = 0.12;
-  let puffT = 0;
-  const tmpQ = new THREE.Vector3();
-
-  const animate = (dt: number, t: number) => {
+  const animate = (dt: number) => {
     clouds.forEach((c, i) => {
       c.position.x += dt * (2 + (i % 3));
       if (c.position.x > 520) c.position.x = -520;
     });
-    balloons.forEach((b) => {
-      b.position.y = b.userData.y + Math.sin(t * 0.4 + b.userData.ph) * 3;
-      b.rotation.y += dt * 0.05;
-      b.position.x += Math.sin(t * 0.05 + b.userData.ph) * dt * 2;
-    });
-
-    trainU = (trainU + (dt * 7.5) / TL) % 1;
-    const gap = 8.4 / TL;
-    train.forEach((g, i) => {
-      const u = (((trainU - i * gap) % 1) + 1) % 1;
-      const p = track.getPointAt(u);
-      g.position.copy(p);
-      track.getPointAt((u + 0.002) % 1, tmpQ);
-      g.lookAt(tmpQ.x, p.y, tmpQ.z);
-    });
-
-    puffT -= dt;
-    const loco = train[0];
-    if (puffT <= 0 && loco) {
-      puffT = 0.35;
-      const f = puffs.find((q) => q.life <= 0);
-      if (f) {
-        (loco.userData.chim as THREE.Object3D).getWorldPosition(f.m.position);
-        f.m.position.y += 1;
-        f.life = 1;
-        f.m.visible = true;
-        f.m.scale.setScalar(0.6);
-      }
-    }
-    puffs.forEach((q) => {
-      if (q.life <= 0) return;
-      q.life -= dt * 0.55;
-      q.m.position.y += dt * 2.6;
-      q.m.scale.multiplyScalar(1 + dt * 1.1);
-      (q.m.material as THREE.MeshLambertMaterial).opacity = Math.max(0, q.life);
-      if (q.life <= 0) q.m.visible = false;
-    });
   };
 
-  return { clouds, balloons, train, puffs, animate };
+  return { clouds, animate };
 }

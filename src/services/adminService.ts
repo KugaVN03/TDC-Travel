@@ -6,8 +6,8 @@ import { getLocalPublicUsers } from './authService';
 import { db, isFirebaseConfigured } from './firebase';
 import { loadLocalCheckinLogs, loadLocalEvents } from './gameService';
 
-const LOCAL_STATIONS_KEY = 'tdc_go_stations_v2';
-const LOCAL_EVENTS_KEY = 'tdc_go_events_v2';
+const LOCAL_STATIONS_KEY = 'tdc_go_stations_v3_3d';
+const LOCAL_EVENTS_KEY = 'tdc_go_events_v3_3d';
 
 export function loadStations(): Station[] {
   try {

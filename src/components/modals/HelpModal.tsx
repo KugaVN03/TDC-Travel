@@ -28,34 +28,41 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
 
         <div className="sh-body help">
           <div>
-            <h3>1. Bản đồ 3D & Cơ chế Mở khóa Sương mù (Fog of War)</h3>
+            <h3>1. Bản đồ 3D Khuôn viên TDC & Định vị GPS 3 Trục (X · Y · Z)</h3>
             <p>
-              Các phân khu chưa khám phá trong trường được bao phủ bởi làn sương mù 3D và vùng tối trên Minimap. Hãy di chuyển tới các cột sáng trạm thử thách, vượt qua câu đố để xóa tan sương mù và thu thập đủ 10 Huy hiệu.
+              Hệ thống sử dụng tín hiệu <b>GPS độ chính xác cao (High-Accuracy WGS84 + Altitude)</b> kết hợp bộ lọc <b>Kalman 3D</b> để định vị vị trí thực tế của bạn trong khuôn viên Trường Cao đẳng Công nghệ Thủ Đức (53 Võ Văn Ngân) theo cả 3 trục:
             </p>
-          </div>
-          <div>
-            <h3>2. Cách Điều khiển Nhân vật</h3>
             <ul>
               <li>
-                <b>Trên Máy tính:</b> Dùng phím <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd>{' '}
-                <kbd>D</kbd> hoặc phím mũi tên để đi bộ, <kbd>Q</kbd> <kbd>E</kbd> hoặc kéo chuột để xoay góc nhìn, cuộn chuột để phóng to/thu nhỏ.
+                <b>Trục X (Đông – Tây) & Trục Z (Nam – Bắc):</b> Xác định vị trí của bạn trên mặt bằng khuôn viên và tự động nhận diện tòa nhà bạn đang đứng (Khu A, Khu B, Hội trường H, Tòa C, Tòa D, KTX, Xưởng Cơ khí).
               </li>
               <li>
-                <b>Trên Điện thoại:</b> Kéo cần điều khiển (Joystick) ở góc trái dưới, vuốt 1 ngón để xoay camera, chụm 2 ngón để zoom.
+                <b>Trục Cao độ Y / Phân tầng (Floor Level):</b> Tính toán độ cao so với mặt sân trường (1 tầng = 4.2m) để hiển thị chính xác tầng bạn đang khám phá từ <b>Tầng Hầm B1 (-4.2m)</b> lên tới <b>Tầng 11 (+42.0m tại Tòa D)</b>.
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h3>2. Khám phá Phân tầng 3D & Chế độ Cắt lớp (3D Floor Cutaway)</h3>
+            <ul>
+              <li>
+                <b>Thanh Chọn Tầng 3D (B1 → T11):</b> Sử dụng thanh thang máy phân tầng ở cạnh trái màn hình hoặc nút <b>Chọn Tòa/Tầng</b> trên bảng GPS để chuyển nhanh giữa các tầng và xem danh sách Phòng ban / Khoa / Phòng Lab tại tầng đó.
               </li>
               <li>
-                <b>Tự động Tìm đường:</b> Bấm trực tiếp xuống mặt đất hoặc bấm vào <b>Thanh la bàn chỉ đường</b> ở dưới đáy màn hình để nhân vật tự chạy tới trạm gần nhất.
+                <b>Cắt lớp Tầng 3D (Cutaway View):</b> Bấm nút <b>Cắt lớp Tầng 3D</b> trên bảng điều khiển GPS để ẩn các tầng phía trên và quan sát trực diện mặt sàn bên trong tầng bạn đang đứng.
+              </li>
+              <li>
+                <b>Chuẩn 0m (Tare Ground Altitude):</b> Khi đứng ở sân trường, bấm <b>Chuẩn 0m</b> để hiệu chuẩn áp kế / độ cao GPS của điện thoại về mốc chuẩn Tầng 1 (0.0m).
               </li>
             </ul>
           </div>
           <div>
             <h3>3. Check-in Thực địa (QR + Mật thư) & Tổ đội Liên khoa</h3>
             <p>
-              Tại mỗi trạm, bạn có thể <b>Quét mã QR</b> qua Camera trình duyệt hoặc <b>Giải mật thư quan sát</b> để nhận thêm điểm thưởng O2O. Hãy lập <b>Tổ đội 2–4 sinh viên khác Khoa</b> để kích hoạt <b>+20% điểm thưởng Liên khoa</b>!
+              Tại mỗi trạm, bạn có thể <b>Quét mã QR</b> qua Camera trình duyệt hoặc <b>Giải mật thư quan sát</b> để xóa tan sương mù (Fog of War) và nhận thêm điểm thưởng O2O. Hãy lập <b>Tổ đội 2–4 sinh viên khác Khoa</b> để kích hoạt <b>+20% điểm thưởng Liên khoa</b>!
             </p>
           </div>
           <button type="button" className="btn big" onClick={onClose}>
-            Đã sẵn sàng Khám phá!
+            Đã sẵn sàng Định vị & Khám phá!
           </button>
         </div>
       </div>
