@@ -1,10 +1,11 @@
-# TDC GO · Web Game 3D Khám phá Khuôn viên Trường Cao đẳng Công nghệ Thủ Đức
+# TDC Travel · Web Game 3D Khám phá Khuôn viên Trường Cao đẳng Công nghệ Thủ Đức
 
-Dự án triển khai từ Đề tài Nghiên cứu Khoa học Cấp Cơ sở năm học 2026–2027: **"Phát triển web game “TDC GO” khám phá khuôn viên Trường Cao đẳng Công nghệ Thủ Đức"**, kế thừa và mở rộng mô hình bản đồ 3D khuôn viên TDC từ [hoanghnguyen9109/tdc-go](https://github.com/hoanghnguyen9109/tdc-go).
+Dự án triển khai từ Đề tài Nghiên cứu Khoa học Cấp Cơ sở năm học 2026–2027: **"Phát triển web game “TDC Travel” khám phá khuôn viên Trường Cao đẳng Công nghệ Thủ Đức"**, kế thừa mô hình kiến trúc bản đồ 3D khuôn viên TDC và tích hợp hệ thống Định vị GPS 3 Trục (`X, Y, Z`) độ chính xác cao kèm hiển thị Phân tầng Tòa nhà (`Hầm B1 → Tầng 11`).
 
 ## Kiến trúc Công nghệ
 - **Frontend**: React 19 + TypeScript + Vite + TailwindCSS v4
-- **3D WebGL Engine**: Three.js (Mô hình 3D Khu A, Khu B, Hội trường H, Tòa C, KTX, Xưởng Cơ khí, Tòa D 11 tầng, 6 sân bóng mini, sân tennis, sân bóng chuyền, Cổng 1 & 2, đoàn tàu TDC Express, nhân vật Chibi & NPC)
+- **3D WebGL Engine**: Three.js (Mô hình 3D Khu A1/A2, Khu B Tây/Đông, Hội trường H, Tòa C, KTX, Xưởng Cơ khí, Tòa D 11 tầng + Hầm B1, 6 sân bóng mini, sân tennis, sân bóng chuyền, Cổng 1 & 2, Cắt lớp mặt bằng tầng 3D `localClippingEnabled`)
+- **Định vị GPS 3 Trục (`X · Y · Z`)**: Quy đổi WGS84 (`Latitude, Longitude, Altitude ASL`) sang tọa độ mét 3D, lọc nhiễu `GpsKalmanFilter3D`, hiệu chuẩn áp kế `Chuẩn 0m` và nhận diện phân tầng tòa nhà tự động.
 - **O2O Camera & QR**: `html5-qrcode` (WebRTC Camera Scanner) + `qrcode` (In Standee QR chống gian lận)
 - **Backend & Cloud**: Firebase Authentication + Cloud Firestore Realtime + Firebase Hosting (tích hợp chế độ **Dual-Mode Local Fallback** giúp chạy thử ngay không cần khóa `.env`)
 

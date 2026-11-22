@@ -407,174 +407,6 @@ export const ElectricCircuitGame: React.FC<ElectricCircuitGameProps> = ({
 };
 </file>
 
-<file path="src/components/minigames/ItDebugGame.tsx">
-import React, { useEffect, useState } from 'react';
-import { audioSfx } from '../../engine/audioSfx';
-
-interface DebugQuestion {
-  id: number;
-  title: string;
-  snippet: string;
-  question: string;
-  options: string[];
-  correctIdx: number;
-  explanation: string;
-}
-
-const IT_CHALLENGES: DebugQuestion[] = [
-  {
-    id: 1,
-    title: 'Bug #1: Điều kiện Cổng Logic Đăng nhập Sinh viên',
-    snippet: `function canAccessLab(isTdcStudent, hasStudentCard) {\n  // Chỉ cho phép vào Lab khi ĐỒNG THỜI là SV TDC VÀ có thẻ SV\n  return isTdcStudent || hasStudentCard; // <-- Dòng nghi vấn\n}`,
-    question: 'Cần sửa toán tử ở dòng return như thế nào để đúng yêu cầu bảo mật?',
-    options: [
-      'Đổi toán tử OR (||) thành AND (&&)',
-      'Đổi thành !isTdcStudent || hasStudentCard',
-      'Đổi return thành console.log()',
-      'Xóa cả hai biến đầu vào',
-    ],
-    correctIdx: 0,
-    explanation: 'Toán tử && (AND) yêu cầu cả hai điều kiện cùng đúng (true).',
-  },
-  {
-    id: 2,
-    title: 'Bug #2: Vòng lặp Tính tổng Điểm Rèn luyện',
-    snippet: `const scores = [80, 90, 95];\nlet total = 0;\nfor (let i = 0; i <= scores.length; i++) {\n  total += scores[i];\n}`,
-    question: 'Vì sao kết quả biến `total` lại bị lỗi `NaN` ở vòng lặp cuối?',
-    options: [
-      'Điều kiện `i <= scores.length` vượt quá chỉ số mảng, cần sửa thành `i < scores.length`',
-      'Mảng trong JavaScript bắt đầu từ chỉ số 1',
-      'Không được dùng `total +=` trong vòng lặp `for`',
-      'Biến `total` phải khởi tạo bằng chuỗi rỗng `""`',
-    ],
-    correctIdx: 0,
-    explanation: 'Mảng 3 phần tử có chỉ số 0, 1, 2. Khi i = 3 thì scores[3] là undefined.',
-  },
-  {
-    id: 3,
-    title: 'Bug #3: Truy vấn API Bản đồ số TDC Travel',
-    snippet: `async function fetchStationData(stationId) {\n  const res = fetch('/api/stations/' + stationId);\n  return res.json(); // Lỗi: res.json is not a function\n}`,
-    question: 'Thiếu từ khóa nào trước hàm bất đồng bộ `fetch(...)`?',
-    options: [
-      'Thiếu từ khóa `await` trước `fetch(...)`',
-      'Thiếu từ khóa `class` trước `fetch(...)`',
-      'Thiếu từ khóa `delete` trước `res.json()`',
-      'Hàm `async` không được phép có `return`',
-    ],
-    correctIdx: 0,
-    explanation: '`fetch()` trả về một Promise nên cần `await fetch(...)` để nhận đối tượng Response.',
-  },
-];
-
-interface ItDebugGameProps {
-  maxPoints: number;
-  onComplete: (earnedPoints: number, summaryHtml: string) => void;
-}
-
-export const ItDebugGame: React.FC<ItDebugGameProps> = ({ maxPoints, onComplete }) => {
-  const [step, setStep] = useState(0);
-  const [fixedCount, setFixedCount] = useState(0);
-  const [picked, setPicked] = useState<number | null>(null);
-  const [timeLeft, setTimeLeft] = useState(45);
-
-  const current = IT_CHALLENGES[step];
-
-  useEffect(() => {
-    if (picked !== null) return;
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [picked, step]);
-
-  const handlePick = (idx: number) => {
-    if (picked !== null) return;
-    setPicked(idx);
-    const ok = idx === current.correctIdx;
-    if (ok) {
-      setFixedCount((c) => c + 1);
-      audioSfx.play('ok');
-    } else {
-      audioSfx.play('bad');
-    }
-  };
-
-  const handleNext = () => {
-    if (step + 1 < IT_CHALLENGES.length) {
-      setStep(step + 1);
-      setPicked(null);
-    } else {
-      const ratio = fixedCount / IT_CHALLENGES.length;
-      const earned = Math.max(40, Math.round(maxPoints * (0.35 + 0.65 * ratio)));
-      onComplete(
-        earned,
-        `<p class="kmsg">Đã vá thành công ${fixedCount}/${IT_CHALLENGES.length} lỗi hệ thống Khoa CNTT!</p>`
-      );
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between bg-[#1E293B] text-emerald-400 px-3.5 py-2 rounded-xl text-xs font-mono font-bold">
-        <span>TDC-IT-LAB://debug_terminal ({step + 1}/3)</span>
-        <span className={timeLeft < 10 ? 'text-rose-400 animate-pulse' : 'text-amber-300'}>
-          ⏱ {timeLeft}s · Đã fix: {fixedCount}/3
-        </span>
-      </div>
-
-      <div className="bg-[#0F172A] text-sky-200 p-3.5 rounded-xl font-mono text-xs overflow-x-auto border-2 border-slate-700 leading-relaxed">
-        <div className="text-amber-400 font-bold mb-1.5">// {current.title}</div>
-        <pre className="m-0 whitespace-pre-wrap">{current.snippet}</pre>
-      </div>
-
-      <p className="q text-base">{current.question}</p>
-
-      <div className="opts">
-        {current.options.map((opt, idx) => {
-          const isCorrect = idx === current.correctIdx;
-          const isSelected = picked === idx;
-          let cls = 'opt';
-          if (picked !== null) {
-            if (isCorrect) cls += ' ok';
-            else if (isSelected) cls += ' no';
-          }
-          return (
-            <button
-              key={idx}
-              type="button"
-              disabled={picked !== null}
-              onClick={() => handlePick(idx)}
-              className={cls}
-            >
-              <i>{String.fromCharCode(65 + idx)}</i>
-              <span>{opt}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {picked !== null && (
-        <div className="flex flex-col gap-2.5 mt-1">
-          <p className="explain">
-            {picked === current.correctIdx ? '✅ Build Passed! ' : '⚠️ Syntax Warning! '}
-            {current.explanation}
-          </p>
-          <button type="button" className="btn big sun" onClick={handleNext}>
-            {step + 1 < IT_CHALLENGES.length ? 'Tiếp tục Vá lỗi tiếp theo →' : 'Hoàn tất Triển khai Code'}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-};
-</file>
-
 <file path="src/components/minigames/KickGame.tsx">
 import React, { useEffect, useRef, useState } from 'react';
 import { audioSfx } from '../../engine/audioSfx';
@@ -721,353 +553,6 @@ export const KickGame: React.FC<KickGameProps> = ({ maxPoints, onComplete }) => 
       >
         ⚽ Sút bóng! (Lượt {Math.min(3, shot + 1)}/3)
       </button>
-    </div>
-  );
-};
-</file>
-
-<file path="src/components/minigames/Viewfinder.tsx">
-import React from 'react';
-import { RotateCw, X } from 'lucide-react';
-import { Station } from '../../types/game';
-
-interface ViewfinderProps {
-  station: Station | null;
-  onRotate: () => void;
-  onCapture: () => void;
-  onCancel: () => void;
-}
-
-export const Viewfinder: React.FC<ViewfinderProps> = ({
-  station,
-  onRotate,
-  onCapture,
-  onCancel,
-}) => {
-  if (!station) return null;
-
-  return (
-    <div id="viewfinder">
-      <div className="fr" />
-      <div className="cap">{station.name} · TDC Travel 3D Polaroid</div>
-      <div className="vf-btns">
-        <button
-          type="button"
-          className="vf-small"
-          onClick={onRotate}
-          title="Xoay góc chụp"
-          aria-label="Xoay góc chụp"
-        >
-          <RotateCw className="w-5 h-5" />
-        </button>
-        <button
-          type="button"
-          className="shutter"
-          onClick={onCapture}
-          title="Chụp ảnh"
-          aria-label="Chụp ảnh"
-        />
-        <button
-          type="button"
-          className="vf-small"
-          onClick={onCancel}
-          title="Hủy chụp"
-          aria-label="Hủy chụp"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-    </div>
-  );
-};
-</file>
-
-<file path="src/components/modals/CertificateModal.tsx">
-import React from 'react';
-import { Compass, ExternalLink, Printer, X } from 'lucide-react';
-import { getFacultyById } from '../../data/faculties';
-import { Station, UserProfile } from '../../types/game';
-import { StationSticker } from '../StationSticker';
-
-interface CertificateModalProps {
-  profile: UserProfile;
-  stations: Station[];
-  onClose: () => void;
-}
-
-export const CertificateModal: React.FC<CertificateModalProps> = ({
-  profile,
-  stations,
-  onClose,
-}) => {
-  const fac = getFacultyById(profile.facultyId);
-  const today = new Date().toLocaleDateString('vi-VN');
-
-  return (
-    <div id="modal">
-      <div className="scrim" onClick={onClose} />
-      <div className="sheet card" role="dialog" aria-modal="true">
-        <div className="sh-head" style={{ '--c': '#FFAA1F' } as React.CSSProperties}>
-          <span
-            className="sticker"
-            style={{ '--c': '#fff', color: '#FFAA1F', width: 56, height: 56 } as React.CSSProperties}
-          >
-            <Compass className="w-7 h-7" />
-          </span>
-          <div>
-            <h2>Chinh Phục 100% Khuôn Viên!</h2>
-            <p>Chứng nhận Nhà Thám Hiểm TDC Travel 2026–2027</p>
-          </div>
-          <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="sh-body">
-          <div className="cert">
-            <small>GIẤY CHỨNG NHẬN ĐIỆN TỬ · TDC TRAVEL</small>
-            <h3>{profile.name}</h3>
-            <div className="text-xs font-extrabold text-slate-600">
-              MSSV: {profile.mssv} · {fac.name}
-            </div>
-            <p style={{ margin: '4px 0 0', fontWeight: 800, fontSize: 13.5 }}>
-              Đã hoàn thành xuất sắc 100% hành trình mở khóa sương mù và khám phá thực địa khuôn viên Trường Cao đẳng Công nghệ Thủ Đức (TDC)
-            </p>
-            <span
-              className="plus"
-              style={{
-                fontFamily: 'var(--f-display)',
-                fontWeight: 800,
-                fontSize: 28,
-                color: 'var(--sun-d)',
-              }}
-            >
-              {profile.points.toLocaleString('vi-VN')} điểm
-            </span>
-            <div className="row">
-              {stations
-                .filter((s) => s.active !== false)
-                .map((st) => (
-                  <StationSticker key={st.id} col={st.col} type={st.type} size={32} />
-                ))}
-            </div>
-            <p className="note">Cấp ngày {today} · Ban Tổ chức Sự kiện TDC Travel</p>
-          </div>
-
-          <p className="note text-center">
-            Xuất trình chứng nhận này tại Quầy Đoàn Thanh niên – Hội Sinh viên hoặc Phòng Tư vấn Tuyển sinh để nhận phần quà lưu niệm TDC!
-          </p>
-
-          <div className="btns">
-            <button
-              type="button"
-              className="btn sun"
-              onClick={() => window.print()}
-            >
-              <Printer className="w-4 h-4" /> In / Lưu PDF
-            </button>
-            <a
-              className="btn blue"
-              href="https://tdc.edu.vn"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <ExternalLink className="w-4 h-4" /> Trang chủ TDC
-            </a>
-            <button type="button" className="btn ghost" onClick={onClose}>
-              Tiếp tục Dạo trường
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-</file>
-
-<file path="src/components/modals/LeaderboardModal.tsx">
-import React, { useEffect, useState } from 'react';
-import { Award, Building2, Trophy, Users, X } from 'lucide-react';
-import { FACULTIES, getFacultyById } from '../../data/faculties';
-import { fetchLeaderboardData } from '../../services/gameService';
-import { PartyRoom, PublicLeaderboardUser, UserProfile } from '../../types/game';
-
-interface LeaderboardModalProps {
-  profile: UserProfile;
-  totalStations: number;
-  onClose: () => void;
-}
-
-export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
-  profile,
-  totalStations,
-  onClose,
-}) => {
-  const [tab, setTab] = useState<'individual' | 'party' | 'faculty'>('individual');
-  const [individuals, setIndividuals] = useState<PublicLeaderboardUser[]>([]);
-  const [parties, setParties] = useState<PartyRoom[]>([]);
-
-  useEffect(() => {
-    void fetchLeaderboardData(profile).then((res) => {
-      setIndividuals(res.individuals);
-      setParties(res.parties);
-    });
-  }, [profile]);
-
-  const facultyRanking = FACULTIES.map((f) => {
-    const members = individuals.filter((u) => u.facultyId === f.id);
-    const totalPoints = members.reduce((sum, u) => sum + u.points, 0);
-    return {
-      faculty: f,
-      studentCount: members.length,
-      totalPoints,
-    };
-  }).sort((a, b) => b.totalPoints - a.totalPoints);
-
-  return (
-    <div id="modal">
-      <div className="scrim" onClick={onClose} />
-      <div className="sheet card" role="dialog" aria-modal="true">
-        <div className="sh-head" style={{ '--c': '#FFAA1F' } as React.CSSProperties}>
-          <span
-            className="sticker"
-            style={{ '--c': '#fff', color: '#FFAA1F', width: 56, height: 56 } as React.CSSProperties}
-          >
-            <Trophy className="w-7 h-7" />
-          </span>
-          <div>
-            <h2>Bảng Xếp Hạng TDC Travel</h2>
-            <p>Học kỳ I · Năm học 2026–2027</p>
-          </div>
-          <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="sh-body">
-          {/* 3 Tabs */}
-          <div className="grid grid-cols-3 gap-1.5 bg-[#FFFBEF] p-1.5 rounded-2xl border border-slate-200">
-            <button
-              type="button"
-              onClick={() => setTab('individual')}
-              className={`py-2 px-2 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1 cursor-pointer ${
-                tab === 'individual'
-                  ? 'bg-amber-400 text-amber-950 shadow-sm'
-                  : 'text-slate-600 hover:bg-white'
-              }`}
-            >
-              <Award className="w-3.5 h-3.5" /> Cá nhân
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab('party')}
-              className={`py-2 px-2 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1 cursor-pointer ${
-                tab === 'party'
-                  ? 'bg-emerald-500 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-white'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5" /> Tổ đội
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab('faculty')}
-              className={`py-2 px-2 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1 cursor-pointer ${
-                tab === 'faculty'
-                  ? 'bg-sky-500 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-white'
-              }`}
-            >
-              <Building2 className="w-3.5 h-3.5" /> Theo Khoa
-            </button>
-          </div>
-
-          {tab === 'individual' && (
-            <div className="list max-h-[340px] overflow-y-auto pr-1">
-              {individuals.map((u, i) => {
-                const isYou = u.uid === profile.uid;
-                const fac = getFacultyById(u.facultyId);
-                return (
-                  <div key={u.uid} className={`rank ${isYou ? 'you' : ''}`}>
-                    <span className="n">{i + 1}</span>
-                    <div className="min-w-0">
-                      <div className="truncate font-extrabold text-sm">
-                        {u.name} {isYou ? '(Bạn)' : ''}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
-                        <span
-                          className="px-1.5 py-0.2 rounded-md font-extrabold"
-                          style={{ backgroundColor: fac.badgeColor, color: fac.color }}
-                        >
-                          {fac.shortName}
-                        </span>
-                        <span>
-                          · {u.unlockedCount}/{totalStations} trạm
-                        </span>
-                      </div>
-                    </div>
-                    <span>{u.points.toLocaleString('vi-VN')} đ</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {tab === 'party' && (
-            <div className="list max-h-[340px] overflow-y-auto pr-1">
-              {parties.map((p, i) => {
-                const isYourParty = profile.partyId === p.code;
-                return (
-                  <div key={p.code} className={`rank ${isYourParty ? 'you' : ''}`}>
-                    <span className="n">{i + 1}</span>
-                    <div className="min-w-0">
-                      <div className="truncate font-extrabold text-sm">
-                        {p.name} {isYourParty ? '(Đội bạn)' : ''}
-                      </div>
-                      <div className="text-[11px] font-bold text-slate-500 flex items-center gap-1.5">
-                        <span>Mã: {p.code}</span>
-                        <span>· {p.members.length}/4 SV</span>
-                        {p.isCrossFaculty && (
-                          <span className="text-emerald-700 font-extrabold">
-                            · Liên khoa +20%
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <span>{p.totalPoints.toLocaleString('vi-VN')} đ</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {tab === 'faculty' && (
-            <div className="list max-h-[340px] overflow-y-auto pr-1">
-              {facultyRanking.map((row, i) => {
-                const isMyFaculty = row.faculty.id === profile.facultyId;
-                return (
-                  <div key={row.faculty.id} className={`rank ${isMyFaculty ? 'you' : ''}`}>
-                    <span className="n">{i + 1}</span>
-                    <div className="min-w-0">
-                      <div className="truncate font-extrabold text-sm">
-                        {row.faculty.name}
-                      </div>
-                      <div className="text-[11px] font-bold text-slate-500">
-                        {row.studentCount} nhà thám hiểm tham gia
-                      </div>
-                    </div>
-                    <span>{row.totalPoints.toLocaleString('vi-VN')} đ</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <p className="note text-center">
-            Điểm số tự động đồng bộ thời gian thực khi hoàn thành trạm & nhiệm vụ.
-          </p>
-        </div>
-      </div>
     </div>
   );
 };
@@ -1466,1085 +951,6 @@ export const ProfileBadgesModal: React.FC<ProfileBadgesModalProps> = ({
             <p className="note text-center">
               Sưu tầm đủ {activeStations.length} huy hiệu tại các tòa nhà để nhận Chứng nhận Nhà thám hiểm TDC!
             </p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-</file>
-
-<file path="src/components/QrScannerModal.tsx">
-import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, KeyRound, QrCode, ShieldCheck, Sparkles, X } from 'lucide-react';
-import { Station } from '../types/game';
-
-interface QrScannerModalProps {
-  stations: Station[];
-  targetStation?: Station | null;
-  onClose: () => void;
-  onQrDetected: (rawCode: string) => void;
-}
-
-export const QrScannerModal: React.FC<QrScannerModalProps> = ({
-  stations,
-  targetStation,
-  onClose,
-  onQrDetected,
-}) => {
-  const [manualToken, setManualToken] = useState('');
-  const [cameraActive, setCameraActive] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-
-  const stopCamera = async () => {
-    if (scannerRef.current) {
-      try {
-        if (scannerRef.current.isScanning) {
-          await scannerRef.current.stop();
-        }
-        scannerRef.current.clear();
-      } catch {
-        // Ignore cleanup errors
-      }
-      scannerRef.current = null;
-    }
-    setCameraActive(false);
-  };
-
-  const startCamera = async () => {
-    setCameraError(null);
-    try {
-      const qr = new Html5Qrcode('tdc-qr-reader');
-      scannerRef.current = qr;
-      setCameraActive(true);
-      await qr.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 220, height: 220 } },
-        (decodedText) => {
-          void stopCamera();
-          onQrDetected(decodedText);
-        },
-        () => {
-          // frame scan ignore
-        }
-      );
-    } catch {
-      setCameraActive(false);
-      setCameraError(
-        'Thiết bị chưa cấp quyền Camera hoặc đang chạy trên máy tính không có Webcam. Bạn có thể nhập mã Token trạm hoặc bấm "Mô phỏng Quét QR" bên dưới!'
-      );
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      void stopCamera();
-    };
-  }, []);
-
-  const handleManualSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!manualToken.trim()) return;
-    onQrDetected(manualToken.trim());
-  };
-
-  return (
-    <div id="modal">
-      <div className="scrim" onClick={onClose} />
-      <div className="sheet card" role="dialog" aria-modal="true">
-        <div className="sh-head" style={{ '--c': '#00AEEF' } as React.CSSProperties}>
-          <span
-            className="sticker"
-            style={{ '--c': '#fff', color: '#00AEEF', width: 54, height: 54 } as React.CSSProperties}
-          >
-            <QrCode className="w-7 h-7" />
-          </span>
-          <div>
-            <h2>Quét Mã QR Thực Địa</h2>
-            <p>
-              {targetStation
-                ? `Xác thực O2O tại: ${targetStation.name}`
-                : 'Hệ thống Check-in WebRTC Camera TDC Travel'}
-            </p>
-          </div>
-          <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="sh-body">
-          <div className="know">
-            <b>Cơ chế Xác thực Kép (O2O Verification)</b>
-            Hướng camera điện thoại vào bảng mã QR đặt tại trạm thực tế trong khuôn viên TDC để mở khóa sương mù và nhận thêm <b>+15 điểm thưởng thực địa</b>.
-          </div>
-
-          <div className="rounded-2xl overflow-hidden bg-slate-900 border-2 border-sky-400 min-h-[210px] flex flex-col items-center justify-center relative p-3">
-            <div id="tdc-qr-reader" className="w-full max-w-[280px]" />
-            {!cameraActive && (
-              <div className="flex flex-col items-center text-center gap-2.5 py-4 text-white">
-                <Camera className="w-10 h-10 text-sky-400" />
-                <p className="text-xs text-slate-300 max-w-xs m-0">
-                  Sử dụng Camera trình duyệt (WebRTC) để quét trực tiếp không cần cài App
-                </p>
-                <button type="button" className="btn blue" onClick={startCamera}>
-                  <Camera className="w-4 h-4" /> Bật Camera Quét QR
-                </button>
-              </div>
-            )}
-          </div>
-
-          {cameraError && (
-            <div className="bg-amber-50 border border-amber-300 text-amber-900 p-3 rounded-xl text-xs font-bold">
-              ℹ️ {cameraError}
-            </div>
-          )}
-
-          <form onSubmit={handleManualSubmit} className="flex flex-col gap-2">
-            <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <KeyRound className="w-3.5 h-3.5" /> Hoặc nhập Mã định danh in dưới bảng QR:
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={manualToken}
-                onChange={(e) => setManualToken(e.target.value)}
-                placeholder={
-                  targetStation
-                    ? `Ví dụ: ${targetStation.qrSecretToken}`
-                    : 'Nhập mã TDC-QR-...'
-                }
-                className="flex-1 px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-[#FFFBEF] font-extrabold text-sm"
-              />
-              <button type="submit" className="btn">
-                Xác nhận
-              </button>
-            </div>
-          </form>
-
-          <div className="border-t border-slate-200 pt-3 flex flex-col gap-2">
-            <span className="text-xs font-extrabold text-slate-500 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Chế độ Giả lập Quét QR (Dành cho Demo trên PC):
-            </span>
-            {targetStation ? (
-              <button
-                type="button"
-                className="btn sun w-full"
-                onClick={() => onQrDetected(targetStation.qrSecretToken)}
-              >
-                <ShieldCheck className="w-5 h-5" /> Mô phỏng Quét QR Trạm {targetStation.name}
-              </button>
-            ) : (
-              <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
-                {stations
-                  .filter((s) => s.active !== false)
-                  .map((st) => (
-                    <button
-                      key={st.id}
-                      type="button"
-                      onClick={() => onQrDetected(st.qrSecretToken)}
-                      className="text-left px-2.5 py-2 rounded-xl border border-slate-200 hover:border-sky-400 bg-slate-50 text-xs font-extrabold truncate cursor-pointer"
-                    >
-                      📲 {st.name}
-                    </button>
-                  ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-</file>
-
-<file path="src/components/StartScreen.tsx">
-import React, { useState } from 'react';
-import { Compass, RotateCcw, Shield, Sparkles } from 'lucide-react';
-import { AVATARS, TDC_LOGO } from '../data/campusLayout';
-import { FACULTIES } from '../data/faculties';
-import { getAvatarSvg } from '../engine/chibiBuilder';
-import { isFirebaseConfigured } from '../services/firebase';
-import { FacultyId, UserProfile } from '../types/game';
-
-interface StartScreenProps {
-  existingProfile: UserProfile | null;
-  totalStations: number;
-  onStartGame: (params: {
-    name: string;
-    mssv: string;
-    email?: string;
-    password?: string;
-    facultyId: FacultyId;
-    avatar: number;
-    mode: 'demo' | 'email_login' | 'email_register' | 'google';
-  }) => Promise<void>;
-  onResetProgress: () => void;
-  onOpenAdmin: () => void;
-}
-
-export const StartScreen: React.FC<StartScreenProps> = ({
-  existingProfile,
-  totalStations,
-  onStartGame,
-  onResetProgress,
-  onOpenAdmin,
-}) => {
-  const [name, setName] = useState(existingProfile?.name || '');
-  const [mssv, setMssv] = useState(existingProfile?.mssv || '26211TT0102');
-  const [facultyId, setFacultyId] = useState<FacultyId>(
-    existingProfile?.facultyId || 'cntt'
-  );
-  const [avatar, setAvatar] = useState<number>(existingProfile?.avatar || 0);
-  const [authTab, setAuthTab] = useState<'quick' | 'cloud'>('quick');
-  const [email, setEmail] = useState(existingProfile?.email || '');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const unlockedCount = Object.keys(existingProfile?.done || {}).length;
-
-  const handleSubmit = async (
-    mode: 'demo' | 'email_login' | 'email_register' | 'google'
-  ) => {
-    setError(null);
-    setLoading(true);
-    try {
-      await onStartGame({
-        name: name.trim() || 'Minh Anh',
-        mssv: mssv.trim() || '26211TT0102',
-        email: email.trim() || undefined,
-        password: password || undefined,
-        facultyId,
-        avatar,
-        mode,
-      });
-    } catch (err) {
-      setError((err as Error).message || 'Đăng nhập thất bại.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div id="start">
-      <div className="st-wrap">
-        <div className="flex items-center justify-between">
-          <div className="logo">
-            <div className="seal">
-              <svg
-                viewBox="118 118 332 332"
-                role="img"
-                aria-label="Logo Trường Cao đẳng Công nghệ Thủ Đức"
-              >
-                <path fill="#00AEEF" d={TDC_LOGO} />
-              </svg>
-            </div>
-            <h1>
-              TDC<span>Travel</span>
-            </h1>
-          </div>
-
-          <button
-            type="button"
-            onClick={onOpenAdmin}
-            className="px-3.5 py-2 rounded-2xl bg-white/95 border-2 border-slate-200 shadow-sm text-xs font-extrabold text-slate-700 hover:border-sky-400 flex items-center gap-1.5 cursor-pointer"
-            title="Mở Cổng Quản trị Hệ thống (Admin CMS)"
-          >
-            <Shield className="w-4 h-4 text-sky-600" /> Admin CMS
-          </button>
-        </div>
-
-        <p className="tag">
-          Khám phá bản đồ 3D khuôn viên Trường Cao đẳng Công nghệ Thủ Đức, mở khóa sương mù tại {totalStations} trạm thực địa, kết nối tổ đội liên khoa và sưu tầm huy hiệu!
-        </p>
-
-        <div className="st-card card">
-          {/* Auth Mode Switcher */}
-          <div className="grid grid-cols-2 gap-1.5 bg-[#FFFBEF] p-1 rounded-xl border border-slate-200">
-            <button
-              type="button"
-              onClick={() => setAuthTab('quick')}
-              className={`py-1.5 rounded-lg text-xs font-extrabold cursor-pointer ${
-                authTab === 'quick'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-slate-600 hover:bg-white'
-              }`}
-            >
-              ⚡ Hồ sơ Sinh viên / Demo
-            </button>
-            <button
-              type="button"
-              onClick={() => setAuthTab('cloud')}
-              className={`py-1.5 rounded-lg text-xs font-extrabold cursor-pointer ${
-                authTab === 'cloud'
-                  ? 'bg-sky-600 text-white'
-                  : 'text-slate-600 hover:bg-white'
-              }`}
-            >
-              ☁️ Tài khoản Email TDC
-            </button>
-          </div>
-
-          {error && (
-            <div className="bg-rose-50 border border-rose-300 text-rose-800 px-3 py-2 rounded-xl text-xs font-extrabold">
-              ⚠️ {error}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div>
-              <label htmlFor="inName">Họ tên Sinh viên</label>
-              <input
-                id="inName"
-                type="text"
-                maxLength={24}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ví dụ: Minh Anh"
-              />
-            </div>
-            <div>
-              <label htmlFor="inMssv">Mã số SV (MSSV)</label>
-              <input
-                id="inMssv"
-                type="text"
-                maxLength={14}
-                value={mssv}
-                onChange={(e) => setMssv(e.target.value.toUpperCase())}
-                placeholder="26211TT0102"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="inFaculty">Khoa / Ngành đào tạo tại TDC</label>
-            <select
-              id="inFaculty"
-              value={facultyId}
-              onChange={(e) => setFacultyId(e.target.value as FacultyId)}
-              className="w-full px-3.5 py-2.5 rounded-xl border-2 border-[#E2EBDA] bg-[#FFFBEF] font-extrabold text-sm text-[#1E3528]"
-            >
-              {FACULTIES.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name} ({f.shortName})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {authTab === 'cloud' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-sky-50/70 p-2.5 rounded-xl border border-sky-200">
-              <div>
-                <label htmlFor="inEmail">Email Sinh viên (@mail.tdc.edu.vn)</label>
-                <input
-                  id="inEmail"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="26211tt0102@mail.tdc.edu.vn"
-                  className="!text-xs !py-2"
-                />
-              </div>
-              <div>
-                <label htmlFor="inPass">Mật khẩu</label>
-                <input
-                  id="inPass"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="!text-xs !py-2"
-                />
-              </div>
-            </div>
-          )}
-
-          <span className="lbl">Chọn Nhân vật Chibi 3D</span>
-          <div className="avas">
-            {AVATARS.map((a, i) => (
-              <button
-                key={a.name}
-                type="button"
-                className={i === avatar ? 'on' : ''}
-                onClick={() => setAvatar(i)}
-                aria-pressed={i === avatar}
-              >
-                <div
-                  className="w-14 h-14"
-                  dangerouslySetInnerHTML={{ __html: getAvatarSvg(i) }}
-                />
-                {a.name}
-              </button>
-            ))}
-          </div>
-
-          {authTab === 'quick' ? (
-            <button
-              type="button"
-              disabled={loading}
-              className="btn big sun"
-              onClick={() => handleSubmit('demo')}
-            >
-              <Compass className="w-5 h-5" />
-              {existingProfile && existingProfile.points > 0
-                ? `Tiếp tục Hành trình · ${existingProfile.points.toLocaleString('vi-VN')} điểm (${unlockedCount}/${totalStations} trạm)`
-                : 'Bắt đầu Khám phá Khuôn viên 3D'}
-            </button>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  disabled={loading}
-                  className="btn blue text-sm"
-                  onClick={() => handleSubmit('email_login')}
-                >
-                  Đăng nhập Email
-                </button>
-                <button
-                  type="button"
-                  disabled={loading}
-                  className="btn sun text-sm"
-                  onClick={() => handleSubmit('email_register')}
-                >
-                  Đăng ký Mới
-                </button>
-              </div>
-              {isFirebaseConfigured && (
-                <button
-                  type="button"
-                  disabled={loading}
-                  className="btn ghost text-xs"
-                  onClick={() => handleSubmit('google')}
-                >
-                  Đăng nhập nhanh với Google (@mail.tdc.edu.vn)
-                </button>
-              )}
-            </div>
-          )}
-
-          {existingProfile && (existingProfile.points > 0 || unlockedCount > 0) && (
-            <div className="st-row">
-              <button
-                type="button"
-                className="btn ghost text-sm"
-                onClick={onResetProgress}
-              >
-                <RotateCcw className="w-4 h-4" /> Đặt lại tiến độ & Phủ lại sương mù từ đầu
-              </button>
-            </div>
-          )}
-
-          <p className="fine flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
-            <span>
-              Đề tài NCKH 2026–2027: Tích hợp Bản đồ 3D + Sương mù (Fog of War), Quét QR thực địa O2O, Mini-game chuyên ngành các Khoa, Tổ đội Liên khoa & Admin CMS.
-            </span>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
-</file>
-
-<file path="src/components/StationModal.tsx">
-import React, { useMemo, useState } from 'react';
-import {
-  Camera,
-  CheckCircle2,
-  Compass,
-  Eye,
-  Flag,
-  HelpCircle,
-  Lightbulb,
-  QrCode,
-  ShieldAlert,
-  Sparkles,
-  Users,
-  X,
-} from 'lucide-react';
-import { TYPE_LABEL } from '../data/campusLayout';
-import { audioSfx } from '../engine/audioSfx';
-import {
-  checkAntiCheatCooldown,
-  verifyStationQrPayload,
-  verifyStationRiddle,
-} from '../services/gameService';
-import {
-  PartyRoom,
-  QuizItem,
-  Station,
-  UnlockedStationRecord,
-  UserProfile,
-  VerificationMethod,
-} from '../types/game';
-import { AutoEngineGame } from './minigames/AutoEngineGame';
-import { ElectricCircuitGame } from './minigames/ElectricCircuitGame';
-import { ItDebugGame } from './minigames/ItDebugGame';
-import { KickGame } from './minigames/KickGame';
-import { StationSticker } from './StationSticker';
-
-interface StationModalProps {
-  station: Station;
-  profile: UserProfile;
-  party: PartyRoom | null;
-  totalStations: number;
-  nextStationName?: string;
-  preverifiedMethod?: VerificationMethod | null;
-  onClose: () => void;
-  onOpenQrScanner: (st: Station) => void;
-  onRequestPhotoMode: (st: Station, method: VerificationMethod) => void;
-  onCompleteStation: (params: {
-    station: Station;
-    basePoints: number;
-    method: VerificationMethod;
-    isQuizOrGameSuccess: boolean;
-    summaryHtml?: string;
-  }) => Promise<{
-    finalPoints: number;
-    crossFacultyBonus: number;
-    qrBonus: number;
-  }>;
-  onShowCertificate: () => void;
-}
-
-export const StationModal: React.FC<StationModalProps> = ({
-  station,
-  profile,
-  party,
-  totalStations,
-  nextStationName,
-  preverifiedMethod,
-  onClose,
-  onOpenQrScanner,
-  onRequestPhotoMode,
-  onCompleteStation,
-  onShowCertificate,
-}) => {
-  const existingRecord: UnlockedStationRecord | undefined = profile.done?.[station.id];
-
-  // Step 1: O2O Field Verification ('qr' | 'riddle' | 'demo')
-  const [verifiedMethod, setVerifiedMethod] = useState<VerificationMethod | null>(
-    preverifiedMethod || (station.id === 'g1' ? 'demo' : null)
-  );
-  const [riddleInput, setRiddleInput] = useState('');
-  const [showRiddleHint, setShowRiddleHint] = useState(false);
-  const [verifyError, setVerifyError] = useState<string | null>(null);
-  const [qrTokenInput, setQrTokenInput] = useState('');
-
-  // Step 2: Quiz state (if type === 'quiz')
-  const pickedQuiz: QuizItem | null = useMemo(() => {
-    if (!station.questions || station.questions.length === 0) return null;
-    const idx = Math.floor(Math.random() * station.questions.length);
-    return station.questions[idx];
-  }, [station]);
-
-  const shuffledOptionIndices = useMemo(() => {
-    if (!pickedQuiz) return [0, 1, 2, 3];
-    return pickedQuiz.opts.map((_, i) => i).sort(() => Math.random() - 0.5);
-  }, [pickedQuiz]);
-
-  const [selectedQuizAns, setSelectedQuizAns] = useState<number | null>(null);
-
-  // Step 3: Completion Reveal state
-  const [completionResult, setCompletionResult] = useState<{
-    finalPoints: number;
-    crossFacultyBonus: number;
-    qrBonus: number;
-    summaryHtml?: string;
-  } | null>(null);
-
-  const unlockedCount = Object.keys(profile.done || {}).length;
-
-  const handleRiddleVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cooldown = checkAntiCheatCooldown(profile, 'riddle');
-    if (!cooldown.allowed) {
-      setVerifyError(
-        `Chống gian lận (Anti-cheat): Bạn di chuyển giữa 2 trạm quá nhanh! Vui lòng đợi ${cooldown.waitSeconds} giây.`
-      );
-      audioSfx.play('bad');
-      return;
-    }
-
-    if (verifyStationRiddle(station, riddleInput)) {
-      audioSfx.play('ok');
-      setVerifyError(null);
-      setVerifiedMethod('riddle');
-    } else {
-      audioSfx.play('bad');
-      setVerifyError('Mật thư thực địa chưa chính xác. Hãy quan sát mô hình 3D hoặc bấm xem Gợi ý!');
-    }
-  };
-
-  const handleInlineQrTokenVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cooldown = checkAntiCheatCooldown(profile, 'qr');
-    if (!cooldown.allowed) {
-      setVerifyError(
-        `Chống gian lận: Vui lòng chờ ${cooldown.waitSeconds}s trước khi quét trạm tiếp theo.`
-      );
-      audioSfx.play('bad');
-      return;
-    }
-    const res = verifyStationQrPayload(station, qrTokenInput);
-    if (res.valid) {
-      audioSfx.play('ok');
-      setVerifyError(null);
-      setVerifiedMethod('qr');
-    } else {
-      audioSfx.play('bad');
-      setVerifyError(res.message);
-    }
-  };
-
-  const handleDemoBypass = () => {
-    audioSfx.play('tap');
-    setVerifyError(null);
-    setVerifiedMethod('demo');
-  };
-
-  const triggerComplete = async (
-    basePoints: number,
-    isQuizOrGameSuccess: boolean,
-    summaryHtml?: string
-  ) => {
-    const method = verifiedMethod || 'demo';
-    const res = await onCompleteStation({
-      station,
-      basePoints,
-      method,
-      isQuizOrGameSuccess,
-      summaryHtml,
-    });
-    setCompletionResult({
-      ...res,
-      summaryHtml,
-    });
-  };
-
-  const handleQuizOptionClick = (originalIdx: number) => {
-    if (selectedQuizAns !== null || !pickedQuiz) return;
-    setSelectedQuizAns(originalIdx);
-    const ok = originalIdx === pickedQuiz.ans;
-    audioSfx.play(ok ? 'ok' : 'bad');
-  };
-
-  // CASE A: Already unlocked previously (Review station info, fun facts & directions)
-  if (existingRecord && !completionResult) {
-    return (
-      <div id="modal">
-        <div className="scrim" onClick={onClose} />
-        <div className="sheet card" role="dialog" aria-modal="true">
-          <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
-            <StationSticker col={station.col} type={station.type} size={56} done />
-            <div>
-              <h2>{station.name}</h2>
-              <p>{station.sub}</p>
-            </div>
-            <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="sh-body">
-            <div className="know">
-              <b>Thông tin Khu vực</b>
-              {station.info}
-            </div>
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs font-bold text-emerald-950 flex flex-col gap-1">
-              <span className="uppercase tracking-wider text-emerald-700 font-black">
-                🌟 Fun Fact Đã Mở Khóa:
-              </span>
-              <span>{station.funFact}</span>
-            </div>
-            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-xs font-bold text-sky-950 flex items-start gap-2">
-              <Compass className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
-              <div>
-                <div className="uppercase tracking-wider text-sky-700 font-black">
-                  Chỉ dẫn Lộ trình Tiếp theo:
-                </div>
-                <div>{station.directions}</div>
-              </div>
-            </div>
-
-            {existingRecord.photoDataUrl && (
-              <div className="polar">
-                <img
-                  src={existingRecord.photoDataUrl}
-                  alt={`Ảnh check-in tại ${station.name}`}
-                />
-                <p>
-                  {profile.name} @ {station.name}
-                  <small>
-                    TDC Travel ·{' '}
-                    {new Date(existingRecord.unlockedAt).toLocaleDateString('vi-VN')}
-                  </small>
-                </p>
-              </div>
-            )}
-
-            <div className="reveal">
-              <StationSticker col={station.col} type={station.type} size={84} />
-              <h3>{station.badge}</h3>
-              <p className="note">
-                Đã mở khóa sương mù với <b>+{existingRecord.pts} điểm</b> (Phương thức:{' '}
-                {existingRecord.method.toUpperCase()}).
-              </p>
-            </div>
-            <button type="button" className="btn big" onClick={onClose}>
-              Tiếp tục Khám phá
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // CASE B: Just completed right now -> Celebration & Badge Reveal
-  if (completionResult) {
-    const allUnlocked = unlockedCount >= totalStations;
-    return (
-      <div id="modal">
-        <div className="scrim" onClick={onClose} />
-        <div className="sheet card" role="dialog" aria-modal="true">
-          <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
-            <StationSticker col={station.col} type={station.type} size={56} />
-            <div>
-              <h2>Sương mù Đã Tan!</h2>
-              <p>{station.name}</p>
-            </div>
-            <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="sh-body">
-            {completionResult.summaryHtml && (
-              <div
-                dangerouslySetInnerHTML={{ __html: completionResult.summaryHtml }}
-              />
-            )}
-
-            <div className="reveal">
-              <StationSticker col={station.col} type={station.type} size={104} />
-              <h3>{station.badge}</h3>
-              <span className="plus">+{completionResult.finalPoints} điểm</span>
-
-              <div className="flex flex-wrap gap-1.5 justify-center text-xs font-extrabold">
-                {completionResult.qrBonus > 0 && (
-                  <span className="bg-sky-100 text-sky-800 px-2.5 py-0.5 rounded-full">
-                    +{completionResult.qrBonus} Điểm Xác thực Thực địa ({verifiedMethod?.toUpperCase()})
-                  </span>
-                )}
-                {completionResult.crossFacultyBonus > 0 && (
-                  <span className="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5" /> +{completionResult.crossFacultyBonus} Thưởng Tổ đội Liên Khoa (+20%)
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs font-bold text-amber-950">
-              <div className="uppercase tracking-wider text-amber-700 font-black mb-0.5">
-                💡 Kiến thức Thú vị (Fun Fact):
-              </div>
-              {station.funFact}
-            </div>
-
-            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-xs font-bold text-sky-950">
-              <div className="uppercase tracking-wider text-sky-700 font-black mb-0.5">
-                🧭 Hướng dẫn Đường đi:
-              </div>
-              {station.directions}
-            </div>
-
-            <p className="note text-center">
-              Tiến độ mở khóa bản đồ: <b>{unlockedCount}/{totalStations}</b> trạm ·{' '}
-              {allUnlocked
-                ? 'Bạn đã mở khóa 100% khuôn viên TDC!'
-                : nextStationName
-                  ? `Gợi ý tiếp theo: ${nextStationName}`
-                  : ''}
-            </p>
-
-            <button
-              type="button"
-              className={`btn big ${allUnlocked ? 'sun' : ''}`}
-              onClick={() => {
-                onClose();
-                if (allUnlocked) {
-                  setTimeout(onShowCertificate, 250);
-                }
-              }}
-            >
-              {allUnlocked ? '🎓 Xem Chứng nhận Nhà Thám Hiểm TDC' : 'Tiếp tục Hành trình'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // CASE C: Step 1 - Real-world O2O Verification (QR Scan or On-site Observation Riddle)
-  if (!verifiedMethod) {
-    return (
-      <div id="modal">
-        <div className="scrim" onClick={onClose} />
-        <div className="sheet card" role="dialog" aria-modal="true">
-          <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
-            <StationSticker col={station.col} type={station.type} size={56} />
-            <div>
-              <h2>{station.name}</h2>
-              <p>Bước 1/2: Xác thực Hiện trường (O2O Check-in)</p>
-            </div>
-            <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="sh-body">
-            <div className="know">
-              <b>Giới thiệu Trạm</b>
-              {station.info}
-            </div>
-
-            {verifyError && (
-              <div className="bg-rose-50 border-2 border-rose-300 text-rose-800 p-3 rounded-xl text-xs font-extrabold flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 shrink-0" />
-                <span>{verifyError}</span>
-              </div>
-            )}
-
-            {/* Option 1: Observation Riddle */}
-            {station.riddle && (
-              <form
-                onSubmit={handleRiddleVerify}
-                className="bg-amber-50/80 border-2 border-amber-200 rounded-2xl p-3.5 flex flex-col gap-2.5"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
-                    <Eye className="w-4 h-4" /> Cách 1: Giải Mật thư Quan sát Thực địa (+10đ)
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowRiddleHint(!showRiddleHint)}
-                    className="text-xs font-extrabold text-sky-700 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Lightbulb className="w-3.5 h-3.5" /> Gợi ý
-                  </button>
-                </div>
-                <p className="m-0 font-extrabold text-sm text-slate-800">
-                  {station.riddle.prompt}
-                </p>
-                {showRiddleHint && (
-                  <p className="m-0 text-xs font-bold text-amber-900 bg-amber-100/80 px-2.5 py-1.5 rounded-lg">
-                    💡 Gợi ý: {station.riddle.hint} (Đáp án mẫu: <b>{station.riddle.answer}</b>)
-                  </p>
-                )}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={riddleInput}
-                    onChange={(e) => setRiddleInput(e.target.value)}
-                    placeholder="Nhập câu trả lời quan sát được..."
-                    className="flex-1 px-3 py-2 rounded-xl border-2 border-amber-300 bg-white font-extrabold text-sm"
-                  />
-                  <button type="submit" className="btn sun">
-                    Giải mã
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Option 2: QR Code Camera / Token */}
-            <div className="bg-sky-50 border-2 border-sky-200 rounded-2xl p-3.5 flex flex-col gap-2.5">
-              <span className="text-xs font-black uppercase tracking-wider text-sky-800 flex items-center gap-1.5">
-                <QrCode className="w-4 h-4" /> Cách 2: Quét Mã QR Cố định tại Trạm (+15đ)
-              </span>
-              <button
-                type="button"
-                className="btn blue w-full"
-                onClick={() => onOpenQrScanner(station)}
-              >
-                <QrCode className="w-5 h-5" /> Mở Camera Quét Mã QR Trạm
-              </button>
-              <form onSubmit={handleInlineQrTokenVerify} className="flex gap-2">
-                <input
-                  type="text"
-                  value={qrTokenInput}
-                  onChange={(e) => setQrTokenInput(e.target.value)}
-                  placeholder={`Hoặc nhập mã QR (${station.qrSecretToken})`}
-                  className="flex-1 px-3 py-1.5 rounded-xl border border-sky-300 bg-white font-bold text-xs"
-                />
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 rounded-xl bg-sky-600 text-white font-extrabold text-xs cursor-pointer"
-                >
-                  Nhập mã
-                </button>
-              </form>
-            </div>
-
-            {/* Option 3: 3D Walk-in Demo Mode */}
-            <button
-              type="button"
-              className="btn ghost w-full"
-              onClick={handleDemoBypass}
-            >
-              <Sparkles className="w-4 h-4" /> Bỏ qua Xác thực Thực địa (Chế độ Trải nghiệm 3D)
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // CASE D: Step 2 - Station Challenge / Faculty Mini-game
-  return (
-    <div id="modal">
-      <div className="scrim" onClick={onClose} />
-      <div className="sheet card" role="dialog" aria-modal="true">
-        <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
-          <StationSticker col={station.col} type={station.type} size={56} />
-          <div>
-            <h2>{station.name}</h2>
-            <p>
-              {TYPE_LABEL[station.type]} · Tối đa +{station.pts} điểm
-            </p>
-          </div>
-          <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="sh-body">
-          <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl text-xs font-extrabold text-emerald-900">
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              Đã xác thực hiện trường ({verifiedMethod.toUpperCase()})
-            </span>
-            {party?.isCrossFaculty && (
-              <span className="text-emerald-700">⚡ Liên khoa +20%</span>
-            )}
-          </div>
-
-          {station.type === 'checkin' && (
-            <>
-              <div className="know">
-                <b>Bạn có biết?</b>
-                {station.info}
-              </div>
-              <button
-                type="button"
-                className="btn big sun"
-                onClick={() => triggerComplete(station.pts, true)}
-              >
-                <Flag className="w-5 h-5" /> Xác nhận Check-in & Mở khóa Sương mù · +{station.pts}
-              </button>
-            </>
-          )}
-
-          {station.type === 'photo' && (
-            <>
-              <div className="know">
-                <b>Góc Sống Ảo 3D</b>
-                {station.info}
-              </div>
-              <button
-                type="button"
-                className="btn big sun"
-                onClick={() => onRequestPhotoMode(station, verifiedMethod)}
-              >
-                <Camera className="w-5 h-5" /> Mở Khung Máy Ảnh Polaroid 3D
-              </button>
-            </>
-          )}
-
-          {station.type === 'quiz' && pickedQuiz && (
-            <>
-              <div className="know">
-                <b>Khám phá Kiến thức TDC</b>
-                {station.info}
-              </div>
-              <p className="q">{pickedQuiz.q}</p>
-              <div className="opts">
-                {shuffledOptionIndices.map((origIdx, displayIdx) => {
-                  const letterLabel = String.fromCharCode(65 + displayIdx);
-                  const isCorrect = origIdx === pickedQuiz.ans;
-                  const isPicked = selectedQuizAns === origIdx;
-                  let cls = 'opt';
-                  if (selectedQuizAns !== null) {
-                    if (isCorrect) cls += ' ok';
-                    else if (isPicked) cls += ' no';
-                  }
-                  return (
-                    <button
-                      key={origIdx}
-                      type="button"
-                      disabled={selectedQuizAns !== null}
-                      onClick={() => handleQuizOptionClick(origIdx)}
-                      className={cls}
-                    >
-                      <i>{letterLabel}</i>
-                      <span>{pickedQuiz.opts[origIdx]}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {selectedQuizAns !== null && (
-                <div className="flex flex-col gap-2.5 mt-1">
-                  <p className="explain">
-                    {selectedQuizAns === pickedQuiz.ans
-                      ? '🎉 Chính xác! '
-                      : '💡 Chưa chính xác! '}
-                    {pickedQuiz.ex}
-                  </p>
-                  <button
-                    type="button"
-                    className={`btn big ${selectedQuizAns === pickedQuiz.ans ? 'sun' : ''}`}
-                    onClick={() =>
-                      triggerComplete(
-                        selectedQuizAns === pickedQuiz.ans ? station.pts : 40,
-                        selectedQuizAns === pickedQuiz.ans
-                      )
-                    }
-                  >
-                    <HelpCircle className="w-5 h-5" /> Nhận Huy hiệu & Xóa Sương mù · +
-                    {selectedQuizAns === pickedQuiz.ans ? station.pts : 40}
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-
-          {station.type === 'kick' && (
-            <KickGame
-              maxPoints={station.pts}
-              onComplete={(pts, html) => triggerComplete(pts, true, html)}
-            />
-          )}
-
-          {station.type === 'it_debug' && (
-            <ItDebugGame
-              maxPoints={station.pts}
-              onComplete={(pts, html) => triggerComplete(pts, true, html)}
-            />
-          )}
-
-          {station.type === 'electric_circuit' && (
-            <ElectricCircuitGame
-              maxPoints={station.pts}
-              onComplete={(pts, html) => triggerComplete(pts, true, html)}
-            />
-          )}
-
-          {station.type === 'auto_engine' && (
-            <AutoEngineGame
-              maxPoints={station.pts}
-              onComplete={(pts, html) => triggerComplete(pts, true, html)}
-            />
           )}
         </div>
       </div>
@@ -4522,1340 +2928,6 @@ export function buildTelemetryFromCampus3D(params: {
 }
 </file>
 
-<file path="src/index.css">
-@import "tailwindcss";
-
-/* Bố cục: thế giới 3D kiểu đồ chơi phủ kín màn hình; HUD bo tròn nổi ở 4 góc; thẻ thử thách trồi lên như tấm thẻ bài */
-:root {
-  --grass: #3DAA5C;
-  --grass-d: #23733D;
-  --leaf-l: #E6F6DA;
-  --sun: #FFC83A;
-  --sun-d: #D98E00;
-  --coral: #FF6F59;
-  --coral-d: #D9452F;
-  --tdc: #00AEEF;
-  --tdc-d: #0A7FC2;
-  --cream: #FFFBEF;
-  --card: #FFFFFF;
-  --ink: #1E3528;
-  --muted: #5B7266;
-  --line: #E2EBDA;
-  --drop: rgba(28, 64, 42, .20);
-  --f-display: "Baloo 2", "Nunito", system-ui, sans-serif;
-  --f-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
-  color-scheme: light;
-}
-
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-}
-
-body {
-  background: #CFEFDF;
-  color: var(--ink);
-  font-family: var(--f-body);
-  font-size: 15px;
-  line-height: 1.45;
-  -webkit-tap-highlight-color: transparent;
-}
-
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-button {
-  font: inherit;
-  color: inherit;
-}
-
-button:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 3px solid var(--tdc);
-  outline-offset: 2px;
-}
-
-#app {
-  position: fixed;
-  inset: 0;
-}
-
-#stage {
-  position: absolute;
-  inset: 0;
-}
-
-#stage canvas {
-  display: block;
-  touch-action: none;
-}
-
-.card {
-  background: var(--card);
-  border-radius: 20px;
-  box-shadow: 0 4px 0 var(--drop), 0 10px 28px rgba(28, 64, 42, .14);
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 18px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--grass);
-  color: #fff;
-  font-family: var(--f-display);
-  font-weight: 800;
-  font-size: 16px;
-  letter-spacing: .01em;
-  cursor: pointer;
-  box-shadow: 0 4px 0 var(--grass-d);
-  transition: transform .08s, box-shadow .08s;
-  touch-action: manipulation;
-}
-
-.btn:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--grass-d);
-}
-
-.btn.sun {
-  background: var(--sun);
-  color: #4A3200;
-  box-shadow: 0 4px 0 var(--sun-d);
-}
-
-.btn.sun:active {
-  box-shadow: 0 1px 0 var(--sun-d);
-}
-
-.btn.blue {
-  background: var(--tdc);
-  color: #fff;
-  box-shadow: 0 4px 0 var(--tdc-d);
-}
-
-.btn.ghost {
-  background: var(--leaf-l);
-  color: var(--grass-d);
-  box-shadow: 0 4px 0 #C7E3B5;
-}
-
-.btn.big {
-  min-height: 52px;
-  font-size: 18px;
-  width: 100%;
-}
-
-/* ---------- màn hình mở đầu ---------- */
-#start {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-top: calc(16px + env(safe-area-inset-top, 0px));
-  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(90deg, rgba(255, 251, 239, .90) 0, rgba(255, 251, 239, .62) 38%, rgba(255, 251, 239, 0) 65%);
-  overflow: auto;
-  z-index: 10;
-}
-
-.st-wrap {
-  width: min(460px, 100%);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-left: clamp(0px, 3vw, 48px);
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.logo .seal {
-  flex: none;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: #fff;
-  display: grid;
-  place-items: center;
-  box-shadow: 0 4px 0 var(--drop);
-}
-
-.logo .seal svg {
-  width: 48px;
-  height: 48px;
-}
-
-.logo h1 {
-  margin: 0;
-  font-family: var(--f-display);
-  font-weight: 800;
-  font-size: 42px;
-  line-height: .9;
-  letter-spacing: -.01em;
-  color: var(--ink);
-}
-
-.logo h1 span {
-  display: inline-block;
-  background: var(--sun);
-  color: #3D2A00;
-  border-radius: 16px;
-  padding: 2px 12px 0;
-  margin-left: 4px;
-  transform: rotate(-3deg);
-  box-shadow: 0 5px 0 var(--sun-d);
-}
-
-.tag {
-  margin: 0;
-  font-size: 15.5px;
-  font-weight: 700;
-  color: var(--ink);
-  max-width: 42ch;
-  text-wrap: balance;
-}
-
-.st-card {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.st-card label, .st-card .lbl {
-  display: block;
-  font-size: 11.5px;
-  font-weight: 900;
-  letter-spacing: .07em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 3px;
-}
-
-.st-card input {
-  font: inherit;
-  font-size: 15px;
-  font-weight: 800;
-  padding: 9px 12px;
-  border-radius: 12px;
-  border: 2px solid var(--line);
-  background: var(--cream);
-  color: var(--ink);
-  width: 100%;
-}
-
-.avas {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-
-.avas button {
-  border: 3px solid var(--line);
-  background: var(--cream);
-  border-radius: 16px;
-  padding: 6px 4px 5px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  font-weight: 800;
-  font-size: 12.5px;
-}
-
-.avas button.on {
-  border-color: var(--grass);
-  background: var(--leaf-l);
-}
-
-.fine {
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.4;
-}
-
-.st-row {
-  display: flex;
-  gap: 10px;
-}
-
-.st-row .btn {
-  flex: 1;
-}
-
-/* ---------- HUD ---------- */
-#hud {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  padding-top: calc(12px + env(safe-area-inset-top, 0px));
-  padding-bottom: 16px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  z-index: 5;
-}
-
-#hud.dim > *:not(#fx) {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.hud-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.me {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 14px 6px 6px;
-  border-radius: 999px;
-  min-width: 0;
-  max-width: min(320px, 55vw);
-}
-
-.me .ava {
-  flex: none;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background: var(--leaf-l);
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-}
-
-.me .ava svg {
-  width: 46px;
-  height: 46px;
-}
-
-.me-txt {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.me-txt b {
-  font-family: var(--f-display);
-  font-size: 16.5px;
-  line-height: 1.1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.me-txt span {
-  font-size: 11.5px;
-  font-weight: 800;
-  color: var(--grass-d);
-}
-
-.xp {
-  height: 7px;
-  border-radius: 5px;
-  background: var(--leaf-l);
-  overflow: hidden;
-  margin-top: 3px;
-  min-width: 90px;
-}
-
-.xp i {
-  display: block;
-  height: 100%;
-  width: 0;
-  background: linear-gradient(90deg, var(--grass), #8BD346);
-  border-radius: 5px;
-  transition: width .4s;
-}
-
-.hud-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.pills {
-  display: flex;
-  gap: 8px;
-}
-
-.pill {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 40px;
-  padding: 0 14px 0 8px;
-  border: 0;
-  border-radius: 999px;
-  background: #fff;
-  cursor: pointer;
-  box-shadow: 0 4px 0 var(--drop);
-  font-family: var(--f-display);
-  font-weight: 800;
-  font-size: 18px;
-  font-variant-numeric: tabular-nums;
-}
-
-.pill .ic {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-}
-
-.pill.pts .ic {
-  background: var(--sun);
-  color: #7A4D00;
-}
-
-.pill.bdg .ic {
-  background: var(--coral);
-  color: #fff;
-}
-
-.pill.bump {
-  animation: bump .45s;
-}
-
-@keyframes bump {
-  40% { transform: scale(1.16); }
-}
-
-#mini {
-  pointer-events: auto;
-  width: 118px;
-  height: 118px;
-  border-radius: 50%;
-  background: #BFE5B0;
-  border: 4px solid #fff;
-  box-shadow: 0 4px 0 var(--drop);
-  cursor: pointer;
-}
-
-.side {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.rb {
-  pointer-events: auto;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 0;
-  background: #fff;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  box-shadow: 0 4px 0 var(--drop);
-  color: var(--ink);
-  position: relative;
-}
-
-.rb:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--drop);
-}
-
-.rb .dot {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--coral);
-  border: 2px solid #fff;
-}
-
-.hud-bot {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-}
-
-.guide {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 44px;
-  padding: 0 16px 0 6px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: #fff;
-  font-weight: 800;
-  font-size: 13.5px;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, .25);
-  max-width: 100%;
-  cursor: pointer;
-  border: 0;
-}
-
-.guide .arr {
-  flex: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--sun);
-  color: #3D2A00;
-  display: grid;
-  place-items: center;
-  transition: transform .15s linear;
-}
-
-.guide span:last-child {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.act {
-  pointer-events: auto;
-  width: min(400px, 100%);
-  padding: 12px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  animation: pop .28s cubic-bezier(.2, 1.4, .4, 1);
-}
-
-.act-txt {
-  flex: 1;
-  min-width: 0;
-}
-
-.act-txt b {
-  display: block;
-  font-family: var(--f-display);
-  font-size: 18px;
-  line-height: 1.1;
-}
-
-.act-txt span {
-  font-size: 12.5px;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.act .btn {
-  min-height: 42px;
-  padding: 0 16px;
-  font-size: 15px;
-}
-
-@keyframes pop {
-  from { transform: translateY(18px) scale(.9); opacity: 0; }
-}
-
-.keys {
-  position: absolute;
-  left: max(16px, env(safe-area-inset-left, 0px));
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  margin: 0;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--ink);
-  background: rgba(255, 255, 255, .82);
-  padding: 6px 10px;
-  border-radius: 10px;
-  max-width: 260px;
-  line-height: 1.4;
-}
-
-.keys b {
-  font-family: var(--f-display);
-}
-
-@media (pointer: coarse) {
-  .keys { display: none; }
-}
-
-@media (max-width: 520px) {
-  .logo h1 { font-size: 32px; }
-  #mini { width: 96px; height: 96px; }
-  .pill { height: 36px; font-size: 16px; padding: 0 11px 0 6px; }
-  .pill .ic { width: 24px; height: 24px; }
-  .rb { width: 40px; height: 40px; }
-  .me .ava, .me .ava svg { width: 40px; height: 40px; }
-  #start {
-    align-items: flex-end;
-    background: linear-gradient(0deg, rgba(255, 251, 239, .94) 0, rgba(255, 251, 239, .75) 55%, rgba(255, 251, 239, 0) 90%);
-  }
-  .st-wrap { margin-left: 0; }
-  .tag { font-size: 14px; }
-}
-
-/* ---------- bảng (modal) ---------- */
-#modal {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 16px;
-  z-index: 30;
-}
-
-.scrim {
-  position: absolute;
-  inset: 0;
-  background: rgba(20, 48, 32, .42);
-}
-
-.sheet {
-  position: relative;
-  width: min(460px, 100%);
-  max-height: 100%;
-  overflow: auto;
-  padding: 0;
-  animation: pop .3s cubic-bezier(.2, 1.3, .4, 1);
-}
-
-@media (max-width: 520px) {
-  #modal {
-    align-items: flex-end;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  }
-}
-
-.sh-head {
-  position: relative;
-  padding: 16px 18px 14px;
-  color: #fff;
-  background: var(--c, var(--grass));
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  border-radius: 20px 20px 0 0;
-  overflow: hidden;
-}
-
-.sh-head::after {
-  content: "";
-  position: absolute;
-  right: -30px;
-  top: -40px;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, .14);
-}
-
-.sh-head h2 {
-  margin: 0;
-  font-family: var(--f-display);
-  font-size: 22px;
-  line-height: 1.08;
-  text-wrap: balance;
-}
-
-.sh-head p {
-  margin: 2px 0 0;
-  font-size: 13px;
-  font-weight: 800;
-  opacity: .92;
-}
-
-.sh-x {
-  position: absolute;
-  right: 10px;
-  top: 10px;
-  z-index: 1;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 0;
-  background: rgba(255, 255, 255, .22);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
-
-.sh-body {
-  padding: 15px 18px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.know {
-  background: var(--cream);
-  border-radius: 14px;
-  padding: 11px 14px;
-  font-size: 13.5px;
-}
-
-.know b {
-  display: block;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--sun-d);
-  margin-bottom: 2px;
-}
-
-.q {
-  margin: 0;
-  font-family: var(--f-display);
-  font-size: 18px;
-  line-height: 1.2;
-  text-wrap: balance;
-}
-
-.opts {
-  display: grid;
-  gap: 8px;
-}
-
-.opt {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-align: left;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 2px solid var(--line);
-  background: #fff;
-  font-weight: 800;
-  font-size: 14px;
-  cursor: pointer;
-  box-shadow: 0 3px 0 var(--line);
-}
-
-.opt i {
-  flex: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  background: var(--leaf-l);
-  color: var(--grass-d);
-  display: grid;
-  place-items: center;
-  font-style: normal;
-  font-family: var(--f-display);
-}
-
-.opt:hover:not(:disabled) {
-  border-color: var(--grass);
-}
-
-.opt.ok {
-  border-color: var(--grass);
-  background: #E8F8E3;
-}
-
-.opt.ok i {
-  background: var(--grass);
-  color: #fff;
-}
-
-.opt.no {
-  border-color: var(--coral);
-  background: #FFECE8;
-  animation: shake .35s;
-}
-
-.opt.no i {
-  background: var(--coral);
-  color: #fff;
-}
-
-.opt:disabled {
-  cursor: default;
-}
-
-@keyframes shake {
-  25% { transform: translateX(-5px); }
-  75% { transform: translateX(5px); }
-}
-
-.explain {
-  margin: 0;
-  font-size: 13.5px;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.reveal {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 6px;
-  padding: 4px 0;
-}
-
-.reveal .sticker {
-  animation: spinIn .7s cubic-bezier(.2, 1.4, .4, 1);
-}
-
-.reveal h3 {
-  margin: 4px 0 0;
-  font-family: var(--f-display);
-  font-size: 21px;
-  line-height: 1.1;
-}
-
-.reveal .plus {
-  font-family: var(--f-display);
-  font-weight: 800;
-  font-size: 26px;
-  color: var(--sun-d);
-}
-
-@keyframes spinIn {
-  from { transform: rotate(-200deg) scale(.2); }
-}
-
-.sticker {
-  flex: none;
-  border-radius: 50%;
-  background: var(--c);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  border: 4px solid #fff;
-  box-shadow: 0 4px 0 var(--drop);
-}
-
-.sticker.off {
-  background: #DDE5D6;
-  color: #A5B49C;
-}
-
-/* đá bóng */
-.pitch {
-  position: relative;
-  height: 150px;
-  border-radius: 16px;
-  overflow: hidden;
-  background: repeating-linear-gradient(90deg, #4FAE5E 0 28px, #5DBE6A 28px 56px);
-}
-
-.pitch .goal {
-  position: absolute;
-  left: 50%;
-  top: 10px;
-  width: 150px;
-  height: 46px;
-  margin-left: -75px;
-  border: 5px solid #fff;
-  border-bottom: 0;
-  border-radius: 6px 6px 0 0;
-  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .35) 0 2px, transparent 2px 9px),
-              repeating-linear-gradient(-45deg, rgba(255, 255, 255, .35) 0 2px, transparent 2px 9px);
-}
-
-.pitch .keeper {
-  position: absolute;
-  left: 50%;
-  top: 26px;
-  width: 26px;
-  height: 30px;
-  margin-left: -13px;
-  border-radius: 10px 10px 6px 6px;
-  background: var(--coral);
-  transition: transform .25s;
-}
-
-.ball {
-  position: absolute;
-  left: 50%;
-  bottom: 16px;
-  width: 30px;
-  height: 30px;
-  margin-left: -15px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%, #1E3528 0 22%, #fff 24%);
-  box-shadow: 0 3px 0 rgba(0, 0, 0, .2);
-  transition: transform .45s cubic-bezier(.3, .8, .4, 1);
-}
-
-.ball.goal {
-  transform: translate(var(--bx, 0px), -96px) scale(.6);
-}
-
-.ball.miss {
-  transform: translate(var(--bx, 90px), -120px) scale(.55);
-}
-
-.pbar {
-  position: relative;
-  height: 30px;
-  border-radius: 15px;
-  background: #F1D9CF;
-  overflow: hidden;
-  border: 3px solid #fff;
-  box-shadow: 0 3px 0 var(--line);
-}
-
-.pbar .zone {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background: var(--grass);
-}
-
-.pbar .needle {
-  position: absolute;
-  top: -2px;
-  bottom: -2px;
-  width: 6px;
-  margin-left: -3px;
-  border-radius: 3px;
-  background: var(--ink);
-}
-
-.kdots {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-}
-
-.kdots i {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--line);
-}
-
-.kdots i.h {
-  background: var(--grass);
-}
-
-.kdots i.m {
-  background: var(--coral);
-}
-
-.kmsg {
-  margin: 0;
-  text-align: center;
-  font-weight: 800;
-}
-
-/* ảnh polaroid */
-.polar {
-  background: #fff;
-  padding: 10px 10px 14px;
-  border-radius: 6px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
-  transform: rotate(-2.5deg);
-  align-self: center;
-  width: min(300px, 100%);
-}
-
-.polar img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-  border-radius: 3px;
-}
-
-.polar p {
-  margin: 8px 0 0;
-  font-family: var(--f-display);
-  font-weight: 700;
-  font-size: 15px;
-  text-align: center;
-  line-height: 1.2;
-}
-
-.polar small {
-  display: block;
-  font-family: var(--f-body);
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-/* danh sách */
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.qitem {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: var(--cream);
-}
-
-.qitem b {
-  font-size: 14.5px;
-}
-
-.qbar {
-  height: 7px;
-  border-radius: 5px;
-  background: var(--line);
-  overflow: hidden;
-  margin-top: 5px;
-}
-
-.qbar i {
-  display: block;
-  height: 100%;
-  background: var(--grass);
-}
-
-.qrew {
-  font-family: var(--f-display);
-  font-weight: 800;
-  color: var(--sun-d);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.qitem.done {
-  background: #E8F8E3;
-}
-
-.qitem.done .qrew {
-  color: var(--grass-d);
-}
-
-.album {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px 6px;
-}
-
-@media (max-width: 480px) {
-  .album {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-.album div {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  text-align: center;
-  font-size: 11.5px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.album small {
-  display: block;
-  font-weight: 700;
-  color: var(--muted);
-  font-size: 10.5px;
-}
-
-.rank {
-  display: grid;
-  grid-template-columns: 34px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border-radius: 12px;
-  background: var(--cream);
-  font-weight: 800;
-}
-
-.rank .n {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: #fff;
-  font-family: var(--f-display);
-}
-
-.rank:nth-child(1) .n { background: var(--sun); }
-.rank:nth-child(2) .n { background: #DDE3E8; }
-.rank:nth-child(3) .n { background: #F2C7A1; }
-
-.rank.you {
-  background: #E1F4FD;
-  outline: 2px solid var(--tdc);
-}
-
-.rank > span:last-child {
-  font-family: var(--f-display);
-  font-variant-numeric: tabular-nums;
-}
-
-.note {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.help h3 {
-  margin: 0 0 4px;
-  font-family: var(--f-display);
-  font-size: 16.5px;
-}
-
-.help p, .help ul {
-  margin: 0;
-  font-size: 13.5px;
-}
-
-.help ul {
-  padding-left: 18px;
-  display: grid;
-  gap: 4px;
-}
-
-.help kbd {
-  font-family: var(--f-display);
-  font-weight: 800;
-  background: var(--cream);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0 6px;
-}
-
-/* chứng nhận */
-.cert {
-  border: 3px dashed var(--sun);
-  border-radius: 18px;
-  padding: 16px 14px;
-  text-align: center;
-  background: var(--cream);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: center;
-}
-
-.cert small {
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--sun-d);
-}
-
-.cert h3 {
-  margin: 0;
-  font-family: var(--f-display);
-  font-size: 28px;
-  line-height: 1.05;
-}
-
-.cert .row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px;
-  margin-top: 4px;
-}
-
-.btns {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.btns > * {
-  flex: 1 1 130px;
-}
-
-a.btn {
-  text-decoration: none;
-}
-
-/* ---------- khung chụp ảnh ---------- */
-#viewfinder {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 25;
-}
-
-#viewfinder .fr {
-  position: absolute;
-  inset: 12% 8% 22%;
-  border-radius: 20px;
-  box-shadow: 0 0 0 2000px rgba(20, 48, 32, .28);
-}
-
-#viewfinder .fr::before, #viewfinder .fr::after {
-  content: "";
-  position: absolute;
-  inset: -4px;
-  border: 5px solid #fff;
-  border-radius: 22px;
-  -webkit-mask: linear-gradient(#000 0 0) top left/34px 34px no-repeat,
-                linear-gradient(#000 0 0) top right/34px 34px no-repeat,
-                linear-gradient(#000 0 0) bottom left/34px 34px no-repeat,
-                linear-gradient(#000 0 0) bottom right/34px 34px no-repeat;
-  mask: linear-gradient(#000 0 0) top left/34px 34px no-repeat,
-        linear-gradient(#000 0 0) top right/34px 34px no-repeat,
-        linear-gradient(#000 0 0) bottom left/34px 34px no-repeat,
-        linear-gradient(#000 0 0) bottom right/34px 34px no-repeat;
-}
-
-#viewfinder .cap {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(12% - 44px);
-  text-align: center;
-  font-family: var(--f-display);
-  font-weight: 800;
-  font-size: 20px;
-  color: #fff;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, .25);
-}
-
-#viewfinder .vf-btns {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(6% + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 22px;
-  pointer-events: auto;
-}
-
-.shutter {
-  width: 76px;
-  height: 76px;
-  border-radius: 50%;
-  border: 6px solid #fff;
-  background: var(--coral);
-  cursor: pointer;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, .2);
-}
-
-.shutter:active {
-  transform: scale(.94);
-}
-
-.vf-small {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  border: 0;
-  background: #fff;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  color: var(--ink);
-}
-
-#flash {
-  position: absolute;
-  inset: 0;
-  background: #fff;
-  pointer-events: none;
-  animation: flash .5s forwards;
-  z-index: 40;
-}
-
-@keyframes flash {
-  to { opacity: 0; }
-}
-
-/* ---------- chữ nổi, thông báo ---------- */
-#fx {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.fxt {
-  position: absolute;
-  left: 0;
-  top: 0;
-  font-family: var(--f-display);
-  font-weight: 800;
-  font-size: 22px;
-  color: var(--sun);
-  -webkit-text-stroke: 5px #fff;
-  paint-order: stroke fill;
-  white-space: nowrap;
-  will-change: transform;
-}
-
-#toasts {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(76px + env(safe-area-inset-top, 0px));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  pointer-events: none;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  z-index: 45;
-}
-
-.toast {
-  background: var(--ink);
-  color: #fff;
-  font-weight: 800;
-  font-size: 14px;
-  padding: 9px 16px;
-  border-radius: 999px;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, .2);
-  animation: pop .3s cubic-bezier(.2, 1.4, .4, 1);
-  max-width: 100%;
-  text-align: center;
-}
-
-.toast.gold {
-  background: var(--sun);
-  color: #3D2A00;
-}
-</file>
-
 <file path="src/main.tsx">
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -6266,74 +3338,15 @@ service cloud.firestore {
 }
 </file>
 
-<file path="index.html">
-<!doctype html>
-<html lang="vi">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>TDC Travel · Khám phá Khuôn viên 3D Trường Cao đẳng Công nghệ Thủ Đức</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@500;700;800;900&display=swap"
-    />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
-</file>
-
-<file path="package.json">
-{
-  "name": "tdc-travel",
-  "private": true,
-  "version": "1.0.0",
-  "description": "TDC Travel - Web Game 3D Khám phá Khuôn viên Trường Cao đẳng Công nghệ Thủ Đức",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "firebase": "^11.3.1",
-    "html5-qrcode": "^2.3.8",
-    "lucide-react": "^0.475.0",
-    "qrcode": "^1.5.4",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "three": "^0.173.0"
-  },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.0.6",
-    "@types/node": "^22.13.4",
-    "@types/qrcode": "^1.5.5",
-    "@types/react": "^19.0.8",
-    "@types/react-dom": "^19.0.3",
-    "@types/three": "^0.173.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "tailwindcss": "^4.0.6",
-    "typescript": "~5.7.2",
-    "vite": "^6.1.0",
-    "vitest": "^3.0.5"
-  }
-}
-</file>
-
 <file path="README.md">
-# TDC GO · Web Game 3D Khám phá Khuôn viên Trường Cao đẳng Công nghệ Thủ Đức
+# TDC Travel · Web Game 3D Khám phá Khuôn viên Trường Cao đẳng Công nghệ Thủ Đức
 
-Dự án triển khai từ Đề tài Nghiên cứu Khoa học Cấp Cơ sở năm học 2026–2027: **"Phát triển web game “TDC GO” khám phá khuôn viên Trường Cao đẳng Công nghệ Thủ Đức"**, kế thừa và mở rộng mô hình bản đồ 3D khuôn viên TDC từ [hoanghnguyen9109/tdc-go](https://github.com/hoanghnguyen9109/tdc-go).
+Dự án triển khai từ Đề tài Nghiên cứu Khoa học Cấp Cơ sở năm học 2026–2027: **"Phát triển web game “TDC Travel” khám phá khuôn viên Trường Cao đẳng Công nghệ Thủ Đức"**, kế thừa mô hình kiến trúc bản đồ 3D khuôn viên TDC và tích hợp hệ thống Định vị GPS 3 Trục (`X, Y, Z`) độ chính xác cao kèm hiển thị Phân tầng Tòa nhà (`Hầm B1 → Tầng 11`).
 
 ## Kiến trúc Công nghệ
 - **Frontend**: React 19 + TypeScript + Vite + TailwindCSS v4
-- **3D WebGL Engine**: Three.js (Mô hình 3D Khu A, Khu B, Hội trường H, Tòa C, KTX, Xưởng Cơ khí, Tòa D 11 tầng, 6 sân bóng mini, sân tennis, sân bóng chuyền, Cổng 1 & 2, đoàn tàu TDC Express, nhân vật Chibi & NPC)
+- **3D WebGL Engine**: Three.js (Mô hình 3D Khu A1/A2, Khu B Tây/Đông, Hội trường H, Tòa C, KTX, Xưởng Cơ khí, Tòa D 11 tầng + Hầm B1, 6 sân bóng mini, sân tennis, sân bóng chuyền, Cổng 1 & 2, Cắt lớp mặt bằng tầng 3D `localClippingEnabled`)
+- **Định vị GPS 3 Trục (`X · Y · Z`)**: Quy đổi WGS84 (`Latitude, Longitude, Altitude ASL`) sang tọa độ mét 3D, lọc nhiễu `GpsKalmanFilter3D`, hiệu chuẩn áp kế `Chuẩn 0m` và nhận diện phân tầng tòa nhà tự động.
 - **O2O Camera & QR**: `html5-qrcode` (WebRTC Camera Scanner) + `qrcode` (In Standee QR chống gian lận)
 - **Backend & Cloud**: Firebase Authentication + Cloud Firestore Realtime + Firebase Hosting (tích hợp chế độ **Dual-Mode Local Fallback** giúp chạy thử ngay không cần khóa `.env`)
 
@@ -6403,73 +3416,514 @@ export default defineConfig({
 });
 </file>
 
-<file path="src/components/modals/HelpModal.tsx">
-import React from 'react';
-import { HelpCircle, X } from 'lucide-react';
+<file path="src/components/minigames/ItDebugGame.tsx">
+import React, { useEffect, useState } from 'react';
+import { audioSfx } from '../../engine/audioSfx';
 
-interface HelpModalProps {
+interface DebugQuestion {
+  id: number;
+  title: string;
+  snippet: string;
+  question: string;
+  options: string[];
+  correctIdx: number;
+  explanation: string;
+}
+
+const IT_CHALLENGES: DebugQuestion[] = [
+  {
+    id: 1,
+    title: 'Bug #1: Điều kiện Cổng Logic Đăng nhập Sinh viên',
+    snippet: `function canAccessLab(isTdcStudent, hasStudentCard) {\n  // Chỉ cho phép vào Lab khi ĐỒNG THỜI là SV TDC VÀ có thẻ SV\n  return isTdcStudent || hasStudentCard; // <-- Dòng nghi vấn\n}`,
+    question: 'Cần sửa toán tử ở dòng return như thế nào để đúng yêu cầu bảo mật?',
+    options: [
+      'Đổi toán tử OR (||) thành AND (&&)',
+      'Đổi thành !isTdcStudent || hasStudentCard',
+      'Đổi return thành console.log()',
+      'Xóa cả hai biến đầu vào',
+    ],
+    correctIdx: 0,
+    explanation: 'Toán tử && (AND) yêu cầu cả hai điều kiện cùng đúng (true).',
+  },
+  {
+    id: 2,
+    title: 'Bug #2: Vòng lặp Tính tổng Điểm Rèn luyện',
+    snippet: `const scores = [80, 90, 95];\nlet total = 0;\nfor (let i = 0; i <= scores.length; i++) {\n  total += scores[i];\n}`,
+    question: 'Vì sao kết quả biến `total` lại bị lỗi `NaN` ở vòng lặp cuối?',
+    options: [
+      'Điều kiện `i <= scores.length` vượt quá chỉ số mảng, cần sửa thành `i < scores.length`',
+      'Mảng trong JavaScript bắt đầu từ chỉ số 1',
+      'Không được dùng `total +=` trong vòng lặp `for`',
+      'Biến `total` phải khởi tạo bằng chuỗi rỗng `""`',
+    ],
+    correctIdx: 0,
+    explanation: 'Mảng 3 phần tử có chỉ số 0, 1, 2. Khi i = 3 thì scores[3] là undefined.',
+  },
+  {
+    id: 3,
+    title: 'Bug #3: Truy vấn API Bản đồ số TDC Travel',
+    snippet: `async function fetchStationData(stationId) {\n  const res = fetch('/api/stations/' + stationId);\n  return res.json(); // Lỗi: res.json is not a function\n}`,
+    question: 'Thiếu từ khóa nào trước hàm bất đồng bộ `fetch(...)`?',
+    options: [
+      'Thiếu từ khóa `await` trước `fetch(...)`',
+      'Thiếu từ khóa `class` trước `fetch(...)`',
+      'Thiếu từ khóa `delete` trước `res.json()`',
+      'Hàm `async` không được phép có `return`',
+    ],
+    correctIdx: 0,
+    explanation: '`fetch()` trả về một Promise nên cần `await fetch(...)` để nhận đối tượng Response.',
+  },
+];
+
+interface ItDebugGameProps {
+  maxPoints: number;
+  onComplete: (earnedPoints: number, summaryHtml: string) => void;
+}
+
+export const ItDebugGame: React.FC<ItDebugGameProps> = ({ maxPoints, onComplete }) => {
+  const [step, setStep] = useState(0);
+  const [fixedCount, setFixedCount] = useState(0);
+  const [picked, setPicked] = useState<number | null>(null);
+  const [timeLeft, setTimeLeft] = useState(45);
+
+  const current = IT_CHALLENGES[step];
+
+  useEffect(() => {
+    if (picked !== null) return;
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [picked, step]);
+
+  const handlePick = (idx: number) => {
+    if (picked !== null) return;
+    setPicked(idx);
+    const ok = idx === current.correctIdx;
+    if (ok) {
+      setFixedCount((c) => c + 1);
+      audioSfx.play('ok');
+    } else {
+      audioSfx.play('bad');
+    }
+  };
+
+  const handleNext = () => {
+    if (step + 1 < IT_CHALLENGES.length) {
+      setStep(step + 1);
+      setPicked(null);
+    } else {
+      const ratio = fixedCount / IT_CHALLENGES.length;
+      const earned = Math.max(40, Math.round(maxPoints * (0.35 + 0.65 * ratio)));
+      onComplete(
+        earned,
+        `<p class="kmsg">Đã vá thành công ${fixedCount}/${IT_CHALLENGES.length} lỗi hệ thống Khoa CNTT!</p>`
+      );
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between bg-[#1E293B] text-emerald-400 px-3.5 py-2 rounded-xl text-xs font-mono font-bold">
+        <span>TDC-IT-LAB://debug_terminal ({step + 1}/3)</span>
+        <span className={timeLeft < 10 ? 'text-rose-400 animate-pulse' : 'text-amber-300'}>
+          ⏱ {timeLeft}s · Đã fix: {fixedCount}/3
+        </span>
+      </div>
+
+      <div className="bg-[#0F172A] text-sky-200 p-3.5 rounded-xl font-mono text-xs overflow-x-auto border-2 border-slate-700 leading-relaxed">
+        <div className="text-amber-400 font-bold mb-1.5">// {current.title}</div>
+        <pre className="m-0 whitespace-pre-wrap">{current.snippet}</pre>
+      </div>
+
+      <p className="q text-base">{current.question}</p>
+
+      <div className="opts">
+        {current.options.map((opt, idx) => {
+          const isCorrect = idx === current.correctIdx;
+          const isSelected = picked === idx;
+          let cls = 'opt';
+          if (picked !== null) {
+            if (isCorrect) cls += ' ok';
+            else if (isSelected) cls += ' no';
+          }
+          return (
+            <button
+              key={idx}
+              type="button"
+              disabled={picked !== null}
+              onClick={() => handlePick(idx)}
+              className={cls}
+            >
+              <i>{String.fromCharCode(65 + idx)}</i>
+              <span>{opt}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {picked !== null && (
+        <div className="flex flex-col gap-2.5 mt-1">
+          <p className="explain">
+            {picked === current.correctIdx ? '✅ Build Passed! ' : '⚠️ Syntax Warning! '}
+            {current.explanation}
+          </p>
+          <button type="button" className="btn big sun" onClick={handleNext}>
+            {step + 1 < IT_CHALLENGES.length ? 'Tiếp tục Vá lỗi tiếp theo →' : 'Hoàn tất Triển khai Code'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+</file>
+
+<file path="src/components/minigames/Viewfinder.tsx">
+import React from 'react';
+import { RotateCw, X } from 'lucide-react';
+import { Station } from '../../types/game';
+
+interface ViewfinderProps {
+  station: Station | null;
+  onRotate: () => void;
+  onCapture: () => void;
+  onCancel: () => void;
+}
+
+export const Viewfinder: React.FC<ViewfinderProps> = ({
+  station,
+  onRotate,
+  onCapture,
+  onCancel,
+}) => {
+  if (!station) return null;
+
+  return (
+    <div id="viewfinder">
+      <div className="fr" />
+      <div className="cap">{station.name} · TDC Travel 3D Polaroid</div>
+      <div className="vf-btns">
+        <button
+          type="button"
+          className="vf-small"
+          onClick={onRotate}
+          title="Xoay góc chụp"
+          aria-label="Xoay góc chụp"
+        >
+          <RotateCw className="w-5 h-5" />
+        </button>
+        <button
+          type="button"
+          className="shutter"
+          onClick={onCapture}
+          title="Chụp ảnh"
+          aria-label="Chụp ảnh"
+        />
+        <button
+          type="button"
+          className="vf-small"
+          onClick={onCancel}
+          title="Hủy chụp"
+          aria-label="Hủy chụp"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+    </div>
+  );
+};
+</file>
+
+<file path="src/components/modals/CertificateModal.tsx">
+import React from 'react';
+import { Compass, ExternalLink, Printer, X } from 'lucide-react';
+import { getFacultyById } from '../../data/faculties';
+import { Station, UserProfile } from '../../types/game';
+import { StationSticker } from '../StationSticker';
+
+interface CertificateModalProps {
+  profile: UserProfile;
+  stations: Station[];
   onClose: () => void;
 }
 
-export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
+export const CertificateModal: React.FC<CertificateModalProps> = ({
+  profile,
+  stations,
+  onClose,
+}) => {
+  const fac = getFacultyById(profile.facultyId);
+  const today = new Date().toLocaleDateString('vi-VN');
+
   return (
     <div id="modal">
       <div className="scrim" onClick={onClose} />
       <div className="sheet card" role="dialog" aria-modal="true">
-        <div className="sh-head" style={{ '--c': '#00AEEF' } as React.CSSProperties}>
+        <div className="sh-head" style={{ '--c': '#FFAA1F' } as React.CSSProperties}>
           <span
             className="sticker"
-            style={{ '--c': '#fff', color: '#00AEEF', width: 56, height: 56 } as React.CSSProperties}
+            style={{ '--c': '#fff', color: '#FFAA1F', width: 56, height: 56 } as React.CSSProperties}
           >
-            <HelpCircle className="w-7 h-7" />
+            <Compass className="w-7 h-7" />
           </span>
           <div>
-            <h2>Hướng Dẫn Khám Phá TDC Travel</h2>
-            <p>Web Game 3D Tương tác Thực tế (O2O Gamification)</p>
+            <h2>Chinh Phục 100% Khuôn Viên!</h2>
+            <p>Chứng nhận Nhà Thám Hiểm TDC Travel 2026–2027</p>
           </div>
           <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="sh-body help">
-          <div>
-            <h3>1. Bản đồ 3D Khuôn viên TDC & Định vị GPS 3 Trục (X · Y · Z)</h3>
-            <p>
-              Hệ thống sử dụng tín hiệu <b>GPS độ chính xác cao (High-Accuracy WGS84 + Altitude)</b> kết hợp bộ lọc <b>Kalman 3D</b> để định vị vị trí thực tế của bạn trong khuôn viên Trường Cao đẳng Công nghệ Thủ Đức (53 Võ Văn Ngân) theo cả 3 trục:
+        <div className="sh-body">
+          <div className="cert">
+            <small>GIẤY CHỨNG NHẬN ĐIỆN TỬ · TDC TRAVEL</small>
+            <h3>{profile.name}</h3>
+            <div className="text-xs font-extrabold text-slate-600">
+              MSSV: {profile.mssv} · {fac.name}
+            </div>
+            <p style={{ margin: '4px 0 0', fontWeight: 800, fontSize: 13.5 }}>
+              Đã hoàn thành xuất sắc 100% hành trình mở khóa sương mù và khám phá thực địa khuôn viên Trường Cao đẳng Công nghệ Thủ Đức (TDC)
             </p>
-            <ul>
-              <li>
-                <b>Trục X (Đông – Tây) & Trục Z (Nam – Bắc):</b> Xác định vị trí của bạn trên mặt bằng khuôn viên và tự động nhận diện tòa nhà bạn đang đứng (Khu A, Khu B, Hội trường H, Tòa C, Tòa D, KTX, Xưởng Cơ khí).
-              </li>
-              <li>
-                <b>Trục Cao độ Y / Phân tầng (Floor Level):</b> Tính toán độ cao so với mặt sân trường (1 tầng = 4.2m) để hiển thị chính xác tầng bạn đang khám phá từ <b>Tầng Hầm B1 (-4.2m)</b> lên tới <b>Tầng 11 (+42.0m tại Tòa D)</b>.
-              </li>
-            </ul>
+            <span
+              className="plus"
+              style={{
+                fontFamily: 'var(--f-display)',
+                fontWeight: 800,
+                fontSize: 28,
+                color: 'var(--sun-d)',
+              }}
+            >
+              {profile.points.toLocaleString('vi-VN')} điểm
+            </span>
+            <div className="row">
+              {stations
+                .filter((s) => s.active !== false)
+                .map((st) => (
+                  <StationSticker key={st.id} col={st.col} type={st.type} size={32} />
+                ))}
+            </div>
+            <p className="note">Cấp ngày {today} · Ban Tổ chức Sự kiện TDC Travel</p>
           </div>
+
+          <p className="note text-center">
+            Xuất trình chứng nhận này tại Quầy Đoàn Thanh niên – Hội Sinh viên hoặc Phòng Tư vấn Tuyển sinh để nhận phần quà lưu niệm TDC!
+          </p>
+
+          <div className="btns">
+            <button
+              type="button"
+              className="btn sun"
+              onClick={() => window.print()}
+            >
+              <Printer className="w-4 h-4" /> In / Lưu PDF
+            </button>
+            <a
+              className="btn blue"
+              href="https://tdc.edu.vn"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ExternalLink className="w-4 h-4" /> Trang chủ TDC
+            </a>
+            <button type="button" className="btn ghost" onClick={onClose}>
+              Tiếp tục Dạo trường
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+</file>
+
+<file path="src/components/modals/LeaderboardModal.tsx">
+import React, { useEffect, useState } from 'react';
+import { Award, Building2, Trophy, Users, X } from 'lucide-react';
+import { FACULTIES, getFacultyById } from '../../data/faculties';
+import { fetchLeaderboardData } from '../../services/gameService';
+import { PartyRoom, PublicLeaderboardUser, UserProfile } from '../../types/game';
+
+interface LeaderboardModalProps {
+  profile: UserProfile;
+  totalStations: number;
+  onClose: () => void;
+}
+
+export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
+  profile,
+  totalStations,
+  onClose,
+}) => {
+  const [tab, setTab] = useState<'individual' | 'party' | 'faculty'>('individual');
+  const [individuals, setIndividuals] = useState<PublicLeaderboardUser[]>([]);
+  const [parties, setParties] = useState<PartyRoom[]>([]);
+
+  useEffect(() => {
+    void fetchLeaderboardData(profile).then((res) => {
+      setIndividuals(res.individuals);
+      setParties(res.parties);
+    });
+  }, [profile]);
+
+  const facultyRanking = FACULTIES.map((f) => {
+    const members = individuals.filter((u) => u.facultyId === f.id);
+    const totalPoints = members.reduce((sum, u) => sum + u.points, 0);
+    return {
+      faculty: f,
+      studentCount: members.length,
+      totalPoints,
+    };
+  }).sort((a, b) => b.totalPoints - a.totalPoints);
+
+  return (
+    <div id="modal">
+      <div className="scrim" onClick={onClose} />
+      <div className="sheet card" role="dialog" aria-modal="true">
+        <div className="sh-head" style={{ '--c': '#FFAA1F' } as React.CSSProperties}>
+          <span
+            className="sticker"
+            style={{ '--c': '#fff', color: '#FFAA1F', width: 56, height: 56 } as React.CSSProperties}
+          >
+            <Trophy className="w-7 h-7" />
+          </span>
           <div>
-            <h3>2. Khám phá Phân tầng 3D & Chế độ Cắt lớp (3D Floor Cutaway)</h3>
-            <ul>
-              <li>
-                <b>Thanh Chọn Tầng 3D (B1 → T11):</b> Sử dụng thanh thang máy phân tầng ở cạnh trái màn hình hoặc nút <b>Chọn Tòa/Tầng</b> trên bảng GPS để chuyển nhanh giữa các tầng và xem danh sách Phòng ban / Khoa / Phòng Lab tại tầng đó.
-              </li>
-              <li>
-                <b>Cắt lớp Tầng 3D (Cutaway View):</b> Bấm nút <b>Cắt lớp Tầng 3D</b> trên bảng điều khiển GPS để ẩn các tầng phía trên và quan sát trực diện mặt sàn bên trong tầng bạn đang đứng.
-              </li>
-              <li>
-                <b>Chuẩn 0m (Tare Ground Altitude):</b> Khi đứng ở sân trường, bấm <b>Chuẩn 0m</b> để hiệu chuẩn áp kế / độ cao GPS của điện thoại về mốc chuẩn Tầng 1 (0.0m).
-              </li>
-            </ul>
+            <h2>Bảng Xếp Hạng TDC Travel</h2>
+            <p>Học kỳ I · Năm học 2026–2027</p>
           </div>
-          <div>
-            <h3>3. Check-in Thực địa (QR + Mật thư) & Tổ đội Liên khoa</h3>
-            <p>
-              Tại mỗi trạm, bạn có thể <b>Quét mã QR</b> qua Camera trình duyệt hoặc <b>Giải mật thư quan sát</b> để xóa tan sương mù (Fog of War) và nhận thêm điểm thưởng O2O. Hãy lập <b>Tổ đội 2–4 sinh viên khác Khoa</b> để kích hoạt <b>+20% điểm thưởng Liên khoa</b>!
-            </p>
-          </div>
-          <button type="button" className="btn big" onClick={onClose}>
-            Đã sẵn sàng Định vị & Khám phá!
+          <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
+            <X className="w-5 h-5" />
           </button>
+        </div>
+
+        <div className="sh-body">
+          {/* 3 Tabs */}
+          <div className="grid grid-cols-3 gap-1.5 bg-[#FFFBEF] p-1.5 rounded-2xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setTab('individual')}
+              className={`py-2 px-2 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1 cursor-pointer ${
+                tab === 'individual'
+                  ? 'bg-amber-400 text-amber-950 shadow-sm'
+                  : 'text-slate-600 hover:bg-white'
+              }`}
+            >
+              <Award className="w-3.5 h-3.5" /> Cá nhân
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('party')}
+              className={`py-2 px-2 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1 cursor-pointer ${
+                tab === 'party'
+                  ? 'bg-emerald-500 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-white'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" /> Tổ đội
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('faculty')}
+              className={`py-2 px-2 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1 cursor-pointer ${
+                tab === 'faculty'
+                  ? 'bg-sky-500 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-white'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" /> Theo Khoa
+            </button>
+          </div>
+
+          {tab === 'individual' && (
+            <div className="list max-h-[340px] overflow-y-auto pr-1">
+              {individuals.map((u, i) => {
+                const isYou = u.uid === profile.uid;
+                const fac = getFacultyById(u.facultyId);
+                return (
+                  <div key={u.uid} className={`rank ${isYou ? 'you' : ''}`}>
+                    <span className="n">{i + 1}</span>
+                    <div className="min-w-0">
+                      <div className="truncate font-extrabold text-sm">
+                        {u.name} {isYou ? '(Bạn)' : ''}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+                        <span
+                          className="px-1.5 py-0.2 rounded-md font-extrabold"
+                          style={{ backgroundColor: fac.badgeColor, color: fac.color }}
+                        >
+                          {fac.shortName}
+                        </span>
+                        <span>
+                          · {u.unlockedCount}/{totalStations} trạm
+                        </span>
+                      </div>
+                    </div>
+                    <span>{u.points.toLocaleString('vi-VN')} đ</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {tab === 'party' && (
+            <div className="list max-h-[340px] overflow-y-auto pr-1">
+              {parties.map((p, i) => {
+                const isYourParty = profile.partyId === p.code;
+                return (
+                  <div key={p.code} className={`rank ${isYourParty ? 'you' : ''}`}>
+                    <span className="n">{i + 1}</span>
+                    <div className="min-w-0">
+                      <div className="truncate font-extrabold text-sm">
+                        {p.name} {isYourParty ? '(Đội bạn)' : ''}
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-500 flex items-center gap-1.5">
+                        <span>Mã: {p.code}</span>
+                        <span>· {p.members.length}/4 SV</span>
+                        {p.isCrossFaculty && (
+                          <span className="text-emerald-700 font-extrabold">
+                            · Liên khoa +20%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span>{p.totalPoints.toLocaleString('vi-VN')} đ</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {tab === 'faculty' && (
+            <div className="list max-h-[340px] overflow-y-auto pr-1">
+              {facultyRanking.map((row, i) => {
+                const isMyFaculty = row.faculty.id === profile.facultyId;
+                return (
+                  <div key={row.faculty.id} className={`rank ${isMyFaculty ? 'you' : ''}`}>
+                    <span className="n">{i + 1}</span>
+                    <div className="min-w-0">
+                      <div className="truncate font-extrabold text-sm">
+                        {row.faculty.name}
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-500">
+                        {row.studentCount} nhà thám hiểm tham gia
+                      </div>
+                    </div>
+                    <span>{row.totalPoints.toLocaleString('vi-VN')} đ</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <p className="note text-center">
+            Điểm số tự động đồng bộ thời gian thực khi hoàn thành trạm & nhiệm vụ.
+          </p>
         </div>
       </div>
     </div>
@@ -7294,6 +4748,1085 @@ export const MiniMap: React.FC<MiniMapProps> = ({
       title="Bản đồ nhỏ khuôn viên TDC (Vùng sương mù sẽ sáng lên khi giải đố)"
       aria-label="Bản đồ nhỏ"
     />
+  );
+};
+</file>
+
+<file path="src/components/QrScannerModal.tsx">
+import React, { useEffect, useRef, useState } from 'react';
+import { Html5Qrcode } from 'html5-qrcode';
+import { Camera, KeyRound, QrCode, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { Station } from '../types/game';
+
+interface QrScannerModalProps {
+  stations: Station[];
+  targetStation?: Station | null;
+  onClose: () => void;
+  onQrDetected: (rawCode: string) => void;
+}
+
+export const QrScannerModal: React.FC<QrScannerModalProps> = ({
+  stations,
+  targetStation,
+  onClose,
+  onQrDetected,
+}) => {
+  const [manualToken, setManualToken] = useState('');
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  const stopCamera = async () => {
+    if (scannerRef.current) {
+      try {
+        if (scannerRef.current.isScanning) {
+          await scannerRef.current.stop();
+        }
+        scannerRef.current.clear();
+      } catch {
+        // Ignore cleanup errors
+      }
+      scannerRef.current = null;
+    }
+    setCameraActive(false);
+  };
+
+  const startCamera = async () => {
+    setCameraError(null);
+    try {
+      const qr = new Html5Qrcode('tdc-qr-reader');
+      scannerRef.current = qr;
+      setCameraActive(true);
+      await qr.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        (decodedText) => {
+          void stopCamera();
+          onQrDetected(decodedText);
+        },
+        () => {
+          // frame scan ignore
+        }
+      );
+    } catch {
+      setCameraActive(false);
+      setCameraError(
+        'Thiết bị chưa cấp quyền Camera hoặc đang chạy trên máy tính không có Webcam. Bạn có thể nhập mã Token trạm hoặc bấm "Mô phỏng Quét QR" bên dưới!'
+      );
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      void stopCamera();
+    };
+  }, []);
+
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualToken.trim()) return;
+    onQrDetected(manualToken.trim());
+  };
+
+  return (
+    <div id="modal">
+      <div className="scrim" onClick={onClose} />
+      <div className="sheet card" role="dialog" aria-modal="true">
+        <div className="sh-head" style={{ '--c': '#00AEEF' } as React.CSSProperties}>
+          <span
+            className="sticker"
+            style={{ '--c': '#fff', color: '#00AEEF', width: 54, height: 54 } as React.CSSProperties}
+          >
+            <QrCode className="w-7 h-7" />
+          </span>
+          <div>
+            <h2>Quét Mã QR Thực Địa</h2>
+            <p>
+              {targetStation
+                ? `Xác thực O2O tại: ${targetStation.name}`
+                : 'Hệ thống Check-in WebRTC Camera TDC Travel'}
+            </p>
+          </div>
+          <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="sh-body">
+          <div className="know">
+            <b>Cơ chế Xác thực Kép (O2O Verification)</b>
+            Hướng camera điện thoại vào bảng mã QR đặt tại trạm thực tế trong khuôn viên TDC để mở khóa sương mù và nhận thêm <b>+15 điểm thưởng thực địa</b>.
+          </div>
+
+          <div className="rounded-2xl overflow-hidden bg-slate-900 border-2 border-sky-400 min-h-[210px] flex flex-col items-center justify-center relative p-3">
+            <div id="tdc-qr-reader" className="w-full max-w-[280px]" />
+            {!cameraActive && (
+              <div className="flex flex-col items-center text-center gap-2.5 py-4 text-white">
+                <Camera className="w-10 h-10 text-sky-400" />
+                <p className="text-xs text-slate-300 max-w-xs m-0">
+                  Sử dụng Camera trình duyệt (WebRTC) để quét trực tiếp không cần cài App
+                </p>
+                <button type="button" className="btn blue" onClick={startCamera}>
+                  <Camera className="w-4 h-4" /> Bật Camera Quét QR
+                </button>
+              </div>
+            )}
+          </div>
+
+          {cameraError && (
+            <div className="bg-amber-50 border border-amber-300 text-amber-900 p-3 rounded-xl text-xs font-bold">
+              ℹ️ {cameraError}
+            </div>
+          )}
+
+          <form onSubmit={handleManualSubmit} className="flex flex-col gap-2">
+            <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <KeyRound className="w-3.5 h-3.5" /> Hoặc nhập Mã định danh in dưới bảng QR:
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={manualToken}
+                onChange={(e) => setManualToken(e.target.value)}
+                placeholder={
+                  targetStation
+                    ? `Ví dụ: ${targetStation.qrSecretToken}`
+                    : 'Nhập mã TDC-QR-...'
+                }
+                className="flex-1 px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-[#FFFBEF] font-extrabold text-sm"
+              />
+              <button type="submit" className="btn">
+                Xác nhận
+              </button>
+            </div>
+          </form>
+
+          <div className="border-t border-slate-200 pt-3 flex flex-col gap-2">
+            <span className="text-xs font-extrabold text-slate-500 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Chế độ Giả lập Quét QR (Dành cho Demo trên PC):
+            </span>
+            {targetStation ? (
+              <button
+                type="button"
+                className="btn sun w-full"
+                onClick={() => onQrDetected(targetStation.qrSecretToken)}
+              >
+                <ShieldCheck className="w-5 h-5" /> Mô phỏng Quét QR Trạm {targetStation.name}
+              </button>
+            ) : (
+              <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                {stations
+                  .filter((s) => s.active !== false)
+                  .map((st) => (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => onQrDetected(st.qrSecretToken)}
+                      className="text-left px-2.5 py-2 rounded-xl border border-slate-200 hover:border-sky-400 bg-slate-50 text-xs font-extrabold truncate cursor-pointer"
+                    >
+                      📲 {st.name}
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+</file>
+
+<file path="src/components/StartScreen.tsx">
+import React, { useState } from 'react';
+import { Compass, RotateCcw, Shield, Sparkles } from 'lucide-react';
+import { AVATARS, TDC_LOGO } from '../data/campusLayout';
+import { FACULTIES } from '../data/faculties';
+import { getAvatarSvg } from '../engine/chibiBuilder';
+import { isFirebaseConfigured } from '../services/firebase';
+import { FacultyId, UserProfile } from '../types/game';
+
+interface StartScreenProps {
+  existingProfile: UserProfile | null;
+  totalStations: number;
+  onStartGame: (params: {
+    name: string;
+    mssv: string;
+    email?: string;
+    password?: string;
+    facultyId: FacultyId;
+    avatar: number;
+    mode: 'demo' | 'email_login' | 'email_register' | 'google';
+  }) => Promise<void>;
+  onResetProgress: () => void;
+  onOpenAdmin: () => void;
+}
+
+export const StartScreen: React.FC<StartScreenProps> = ({
+  existingProfile,
+  totalStations,
+  onStartGame,
+  onResetProgress,
+  onOpenAdmin,
+}) => {
+  const [name, setName] = useState(existingProfile?.name || '');
+  const [mssv, setMssv] = useState(existingProfile?.mssv || '26211TT0102');
+  const [facultyId, setFacultyId] = useState<FacultyId>(
+    existingProfile?.facultyId || 'cntt'
+  );
+  const [avatar, setAvatar] = useState<number>(existingProfile?.avatar || 0);
+  const [authTab, setAuthTab] = useState<'quick' | 'cloud'>('quick');
+  const [email, setEmail] = useState(existingProfile?.email || '');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const unlockedCount = Object.keys(existingProfile?.done || {}).length;
+
+  const handleSubmit = async (
+    mode: 'demo' | 'email_login' | 'email_register' | 'google'
+  ) => {
+    setError(null);
+    setLoading(true);
+    try {
+      await onStartGame({
+        name: name.trim() || 'Minh Anh',
+        mssv: mssv.trim() || '26211TT0102',
+        email: email.trim() || undefined,
+        password: password || undefined,
+        facultyId,
+        avatar,
+        mode,
+      });
+    } catch (err) {
+      setError((err as Error).message || 'Đăng nhập thất bại.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div id="start">
+      <div className="st-wrap">
+        <div className="flex items-center justify-between">
+          <div className="logo">
+            <div className="seal">
+              <svg
+                viewBox="118 118 332 332"
+                role="img"
+                aria-label="Logo Trường Cao đẳng Công nghệ Thủ Đức"
+              >
+                <path fill="#00AEEF" d={TDC_LOGO} />
+              </svg>
+            </div>
+            <h1>
+              TDC<span>Travel</span>
+            </h1>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenAdmin}
+            className="px-3.5 py-2 rounded-2xl bg-white/95 border-2 border-slate-200 shadow-sm text-xs font-extrabold text-slate-700 hover:border-sky-400 flex items-center gap-1.5 cursor-pointer"
+            title="Mở Cổng Quản trị Hệ thống (Admin CMS)"
+          >
+            <Shield className="w-4 h-4 text-sky-600" /> Admin CMS
+          </button>
+        </div>
+
+        <p className="tag">
+          Khám phá bản đồ 3D khuôn viên Trường Cao đẳng Công nghệ Thủ Đức, mở khóa sương mù tại {totalStations} trạm thực địa, kết nối tổ đội liên khoa và sưu tầm huy hiệu!
+        </p>
+
+        <div className="st-card card">
+          {/* Auth Mode Switcher */}
+          <div className="grid grid-cols-2 gap-1.5 bg-[#FFFBEF] p-1 rounded-xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setAuthTab('quick')}
+              className={`py-1.5 rounded-lg text-xs font-extrabold cursor-pointer ${
+                authTab === 'quick'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-slate-600 hover:bg-white'
+              }`}
+            >
+              ⚡ Hồ sơ Sinh viên / Demo
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthTab('cloud')}
+              className={`py-1.5 rounded-lg text-xs font-extrabold cursor-pointer ${
+                authTab === 'cloud'
+                  ? 'bg-sky-600 text-white'
+                  : 'text-slate-600 hover:bg-white'
+              }`}
+            >
+              ☁️ Tài khoản Email TDC
+            </button>
+          </div>
+
+          {error && (
+            <div className="bg-rose-50 border border-rose-300 text-rose-800 px-3 py-2 rounded-xl text-xs font-extrabold">
+              ⚠️ {error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label htmlFor="inName">Họ tên Sinh viên</label>
+              <input
+                id="inName"
+                type="text"
+                maxLength={24}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ví dụ: Minh Anh"
+              />
+            </div>
+            <div>
+              <label htmlFor="inMssv">Mã số SV (MSSV)</label>
+              <input
+                id="inMssv"
+                type="text"
+                maxLength={14}
+                value={mssv}
+                onChange={(e) => setMssv(e.target.value.toUpperCase())}
+                placeholder="26211TT0102"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="inFaculty">Khoa / Ngành đào tạo tại TDC</label>
+            <select
+              id="inFaculty"
+              value={facultyId}
+              onChange={(e) => setFacultyId(e.target.value as FacultyId)}
+              className="w-full px-3.5 py-2.5 rounded-xl border-2 border-[#E2EBDA] bg-[#FFFBEF] font-extrabold text-sm text-[#1E3528]"
+            >
+              {FACULTIES.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name} ({f.shortName})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {authTab === 'cloud' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-sky-50/70 p-2.5 rounded-xl border border-sky-200">
+              <div>
+                <label htmlFor="inEmail">Email Sinh viên (@mail.tdc.edu.vn)</label>
+                <input
+                  id="inEmail"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="26211tt0102@mail.tdc.edu.vn"
+                  className="!text-xs !py-2"
+                />
+              </div>
+              <div>
+                <label htmlFor="inPass">Mật khẩu</label>
+                <input
+                  id="inPass"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="!text-xs !py-2"
+                />
+              </div>
+            </div>
+          )}
+
+          <span className="lbl">Chọn Nhân vật Chibi 3D</span>
+          <div className="avas">
+            {AVATARS.map((a, i) => (
+              <button
+                key={a.name}
+                type="button"
+                className={i === avatar ? 'on' : ''}
+                onClick={() => setAvatar(i)}
+                aria-pressed={i === avatar}
+              >
+                <div
+                  className="w-14 h-14"
+                  dangerouslySetInnerHTML={{ __html: getAvatarSvg(i) }}
+                />
+                {a.name}
+              </button>
+            ))}
+          </div>
+
+          {authTab === 'quick' ? (
+            <button
+              type="button"
+              disabled={loading}
+              className="btn big sun"
+              onClick={() => handleSubmit('demo')}
+            >
+              <Compass className="w-5 h-5" />
+              {existingProfile && existingProfile.points > 0
+                ? `Tiếp tục Hành trình · ${existingProfile.points.toLocaleString('vi-VN')} điểm (${unlockedCount}/${totalStations} trạm)`
+                : 'Bắt đầu Khám phá Khuôn viên 3D'}
+            </button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={loading}
+                  className="btn blue text-sm"
+                  onClick={() => handleSubmit('email_login')}
+                >
+                  Đăng nhập Email
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  className="btn sun text-sm"
+                  onClick={() => handleSubmit('email_register')}
+                >
+                  Đăng ký Mới
+                </button>
+              </div>
+              {isFirebaseConfigured && (
+                <button
+                  type="button"
+                  disabled={loading}
+                  className="btn ghost text-xs"
+                  onClick={() => handleSubmit('google')}
+                >
+                  Đăng nhập nhanh với Google (@mail.tdc.edu.vn)
+                </button>
+              )}
+            </div>
+          )}
+
+          {existingProfile && (existingProfile.points > 0 || unlockedCount > 0) && (
+            <div className="st-row">
+              <button
+                type="button"
+                className="btn ghost text-sm"
+                onClick={onResetProgress}
+              >
+                <RotateCcw className="w-4 h-4" /> Đặt lại tiến độ & Phủ lại sương mù từ đầu
+              </button>
+            </div>
+          )}
+
+          <p className="fine flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>
+              Đề tài NCKH 2026–2027: Tích hợp Bản đồ 3D + Sương mù (Fog of War), Quét QR thực địa O2O, Mini-game chuyên ngành các Khoa, Tổ đội Liên khoa & Admin CMS.
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+</file>
+
+<file path="src/components/StationModal.tsx">
+import React, { useMemo, useState } from 'react';
+import {
+  Camera,
+  CheckCircle2,
+  Compass,
+  Eye,
+  Flag,
+  HelpCircle,
+  Lightbulb,
+  QrCode,
+  ShieldAlert,
+  Sparkles,
+  Users,
+  X,
+} from 'lucide-react';
+import { TYPE_LABEL } from '../data/campusLayout';
+import { audioSfx } from '../engine/audioSfx';
+import {
+  checkAntiCheatCooldown,
+  verifyStationQrPayload,
+  verifyStationRiddle,
+} from '../services/gameService';
+import {
+  PartyRoom,
+  QuizItem,
+  Station,
+  UnlockedStationRecord,
+  UserProfile,
+  VerificationMethod,
+} from '../types/game';
+import { AutoEngineGame } from './minigames/AutoEngineGame';
+import { ElectricCircuitGame } from './minigames/ElectricCircuitGame';
+import { ItDebugGame } from './minigames/ItDebugGame';
+import { KickGame } from './minigames/KickGame';
+import { StationSticker } from './StationSticker';
+
+interface StationModalProps {
+  station: Station;
+  profile: UserProfile;
+  party: PartyRoom | null;
+  totalStations: number;
+  nextStationName?: string;
+  preverifiedMethod?: VerificationMethod | null;
+  onClose: () => void;
+  onOpenQrScanner: (st: Station) => void;
+  onRequestPhotoMode: (st: Station, method: VerificationMethod) => void;
+  onCompleteStation: (params: {
+    station: Station;
+    basePoints: number;
+    method: VerificationMethod;
+    isQuizOrGameSuccess: boolean;
+    summaryHtml?: string;
+  }) => Promise<{
+    finalPoints: number;
+    crossFacultyBonus: number;
+    qrBonus: number;
+  }>;
+  onShowCertificate: () => void;
+}
+
+export const StationModal: React.FC<StationModalProps> = ({
+  station,
+  profile,
+  party,
+  totalStations,
+  nextStationName,
+  preverifiedMethod,
+  onClose,
+  onOpenQrScanner,
+  onRequestPhotoMode,
+  onCompleteStation,
+  onShowCertificate,
+}) => {
+  const existingRecord: UnlockedStationRecord | undefined = profile.done?.[station.id];
+
+  // Step 1: O2O Field Verification ('qr' | 'riddle' | 'demo')
+  const [verifiedMethod, setVerifiedMethod] = useState<VerificationMethod | null>(
+    preverifiedMethod || (station.id === 'g1' ? 'demo' : null)
+  );
+  const [riddleInput, setRiddleInput] = useState('');
+  const [showRiddleHint, setShowRiddleHint] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [qrTokenInput, setQrTokenInput] = useState('');
+
+  // Step 2: Quiz state (if type === 'quiz')
+  const pickedQuiz: QuizItem | null = useMemo(() => {
+    if (!station.questions || station.questions.length === 0) return null;
+    const idx = Math.floor(Math.random() * station.questions.length);
+    return station.questions[idx];
+  }, [station]);
+
+  const shuffledOptionIndices = useMemo(() => {
+    if (!pickedQuiz) return [0, 1, 2, 3];
+    return pickedQuiz.opts.map((_, i) => i).sort(() => Math.random() - 0.5);
+  }, [pickedQuiz]);
+
+  const [selectedQuizAns, setSelectedQuizAns] = useState<number | null>(null);
+
+  // Step 3: Completion Reveal state
+  const [completionResult, setCompletionResult] = useState<{
+    finalPoints: number;
+    crossFacultyBonus: number;
+    qrBonus: number;
+    summaryHtml?: string;
+  } | null>(null);
+
+  const unlockedCount = Object.keys(profile.done || {}).length;
+
+  const handleRiddleVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cooldown = checkAntiCheatCooldown(profile, 'riddle');
+    if (!cooldown.allowed) {
+      setVerifyError(
+        `Chống gian lận (Anti-cheat): Bạn di chuyển giữa 2 trạm quá nhanh! Vui lòng đợi ${cooldown.waitSeconds} giây.`
+      );
+      audioSfx.play('bad');
+      return;
+    }
+
+    if (verifyStationRiddle(station, riddleInput)) {
+      audioSfx.play('ok');
+      setVerifyError(null);
+      setVerifiedMethod('riddle');
+    } else {
+      audioSfx.play('bad');
+      setVerifyError('Mật thư thực địa chưa chính xác. Hãy quan sát mô hình 3D hoặc bấm xem Gợi ý!');
+    }
+  };
+
+  const handleInlineQrTokenVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cooldown = checkAntiCheatCooldown(profile, 'qr');
+    if (!cooldown.allowed) {
+      setVerifyError(
+        `Chống gian lận: Vui lòng chờ ${cooldown.waitSeconds}s trước khi quét trạm tiếp theo.`
+      );
+      audioSfx.play('bad');
+      return;
+    }
+    const res = verifyStationQrPayload(station, qrTokenInput);
+    if (res.valid) {
+      audioSfx.play('ok');
+      setVerifyError(null);
+      setVerifiedMethod('qr');
+    } else {
+      audioSfx.play('bad');
+      setVerifyError(res.message);
+    }
+  };
+
+  const handleDemoBypass = () => {
+    audioSfx.play('tap');
+    setVerifyError(null);
+    setVerifiedMethod('demo');
+  };
+
+  const triggerComplete = async (
+    basePoints: number,
+    isQuizOrGameSuccess: boolean,
+    summaryHtml?: string
+  ) => {
+    const method = verifiedMethod || 'demo';
+    const res = await onCompleteStation({
+      station,
+      basePoints,
+      method,
+      isQuizOrGameSuccess,
+      summaryHtml,
+    });
+    setCompletionResult({
+      ...res,
+      summaryHtml,
+    });
+  };
+
+  const handleQuizOptionClick = (originalIdx: number) => {
+    if (selectedQuizAns !== null || !pickedQuiz) return;
+    setSelectedQuizAns(originalIdx);
+    const ok = originalIdx === pickedQuiz.ans;
+    audioSfx.play(ok ? 'ok' : 'bad');
+  };
+
+  // CASE A: Already unlocked previously (Review station info, fun facts & directions)
+  if (existingRecord && !completionResult) {
+    return (
+      <div id="modal">
+        <div className="scrim" onClick={onClose} />
+        <div className="sheet card" role="dialog" aria-modal="true">
+          <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
+            <StationSticker col={station.col} type={station.type} size={56} done />
+            <div>
+              <h2>{station.name}</h2>
+              <p>{station.sub}</p>
+            </div>
+            <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="sh-body">
+            <div className="know">
+              <b>Thông tin Khu vực</b>
+              {station.info}
+            </div>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs font-bold text-emerald-950 flex flex-col gap-1">
+              <span className="uppercase tracking-wider text-emerald-700 font-black">
+                🌟 Fun Fact Đã Mở Khóa:
+              </span>
+              <span>{station.funFact}</span>
+            </div>
+            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-xs font-bold text-sky-950 flex items-start gap-2">
+              <Compass className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+              <div>
+                <div className="uppercase tracking-wider text-sky-700 font-black">
+                  Chỉ dẫn Lộ trình Tiếp theo:
+                </div>
+                <div>{station.directions}</div>
+              </div>
+            </div>
+
+            {existingRecord.photoDataUrl && (
+              <div className="polar">
+                <img
+                  src={existingRecord.photoDataUrl}
+                  alt={`Ảnh check-in tại ${station.name}`}
+                />
+                <p>
+                  {profile.name} @ {station.name}
+                  <small>
+                    TDC Travel ·{' '}
+                    {new Date(existingRecord.unlockedAt).toLocaleDateString('vi-VN')}
+                  </small>
+                </p>
+              </div>
+            )}
+
+            <div className="reveal">
+              <StationSticker col={station.col} type={station.type} size={84} />
+              <h3>{station.badge}</h3>
+              <p className="note">
+                Đã mở khóa sương mù với <b>+{existingRecord.pts} điểm</b> (Phương thức:{' '}
+                {existingRecord.method.toUpperCase()}).
+              </p>
+            </div>
+            <button type="button" className="btn big" onClick={onClose}>
+              Tiếp tục Khám phá
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // CASE B: Just completed right now -> Celebration & Badge Reveal
+  if (completionResult) {
+    const allUnlocked = unlockedCount >= totalStations;
+    return (
+      <div id="modal">
+        <div className="scrim" onClick={onClose} />
+        <div className="sheet card" role="dialog" aria-modal="true">
+          <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
+            <StationSticker col={station.col} type={station.type} size={56} />
+            <div>
+              <h2>Sương mù Đã Tan!</h2>
+              <p>{station.name}</p>
+            </div>
+            <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="sh-body">
+            {completionResult.summaryHtml && (
+              <div
+                dangerouslySetInnerHTML={{ __html: completionResult.summaryHtml }}
+              />
+            )}
+
+            <div className="reveal">
+              <StationSticker col={station.col} type={station.type} size={104} />
+              <h3>{station.badge}</h3>
+              <span className="plus">+{completionResult.finalPoints} điểm</span>
+
+              <div className="flex flex-wrap gap-1.5 justify-center text-xs font-extrabold">
+                {completionResult.qrBonus > 0 && (
+                  <span className="bg-sky-100 text-sky-800 px-2.5 py-0.5 rounded-full">
+                    +{completionResult.qrBonus} Điểm Xác thực Thực địa ({verifiedMethod?.toUpperCase()})
+                  </span>
+                )}
+                {completionResult.crossFacultyBonus > 0 && (
+                  <span className="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5" /> +{completionResult.crossFacultyBonus} Thưởng Tổ đội Liên Khoa (+20%)
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs font-bold text-amber-950">
+              <div className="uppercase tracking-wider text-amber-700 font-black mb-0.5">
+                💡 Kiến thức Thú vị (Fun Fact):
+              </div>
+              {station.funFact}
+            </div>
+
+            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-xs font-bold text-sky-950">
+              <div className="uppercase tracking-wider text-sky-700 font-black mb-0.5">
+                🧭 Hướng dẫn Đường đi:
+              </div>
+              {station.directions}
+            </div>
+
+            <p className="note text-center">
+              Tiến độ mở khóa bản đồ: <b>{unlockedCount}/{totalStations}</b> trạm ·{' '}
+              {allUnlocked
+                ? 'Bạn đã mở khóa 100% khuôn viên TDC!'
+                : nextStationName
+                  ? `Gợi ý tiếp theo: ${nextStationName}`
+                  : ''}
+            </p>
+
+            <button
+              type="button"
+              className={`btn big ${allUnlocked ? 'sun' : ''}`}
+              onClick={() => {
+                onClose();
+                if (allUnlocked) {
+                  setTimeout(onShowCertificate, 250);
+                }
+              }}
+            >
+              {allUnlocked ? '🎓 Xem Chứng nhận Nhà Thám Hiểm TDC' : 'Tiếp tục Hành trình'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // CASE C: Step 1 - Real-world O2O Verification (QR Scan or On-site Observation Riddle)
+  if (!verifiedMethod) {
+    return (
+      <div id="modal">
+        <div className="scrim" onClick={onClose} />
+        <div className="sheet card" role="dialog" aria-modal="true">
+          <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
+            <StationSticker col={station.col} type={station.type} size={56} />
+            <div>
+              <h2>{station.name}</h2>
+              <p>Bước 1/2: Xác thực Hiện trường (O2O Check-in)</p>
+            </div>
+            <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="sh-body">
+            <div className="know">
+              <b>Giới thiệu Trạm</b>
+              {station.info}
+            </div>
+
+            {verifyError && (
+              <div className="bg-rose-50 border-2 border-rose-300 text-rose-800 p-3 rounded-xl text-xs font-extrabold flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+                <span>{verifyError}</span>
+              </div>
+            )}
+
+            {/* Option 1: Observation Riddle */}
+            {station.riddle && (
+              <form
+                onSubmit={handleRiddleVerify}
+                className="bg-amber-50/80 border-2 border-amber-200 rounded-2xl p-3.5 flex flex-col gap-2.5"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
+                    <Eye className="w-4 h-4" /> Cách 1: Giải Mật thư Quan sát Thực địa (+10đ)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowRiddleHint(!showRiddleHint)}
+                    className="text-xs font-extrabold text-sky-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Lightbulb className="w-3.5 h-3.5" /> Gợi ý
+                  </button>
+                </div>
+                <p className="m-0 font-extrabold text-sm text-slate-800">
+                  {station.riddle.prompt}
+                </p>
+                {showRiddleHint && (
+                  <p className="m-0 text-xs font-bold text-amber-900 bg-amber-100/80 px-2.5 py-1.5 rounded-lg">
+                    💡 Gợi ý: {station.riddle.hint} (Đáp án mẫu: <b>{station.riddle.answer}</b>)
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={riddleInput}
+                    onChange={(e) => setRiddleInput(e.target.value)}
+                    placeholder="Nhập câu trả lời quan sát được..."
+                    className="flex-1 px-3 py-2 rounded-xl border-2 border-amber-300 bg-white font-extrabold text-sm"
+                  />
+                  <button type="submit" className="btn sun">
+                    Giải mã
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Option 2: QR Code Camera / Token */}
+            <div className="bg-sky-50 border-2 border-sky-200 rounded-2xl p-3.5 flex flex-col gap-2.5">
+              <span className="text-xs font-black uppercase tracking-wider text-sky-800 flex items-center gap-1.5">
+                <QrCode className="w-4 h-4" /> Cách 2: Quét Mã QR Cố định tại Trạm (+15đ)
+              </span>
+              <button
+                type="button"
+                className="btn blue w-full"
+                onClick={() => onOpenQrScanner(station)}
+              >
+                <QrCode className="w-5 h-5" /> Mở Camera Quét Mã QR Trạm
+              </button>
+              <form onSubmit={handleInlineQrTokenVerify} className="flex gap-2">
+                <input
+                  type="text"
+                  value={qrTokenInput}
+                  onChange={(e) => setQrTokenInput(e.target.value)}
+                  placeholder={`Hoặc nhập mã QR (${station.qrSecretToken})`}
+                  className="flex-1 px-3 py-1.5 rounded-xl border border-sky-300 bg-white font-bold text-xs"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 rounded-xl bg-sky-600 text-white font-extrabold text-xs cursor-pointer"
+                >
+                  Nhập mã
+                </button>
+              </form>
+            </div>
+
+            {/* Option 3: 3D Walk-in Demo Mode */}
+            <button
+              type="button"
+              className="btn ghost w-full"
+              onClick={handleDemoBypass}
+            >
+              <Sparkles className="w-4 h-4" /> Bỏ qua Xác thực Thực địa (Chế độ Trải nghiệm 3D)
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // CASE D: Step 2 - Station Challenge / Faculty Mini-game
+  return (
+    <div id="modal">
+      <div className="scrim" onClick={onClose} />
+      <div className="sheet card" role="dialog" aria-modal="true">
+        <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
+          <StationSticker col={station.col} type={station.type} size={56} />
+          <div>
+            <h2>{station.name}</h2>
+            <p>
+              {TYPE_LABEL[station.type]} · Tối đa +{station.pts} điểm
+            </p>
+          </div>
+          <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="sh-body">
+          <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl text-xs font-extrabold text-emerald-900">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              Đã xác thực hiện trường ({verifiedMethod.toUpperCase()})
+            </span>
+            {party?.isCrossFaculty && (
+              <span className="text-emerald-700">⚡ Liên khoa +20%</span>
+            )}
+          </div>
+
+          {station.type === 'checkin' && (
+            <>
+              <div className="know">
+                <b>Bạn có biết?</b>
+                {station.info}
+              </div>
+              <button
+                type="button"
+                className="btn big sun"
+                onClick={() => triggerComplete(station.pts, true)}
+              >
+                <Flag className="w-5 h-5" /> Xác nhận Check-in & Mở khóa Sương mù · +{station.pts}
+              </button>
+            </>
+          )}
+
+          {station.type === 'photo' && (
+            <>
+              <div className="know">
+                <b>Góc Sống Ảo 3D</b>
+                {station.info}
+              </div>
+              <button
+                type="button"
+                className="btn big sun"
+                onClick={() => onRequestPhotoMode(station, verifiedMethod)}
+              >
+                <Camera className="w-5 h-5" /> Mở Khung Máy Ảnh Polaroid 3D
+              </button>
+            </>
+          )}
+
+          {station.type === 'quiz' && pickedQuiz && (
+            <>
+              <div className="know">
+                <b>Khám phá Kiến thức TDC</b>
+                {station.info}
+              </div>
+              <p className="q">{pickedQuiz.q}</p>
+              <div className="opts">
+                {shuffledOptionIndices.map((origIdx, displayIdx) => {
+                  const letterLabel = String.fromCharCode(65 + displayIdx);
+                  const isCorrect = origIdx === pickedQuiz.ans;
+                  const isPicked = selectedQuizAns === origIdx;
+                  let cls = 'opt';
+                  if (selectedQuizAns !== null) {
+                    if (isCorrect) cls += ' ok';
+                    else if (isPicked) cls += ' no';
+                  }
+                  return (
+                    <button
+                      key={origIdx}
+                      type="button"
+                      disabled={selectedQuizAns !== null}
+                      onClick={() => handleQuizOptionClick(origIdx)}
+                      className={cls}
+                    >
+                      <i>{letterLabel}</i>
+                      <span>{pickedQuiz.opts[origIdx]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedQuizAns !== null && (
+                <div className="flex flex-col gap-2.5 mt-1">
+                  <p className="explain">
+                    {selectedQuizAns === pickedQuiz.ans
+                      ? '🎉 Chính xác! '
+                      : '💡 Chưa chính xác! '}
+                    {pickedQuiz.ex}
+                  </p>
+                  <button
+                    type="button"
+                    className={`btn big ${selectedQuizAns === pickedQuiz.ans ? 'sun' : ''}`}
+                    onClick={() =>
+                      triggerComplete(
+                        selectedQuizAns === pickedQuiz.ans ? station.pts : 40,
+                        selectedQuizAns === pickedQuiz.ans
+                      )
+                    }
+                  >
+                    <HelpCircle className="w-5 h-5" /> Nhận Huy hiệu & Xóa Sương mù · +
+                    {selectedQuizAns === pickedQuiz.ans ? station.pts : 40}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {station.type === 'kick' && (
+            <KickGame
+              maxPoints={station.pts}
+              onComplete={(pts, html) => triggerComplete(pts, true, html)}
+            />
+          )}
+
+          {station.type === 'it_debug' && (
+            <ItDebugGame
+              maxPoints={station.pts}
+              onComplete={(pts, html) => triggerComplete(pts, true, html)}
+            />
+          )}
+
+          {station.type === 'electric_circuit' && (
+            <ElectricCircuitGame
+              maxPoints={station.pts}
+              onComplete={(pts, html) => triggerComplete(pts, true, html)}
+            />
+          )}
+
+          {station.type === 'auto_engine' && (
+            <AutoEngineGame
+              maxPoints={station.pts}
+              onComplete={(pts, html) => triggerComplete(pts, true, html)}
+            />
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 </file>
@@ -9449,6 +7982,3235 @@ export function buildNatureAndTrain(ctx: {
 }
 </file>
 
+<file path="src/services/partyService.ts">
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { FACULTIES } from '../data/faculties';
+import { FacultyId, PartyMember, PartyRoom, UserProfile } from '../types/game';
+import { syncProfileToCloud } from './authService';
+import { db, isFirebaseConfigured } from './firebase';
+
+const LOCAL_PARTIES_KEY = 'tdc_go_parties_v2';
+
+const SAMPLE_PARTIES: PartyRoom[] = [
+  {
+    code: 'TDC26A',
+    hostUid: 'sample_1',
+    name: 'Biệt đội Liên Khoa TDC',
+    memberUids: ['sample_1', 'sample_2', 'sample_3'],
+    members: [
+      {
+        uid: 'sample_1',
+        name: 'Minh Anh',
+        mssv: '24211TT0124',
+        facultyId: 'cntt',
+        avatar: 0,
+        points: 1420,
+      },
+      {
+        uid: 'sample_2',
+        name: 'Gia Huy',
+        mssv: '24211DD0089',
+        facultyId: 'dien_dt',
+        avatar: 1,
+        points: 1280,
+      },
+      {
+        uid: 'sample_3',
+        name: 'Thảo Vy',
+        mssv: '24211KT0215',
+        facultyId: 'kinh_te',
+        avatar: 2,
+        points: 1150,
+      },
+    ],
+    isCrossFaculty: true,
+    bonusMultiplier: 1.2,
+    totalPoints: 3850,
+    createdAt: Date.now() - 7200000,
+  },
+  {
+    code: 'CNTT99',
+    hostUid: 'sample_4',
+    name: 'Chiến thần Code & Cơ khí',
+    memberUids: ['sample_4', 'sample_6'],
+    members: [
+      {
+        uid: 'sample_4',
+        name: 'Quốc Bảo',
+        mssv: '24211OT0042',
+        facultyId: 'co_khi_oto',
+        avatar: 0,
+        points: 990,
+      },
+      {
+        uid: 'sample_6',
+        name: 'Tuấn Kiệt',
+        mssv: '24211CK0071',
+        facultyId: 'co_khi_ctm',
+        avatar: 1,
+        points: 740,
+      },
+    ],
+    isCrossFaculty: true,
+    bonusMultiplier: 1.2,
+    totalPoints: 1730,
+    createdAt: Date.now() - 5400000,
+  },
+];
+
+export function evaluateCrossFacultyBonus(members: PartyMember[]): {
+  isCrossFaculty: boolean;
+  bonusMultiplier: number;
+} {
+  const uniqueFaculties = new Set(members.map((m) => m.facultyId));
+  const isCross = uniqueFaculties.size >= 2;
+  return {
+    isCrossFaculty: isCross,
+    bonusMultiplier: isCross ? 1.2 : 1.0,
+  };
+}
+
+export function loadLocalParties(): PartyRoom[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_PARTIES_KEY);
+    if (!raw) {
+      localStorage.setItem(LOCAL_PARTIES_KEY, JSON.stringify(SAMPLE_PARTIES));
+      return [...SAMPLE_PARTIES];
+    }
+    const parsed = JSON.parse(raw) as PartyRoom[];
+    return Array.isArray(parsed) ? parsed : [...SAMPLE_PARTIES];
+  } catch {
+    return [...SAMPLE_PARTIES];
+  }
+}
+
+export function saveLocalParties(parties: PartyRoom[]): void {
+  try {
+    localStorage.setItem(LOCAL_PARTIES_KEY, JSON.stringify(parties));
+  } catch {
+    // Ignore
+  }
+}
+
+function generateRoomCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 6; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
+}
+
+export async function getPartyByCode(code: string): Promise<PartyRoom | null> {
+  const cleanCode = code.trim().toUpperCase();
+  if (!cleanCode) return null;
+
+  if (isFirebaseConfigured && db) {
+    try {
+      const snap = await getDoc(doc(db, 'parties', cleanCode));
+      if (snap.exists()) return snap.data() as PartyRoom;
+    } catch {
+      // Fallback local
+    }
+  }
+  const parties = loadLocalParties();
+  return parties.find((p) => p.code === cleanCode) || null;
+}
+
+export async function createPartyRoom(
+  profile: UserProfile,
+  partyName: string
+): Promise<{ room: PartyRoom; updatedProfile: UserProfile }> {
+  const code = generateRoomCode();
+  const hostMember: PartyMember = {
+    uid: profile.uid,
+    name: profile.name,
+    mssv: profile.mssv,
+    facultyId: profile.facultyId,
+    avatar: profile.avatar,
+    points: profile.points,
+  };
+
+  const room: PartyRoom = {
+    code,
+    hostUid: profile.uid,
+    name: partyName.trim().slice(0, 45) || `Tổ đội của ${profile.name}`,
+    memberUids: [profile.uid],
+    members: [hostMember],
+    isCrossFaculty: false,
+    bonusMultiplier: 1.0,
+    totalPoints: profile.points,
+    createdAt: Date.now(),
+  };
+
+  if (isFirebaseConfigured && db) {
+    try {
+      await setDoc(doc(db, 'parties', code), room);
+    } catch {
+      // Fallback local
+    }
+  }
+
+  const parties = loadLocalParties().filter((p) => p.code !== code);
+  parties.unshift(room);
+  saveLocalParties(parties);
+
+  const updatedProfile: UserProfile = {
+    ...profile,
+    partyId: code,
+    updatedAt: Date.now(),
+  };
+  await syncProfileToCloud(updatedProfile);
+  return { room, updatedProfile };
+}
+
+export async function joinPartyRoom(
+  profile: UserProfile,
+  codeInput: string
+): Promise<{ room: PartyRoom; updatedProfile: UserProfile }> {
+  const code = codeInput.trim().toUpperCase();
+  const room = await getPartyByCode(code);
+  if (!room) {
+    throw new Error(`Không tìm thấy phòng Tổ đội với mã "${code}".`);
+  }
+  if (!room.memberUids.includes(profile.uid) && room.members.length >= 4) {
+    throw new Error('Phòng Tổ đội này đã đủ tối đa 4 thành viên.');
+  }
+
+  const me: PartyMember = {
+    uid: profile.uid,
+    name: profile.name,
+    mssv: profile.mssv,
+    facultyId: profile.facultyId,
+    avatar: profile.avatar,
+    points: profile.points,
+  };
+
+  const filteredMembers = room.members.filter((m) => m.uid !== profile.uid);
+  const nextMembers = [...filteredMembers, me];
+  const nextUids = nextMembers.map((m) => m.uid);
+  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
+  const totalPoints = nextMembers.reduce((sum, m) => sum + m.points, 0);
+
+  const updatedRoom: PartyRoom = {
+    ...room,
+    memberUids: nextUids,
+    members: nextMembers,
+    isCrossFaculty,
+    bonusMultiplier,
+    totalPoints,
+  };
+
+  if (isFirebaseConfigured && db) {
+    try {
+      await setDoc(doc(db, 'parties', code), updatedRoom);
+    } catch {
+      // Fallback local
+    }
+  }
+
+  const parties = loadLocalParties();
+  const idx = parties.findIndex((p) => p.code === code);
+  if (idx >= 0) parties[idx] = updatedRoom;
+  else parties.unshift(updatedRoom);
+  saveLocalParties(parties);
+
+  const updatedProfile: UserProfile = {
+    ...profile,
+    partyId: code,
+    updatedAt: Date.now(),
+  };
+  await syncProfileToCloud(updatedProfile);
+
+  return { room: updatedRoom, updatedProfile };
+}
+
+export async function simulateTeammateJoin(
+  roomCode: string,
+  currentFacultyId: FacultyId
+): Promise<PartyRoom> {
+  const room = await getPartyByCode(roomCode);
+  if (!room) throw new Error('Không tìm thấy phòng tổ đội.');
+  if (room.members.length >= 4) {
+    throw new Error('Tổ đội đã đủ 4 thành viên.');
+  }
+
+  const otherFaculties = FACULTIES.filter((f) => f.id !== currentFacultyId);
+  const pickedFaculty =
+    otherFaculties[room.members.length % otherFaculties.length] || FACULTIES[1];
+  const sampleNames = ['Hoàng Nam', 'Khánh Linh', 'Đức Trọng', 'Phương Thảo'];
+  const idx = room.members.length;
+  const teammate: PartyMember = {
+    uid: `coop_ally_${Date.now()}`,
+    name: sampleNames[idx % sampleNames.length],
+    mssv: `25211${pickedFaculty.id.slice(0, 2).toUpperCase()}0${10 + idx}`,
+    facultyId: pickedFaculty.id,
+    avatar: idx % 3,
+    points: 240 + idx * 80,
+  };
+
+  const nextMembers = [...room.members, teammate];
+  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
+  const updatedRoom: PartyRoom = {
+    ...room,
+    memberUids: nextMembers.map((m) => m.uid),
+    members: nextMembers,
+    isCrossFaculty,
+    bonusMultiplier,
+    totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
+  };
+
+  if (isFirebaseConfigured && db) {
+    try {
+      await setDoc(doc(db, 'parties', room.code), updatedRoom);
+    } catch {
+      // Ignore
+    }
+  }
+
+  const parties = loadLocalParties();
+  const pIdx = parties.findIndex((p) => p.code === room.code);
+  if (pIdx >= 0) parties[pIdx] = updatedRoom;
+  else parties.unshift(updatedRoom);
+  saveLocalParties(parties);
+
+  return updatedRoom;
+}
+
+export async function syncMemberPointsInParty(profile: UserProfile): Promise<PartyRoom | null> {
+  if (!profile.partyId) return null;
+  const room = await getPartyByCode(profile.partyId);
+  if (!room) return null;
+
+  const nextMembers = room.members.map((m) =>
+    m.uid === profile.uid
+      ? {
+          ...m,
+          name: profile.name,
+          facultyId: profile.facultyId,
+          avatar: profile.avatar,
+          points: profile.points,
+        }
+      : m
+  );
+  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
+  const updatedRoom: PartyRoom = {
+    ...room,
+    members: nextMembers,
+    isCrossFaculty,
+    bonusMultiplier,
+    totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
+  };
+
+  if (isFirebaseConfigured && db) {
+    try {
+      await setDoc(doc(db, 'parties', room.code), updatedRoom);
+    } catch {
+      // Ignore
+    }
+  }
+
+  const parties = loadLocalParties();
+  const idx = parties.findIndex((p) => p.code === room.code);
+  if (idx >= 0) parties[idx] = updatedRoom;
+  saveLocalParties(parties);
+  return updatedRoom;
+}
+
+export async function leavePartyRoom(profile: UserProfile): Promise<UserProfile> {
+  if (profile.partyId) {
+    const code = profile.partyId.trim().toUpperCase();
+    const room = await getPartyByCode(code);
+    if (room) {
+      const nextMembers = room.members.filter((m) => m.uid !== profile.uid);
+      const nextUids = nextMembers.map((m) => m.uid);
+      const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
+      const updatedRoom: PartyRoom = {
+        ...room,
+        hostUid: nextMembers[0]?.uid || room.hostUid,
+        memberUids: nextUids,
+        members: nextMembers,
+        isCrossFaculty,
+        bonusMultiplier,
+        totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
+      };
+
+      if (isFirebaseConfigured && db && nextMembers.length > 0) {
+        try {
+          await setDoc(doc(db, 'parties', room.code), updatedRoom);
+        } catch {
+          // Ignore
+        }
+      }
+
+      const parties = loadLocalParties();
+      const idx = parties.findIndex((p) => p.code === room.code);
+      if (idx >= 0) {
+        if (nextMembers.length > 0) {
+          parties[idx] = updatedRoom;
+        } else {
+          parties.splice(idx, 1);
+        }
+        saveLocalParties(parties);
+      }
+    }
+  }
+
+  const updated: UserProfile = {
+    ...profile,
+    partyId: undefined,
+    updatedAt: Date.now(),
+  };
+  await syncProfileToCloud(updated);
+  return updated;
+}
+</file>
+
+<file path="src/types/game.ts">
+export type FacultyId =
+  | 'cntt'
+  | 'dien_dt'
+  | 'co_khi_oto'
+  | 'co_khi_ctm'
+  | 'kinh_te'
+  | 'ngoai_ngu'
+  | 'du_lich'
+  | 'khac';
+
+export interface Faculty {
+  id: FacultyId;
+  name: string;
+  shortName: string;
+  color: string;
+  badgeColor: string;
+}
+
+export type StationType =
+  | 'checkin'
+  | 'photo'
+  | 'quiz'
+  | 'kick'
+  | 'it_debug'
+  | 'electric_circuit'
+  | 'auto_engine';
+
+export interface QuizItem {
+  q: string;
+  opts: string[];
+  ans: number;
+  ex: string;
+}
+
+export interface StationRiddle {
+  prompt: string;
+  answer: string;
+  hint: string;
+}
+
+export interface Station {
+  id: string;
+  name: string;
+  sub: string;
+  facultyId: string;
+  x: number;
+  y?: number;
+  z: number;
+  floor?: number;
+  buildingId?: string;
+  fogRadius: number;
+  col: string;
+  type: StationType;
+  pts: number;
+  badge: string;
+  info: string;
+  funFact: string;
+  directions: string;
+  qrSecretToken: string;
+  riddle?: StationRiddle;
+  questions?: QuizItem[];
+  active: boolean;
+}
+
+export interface BuildingFloorSpec {
+  floor: number;
+  label: string;
+  elevationMeters: number;
+  departments: string;
+  highlights: string;
+}
+
+export interface CampusBuildingZone {
+  id: string;
+  code: string;
+  name: string;
+  bounds: [number, number, number, number]; // [x0, z0, x1, z1]
+  minFloor: number;
+  maxFloor: number;
+  floorHeightMeters: number;
+  color: string;
+  floors: BuildingFloorSpec[];
+}
+
+export interface GpsTelemetry3D {
+  lat: number;
+  lng: number;
+  altitudeAsl: number | null;
+  accuracyMeters: number;
+  altitudeAccuracyMeters: number | null;
+  headingDeg: number | null;
+  speedMps: number | null;
+  x: number;
+  y: number;
+  z: number;
+  detectedFloor: number;
+  detectedBuilding: CampusBuildingZone | null;
+  insideCampus: boolean;
+  source: 'gps_hardware' | 'gps_calibrated' | 'manual_override';
+  timestamp: number;
+}
+
+export type VerificationMethod = 'qr' | 'riddle' | 'demo';
+
+export interface UnlockedStationRecord {
+  pts: number;
+  unlockedAt: number;
+  method: VerificationMethod;
+  photoDataUrl?: string;
+}
+
+export interface UserProfile {
+  uid: string;
+  name: string;
+  mssv: string;
+  email: string;
+  facultyId: FacultyId;
+  role: 'student' | 'admin';
+  avatar: number;
+  points: number;
+  stars: number;
+  quizOk: number;
+  photos: number;
+  done: Record<string, UnlockedStationRecord>;
+  bonus: Record<string, boolean>;
+  partyId?: string;
+  pos?: [number, number] | [number, number, number] | null;
+  certClaimed?: boolean;
+  updatedAt: number;
+}
+
+export interface PublicLeaderboardUser {
+  uid: string;
+  name: string;
+  mssv: string;
+  facultyId: FacultyId;
+  avatar: number;
+  points: number;
+  unlockedCount: number;
+  partyId?: string;
+  updatedAt: number;
+}
+
+export interface PartyMember {
+  uid: string;
+  name: string;
+  mssv: string;
+  facultyId: FacultyId;
+  avatar: number;
+  points: number;
+}
+
+export interface PartyRoom {
+  code: string;
+  hostUid: string;
+  name: string;
+  memberUids: string[];
+  members: PartyMember[];
+  isCrossFaculty: boolean;
+  bonusMultiplier: number;
+  totalPoints: number;
+  createdAt: number;
+}
+
+export interface Quest {
+  id: string;
+  name: string;
+  description: string;
+  need: number;
+  reward: number;
+  icon: StationType | 'star' | 'explorer' | 'party';
+  col: string;
+  getValue: (profile: UserProfile, totalStations: number) => number;
+}
+
+export interface CampaignEvent {
+  id: string;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  active: boolean;
+  bonusMultiplier: number;
+}
+
+export interface CheckinLog {
+  id: string;
+  uid: string;
+  userName: string;
+  stationId: string;
+  facultyId: FacultyId;
+  method: VerificationMethod;
+  pts: number;
+  timestamp: number;
+}
+</file>
+
+<file path="src/index.css">
+@import "tailwindcss";
+
+/* Bố cục: thế giới 3D kiểu đồ chơi phủ kín màn hình; HUD bo tròn nổi ở 4 góc; thẻ thử thách trồi lên như tấm thẻ bài */
+:root {
+  --grass: #3DAA5C;
+  --grass-d: #23733D;
+  --leaf-l: #E6F6DA;
+  --sun: #FFC83A;
+  --sun-d: #D98E00;
+  --coral: #FF6F59;
+  --coral-d: #D9452F;
+  --tdc: #00AEEF;
+  --tdc-d: #0A7FC2;
+  --cream: #FFFBEF;
+  --card: #FFFFFF;
+  --ink: #1E3528;
+  --muted: #5B7266;
+  --line: #E2EBDA;
+  --drop: rgba(28, 64, 42, .20);
+  --f-display: "Baloo 2", "Nunito", system-ui, sans-serif;
+  --f-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  background: #CFEFDF;
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-tap-highlight-color: transparent;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 3px solid var(--tdc);
+  outline-offset: 2px;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#stage {
+  position: absolute;
+  inset: 0;
+}
+
+#stage canvas {
+  display: block;
+  touch-action: none;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 20px;
+  box-shadow: 0 4px 0 var(--drop), 0 10px 28px rgba(28, 64, 42, .14);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--grass);
+  color: #fff;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: .01em;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--grass-d);
+  transition: transform .08s, box-shadow .08s;
+  touch-action: manipulation;
+}
+
+.btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--grass-d);
+}
+
+.btn.sun {
+  background: var(--sun);
+  color: #4A3200;
+  box-shadow: 0 4px 0 var(--sun-d);
+}
+
+.btn.sun:active {
+  box-shadow: 0 1px 0 var(--sun-d);
+}
+
+.btn.blue {
+  background: var(--tdc);
+  color: #fff;
+  box-shadow: 0 4px 0 var(--tdc-d);
+}
+
+.btn.ghost {
+  background: var(--leaf-l);
+  color: var(--grass-d);
+  box-shadow: 0 4px 0 #C7E3B5;
+}
+
+.btn.big {
+  min-height: 52px;
+  font-size: 18px;
+  width: 100%;
+}
+
+/* ---------- màn hình mở đầu ---------- */
+#start {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(90deg, rgba(255, 251, 239, .90) 0, rgba(255, 251, 239, .62) 38%, rgba(255, 251, 239, 0) 65%);
+  overflow: auto;
+  z-index: 10;
+}
+
+.st-wrap {
+  width: min(460px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-left: clamp(0px, 3vw, 48px);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo .seal {
+  flex: none;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 0 var(--drop);
+}
+
+.logo .seal svg {
+  width: 48px;
+  height: 48px;
+}
+
+.logo h1 {
+  margin: 0;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 42px;
+  line-height: .9;
+  letter-spacing: -.01em;
+  color: var(--ink);
+}
+
+.logo h1 span {
+  display: inline-block;
+  background: var(--sun);
+  color: #3D2A00;
+  border-radius: 16px;
+  padding: 2px 12px 0;
+  margin-left: 4px;
+  transform: rotate(-3deg);
+  box-shadow: 0 5px 0 var(--sun-d);
+}
+
+.tag {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--ink);
+  max-width: 42ch;
+  text-wrap: balance;
+}
+
+.st-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.st-card label, .st-card .lbl {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 900;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+
+.st-card input {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  background: var(--cream);
+  color: var(--ink);
+  width: 100%;
+}
+
+.avas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.avas button {
+  border: 3px solid var(--line);
+  background: var(--cream);
+  border-radius: 16px;
+  padding: 6px 4px 5px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-weight: 800;
+  font-size: 12.5px;
+}
+
+.avas button.on {
+  border-color: var(--grass);
+  background: var(--leaf-l);
+}
+
+.fine {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.st-row {
+  display: flex;
+  gap: 10px;
+}
+
+.st-row .btn {
+  flex: 1;
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  padding-bottom: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  z-index: 5;
+}
+
+#hud.dim > *:not(#fx) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hud-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.me {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 6px 6px;
+  border-radius: 999px;
+  min-width: 0;
+  max-width: min(320px, 55vw);
+}
+
+.me .ava {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--leaf-l);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.me .ava svg {
+  width: 46px;
+  height: 46px;
+}
+
+.me-txt {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.me-txt b {
+  font-family: var(--f-display);
+  font-size: 16.5px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.me-txt span {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--grass-d);
+}
+
+.xp {
+  height: 7px;
+  border-radius: 5px;
+  background: var(--leaf-l);
+  overflow: hidden;
+  margin-top: 3px;
+  min-width: 90px;
+}
+
+.xp i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--grass), #8BD346);
+  border-radius: 5px;
+  transition: width .4s;
+}
+
+.hud-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.pills {
+  display: flex;
+  gap: 8px;
+}
+
+.pill {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 14px 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--drop);
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pill .ic {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.pill.pts .ic {
+  background: var(--sun);
+  color: #7A4D00;
+}
+
+.pill.bdg .ic {
+  background: var(--coral);
+  color: #fff;
+}
+
+.pill.bump {
+  animation: bump .45s;
+}
+
+@keyframes bump {
+  40% { transform: scale(1.16); }
+}
+
+#mini {
+  pointer-events: auto;
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  background: #BFE5B0;
+  border: 4px solid #fff;
+  box-shadow: 0 4px 0 var(--drop);
+  cursor: pointer;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rb {
+  pointer-events: auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 0;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--drop);
+  color: var(--ink);
+  position: relative;
+}
+
+.rb:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--drop);
+}
+
+.rb .dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--coral);
+  border: 2px solid #fff;
+}
+
+.hud-bot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+.guide {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 16px 0 6px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-weight: 800;
+  font-size: 13.5px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .25);
+  max-width: 100%;
+  cursor: pointer;
+  border: 0;
+}
+
+.guide .arr {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--sun);
+  color: #3D2A00;
+  display: grid;
+  place-items: center;
+  transition: transform .15s linear;
+}
+
+.guide span:last-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.act {
+  pointer-events: auto;
+  width: min(400px, 100%);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: pop .28s cubic-bezier(.2, 1.4, .4, 1);
+}
+
+.act-txt {
+  flex: 1;
+  min-width: 0;
+}
+
+.act-txt b {
+  display: block;
+  font-family: var(--f-display);
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.act-txt span {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.act .btn {
+  min-height: 42px;
+  padding: 0 16px;
+  font-size: 15px;
+}
+
+@keyframes pop {
+  from { transform: translateY(18px) scale(.9); opacity: 0; }
+}
+
+.keys {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink);
+  background: rgba(255, 255, 255, .82);
+  padding: 6px 10px;
+  border-radius: 10px;
+  max-width: 260px;
+  line-height: 1.4;
+}
+
+.keys b {
+  font-family: var(--f-display);
+}
+
+@media (pointer: coarse) {
+  .keys { display: none; }
+}
+
+@media (max-width: 520px) {
+  .logo h1 { font-size: 32px; }
+  #mini { width: 96px; height: 96px; }
+  .pill { height: 36px; font-size: 16px; padding: 0 11px 0 6px; }
+  .pill .ic { width: 24px; height: 24px; }
+  .rb { width: 40px; height: 40px; }
+  .me .ava, .me .ava svg { width: 40px; height: 40px; }
+  #start {
+    align-items: flex-end;
+    background: linear-gradient(0deg, rgba(255, 251, 239, .94) 0, rgba(255, 251, 239, .75) 55%, rgba(255, 251, 239, 0) 90%);
+  }
+  .st-wrap { margin-left: 0; }
+  .tag { font-size: 14px; }
+}
+
+/* ---------- bảng (modal) ---------- */
+#modal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px;
+  z-index: 30;
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 48, 32, .42);
+}
+
+.sheet {
+  position: relative;
+  width: min(460px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 0;
+  animation: pop .3s cubic-bezier(.2, 1.3, .4, 1);
+}
+
+@media (max-width: 520px) {
+  #modal {
+    align-items: flex-end;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.sh-head {
+  position: relative;
+  padding: 16px 18px 14px;
+  color: #fff;
+  background: var(--c, var(--grass));
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border-radius: 20px 20px 0 0;
+  overflow: hidden;
+}
+
+.sh-head::after {
+  content: "";
+  position: absolute;
+  right: -30px;
+  top: -40px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .14);
+}
+
+.sh-head h2 {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 22px;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.sh-head p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 800;
+  opacity: .92;
+}
+
+.sh-x {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, .22);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.sh-body {
+  padding: 15px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.know {
+  background: var(--cream);
+  border-radius: 14px;
+  padding: 11px 14px;
+  font-size: 13.5px;
+}
+
+.know b {
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--sun-d);
+  margin-bottom: 2px;
+}
+
+.q {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 18px;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.opts {
+  display: grid;
+  gap: 8px;
+}
+
+.opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--line);
+}
+
+.opt i {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--leaf-l);
+  color: var(--grass-d);
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-family: var(--f-display);
+}
+
+.opt:hover:not(:disabled) {
+  border-color: var(--grass);
+}
+
+.opt.ok {
+  border-color: var(--grass);
+  background: #E8F8E3;
+}
+
+.opt.ok i {
+  background: var(--grass);
+  color: #fff;
+}
+
+.opt.no {
+  border-color: var(--coral);
+  background: #FFECE8;
+  animation: shake .35s;
+}
+
+.opt.no i {
+  background: var(--coral);
+  color: #fff;
+}
+
+.opt:disabled {
+  cursor: default;
+}
+
+@keyframes shake {
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.explain {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.reveal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.reveal .sticker {
+  animation: spinIn .7s cubic-bezier(.2, 1.4, .4, 1);
+}
+
+.reveal h3 {
+  margin: 4px 0 0;
+  font-family: var(--f-display);
+  font-size: 21px;
+  line-height: 1.1;
+}
+
+.reveal .plus {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 26px;
+  color: var(--sun-d);
+}
+
+@keyframes spinIn {
+  from { transform: rotate(-200deg) scale(.2); }
+}
+
+.sticker {
+  flex: none;
+  border-radius: 50%;
+  background: var(--c);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  border: 4px solid #fff;
+  box-shadow: 0 4px 0 var(--drop);
+}
+
+.sticker.off {
+  background: #DDE5D6;
+  color: #A5B49C;
+}
+
+/* đá bóng */
+.pitch {
+  position: relative;
+  height: 150px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: repeating-linear-gradient(90deg, #4FAE5E 0 28px, #5DBE6A 28px 56px);
+}
+
+.pitch .goal {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  width: 150px;
+  height: 46px;
+  margin-left: -75px;
+  border: 5px solid #fff;
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .35) 0 2px, transparent 2px 9px),
+              repeating-linear-gradient(-45deg, rgba(255, 255, 255, .35) 0 2px, transparent 2px 9px);
+}
+
+.pitch .keeper {
+  position: absolute;
+  left: 50%;
+  top: 26px;
+  width: 26px;
+  height: 30px;
+  margin-left: -13px;
+  border-radius: 10px 10px 6px 6px;
+  background: var(--coral);
+  transition: transform .25s;
+}
+
+.ball {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  width: 30px;
+  height: 30px;
+  margin-left: -15px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, #1E3528 0 22%, #fff 24%);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, .2);
+  transition: transform .45s cubic-bezier(.3, .8, .4, 1);
+}
+
+.ball.goal {
+  transform: translate(var(--bx, 0px), -96px) scale(.6);
+}
+
+.ball.miss {
+  transform: translate(var(--bx, 90px), -120px) scale(.55);
+}
+
+.pbar {
+  position: relative;
+  height: 30px;
+  border-radius: 15px;
+  background: #F1D9CF;
+  overflow: hidden;
+  border: 3px solid #fff;
+  box-shadow: 0 3px 0 var(--line);
+}
+
+.pbar .zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--grass);
+}
+
+.pbar .needle {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 6px;
+  margin-left: -3px;
+  border-radius: 3px;
+  background: var(--ink);
+}
+
+.kdots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.kdots i {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.kdots i.h {
+  background: var(--grass);
+}
+
+.kdots i.m {
+  background: var(--coral);
+}
+
+.kmsg {
+  margin: 0;
+  text-align: center;
+  font-weight: 800;
+}
+
+/* ảnh polaroid */
+.polar {
+  background: #fff;
+  padding: 10px 10px 14px;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+  transform: rotate(-2.5deg);
+  align-self: center;
+  width: min(300px, 100%);
+}
+
+.polar img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 3px;
+}
+
+.polar p {
+  margin: 8px 0 0;
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 15px;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.polar small {
+  display: block;
+  font-family: var(--f-body);
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* danh sách */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qitem {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--cream);
+}
+
+.qitem b {
+  font-size: 14.5px;
+}
+
+.qbar {
+  height: 7px;
+  border-radius: 5px;
+  background: var(--line);
+  overflow: hidden;
+  margin-top: 5px;
+}
+
+.qbar i {
+  display: block;
+  height: 100%;
+  background: var(--grass);
+}
+
+.qrew {
+  font-family: var(--f-display);
+  font-weight: 800;
+  color: var(--sun-d);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.qitem.done {
+  background: #E8F8E3;
+}
+
+.qitem.done .qrew {
+  color: var(--grass-d);
+}
+
+.album {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px 6px;
+}
+
+@media (max-width: 480px) {
+  .album {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.album div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.album small {
+  display: block;
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.rank {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--cream);
+  font-weight: 800;
+}
+
+.rank .n {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  font-family: var(--f-display);
+}
+
+.rank:nth-child(1) .n { background: var(--sun); }
+.rank:nth-child(2) .n { background: #DDE3E8; }
+.rank:nth-child(3) .n { background: #F2C7A1; }
+
+.rank.you {
+  background: #E1F4FD;
+  outline: 2px solid var(--tdc);
+}
+
+.rank > span:last-child {
+  font-family: var(--f-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.help h3 {
+  margin: 0 0 4px;
+  font-family: var(--f-display);
+  font-size: 16.5px;
+}
+
+.help p, .help ul {
+  margin: 0;
+  font-size: 13.5px;
+}
+
+.help ul {
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.help kbd {
+  font-family: var(--f-display);
+  font-weight: 800;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 6px;
+}
+
+/* chứng nhận */
+.cert {
+  border: 3px dashed var(--sun);
+  border-radius: 18px;
+  padding: 16px 14px;
+  text-align: center;
+  background: var(--cream);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.cert small {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--sun-d);
+}
+
+.cert h3 {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+.cert .row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.btns {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btns > * {
+  flex: 1 1 130px;
+}
+
+a.btn {
+  text-decoration: none;
+}
+
+/* ---------- khung chụp ảnh ---------- */
+#viewfinder {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 25;
+}
+
+#viewfinder .fr {
+  position: absolute;
+  inset: 12% 8% 22%;
+  border-radius: 20px;
+  box-shadow: 0 0 0 2000px rgba(20, 48, 32, .28);
+}
+
+#viewfinder .fr::before, #viewfinder .fr::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 5px solid #fff;
+  border-radius: 22px;
+  -webkit-mask: linear-gradient(#000 0 0) top left/34px 34px no-repeat,
+                linear-gradient(#000 0 0) top right/34px 34px no-repeat,
+                linear-gradient(#000 0 0) bottom left/34px 34px no-repeat,
+                linear-gradient(#000 0 0) bottom right/34px 34px no-repeat;
+  mask: linear-gradient(#000 0 0) top left/34px 34px no-repeat,
+        linear-gradient(#000 0 0) top right/34px 34px no-repeat,
+        linear-gradient(#000 0 0) bottom left/34px 34px no-repeat,
+        linear-gradient(#000 0 0) bottom right/34px 34px no-repeat;
+}
+
+#viewfinder .cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(12% - 44px);
+  text-align: center;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 20px;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .25);
+}
+
+#viewfinder .vf-btns {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(6% + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  pointer-events: auto;
+}
+
+.shutter {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 6px solid #fff;
+  background: var(--coral);
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .2);
+}
+
+.shutter:active {
+  transform: scale(.94);
+}
+
+.vf-small {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 0;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+#flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  pointer-events: none;
+  animation: flash .5s forwards;
+  z-index: 40;
+}
+
+@keyframes flash {
+  to { opacity: 0; }
+}
+
+/* ---------- chữ nổi, thông báo ---------- */
+#fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fxt {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--sun);
+  -webkit-text-stroke: 5px #fff;
+  paint-order: stroke fill;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+#toasts {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(76px + env(safe-area-inset-top, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  z-index: 45;
+}
+
+.toast {
+  background: var(--ink);
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .2);
+  animation: pop .3s cubic-bezier(.2, 1.4, .4, 1);
+  max-width: 100%;
+  text-align: center;
+}
+
+.toast.gold {
+  background: var(--sun);
+  color: #3D2A00;
+}
+</file>
+
+<file path="index.html">
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>TDC Travel · Khám phá Khuôn viên 3D Trường Cao đẳng Công nghệ Thủ Đức</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@500;700;800;900&display=swap"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+</file>
+
+<file path="package.json">
+{
+  "name": "tdc-travel",
+  "private": true,
+  "version": "1.0.0",
+  "description": "TDC Travel - Web Game 3D Khám phá Khuôn viên Trường Cao đẳng Công nghệ Thủ Đức",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "firebase": "^11.3.1",
+    "html5-qrcode": "^2.3.8",
+    "lucide-react": "^0.475.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "three": "^0.173.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.6",
+    "@types/node": "^22.13.4",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "@types/three": "^0.173.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.0.6",
+    "typescript": "~5.7.2",
+    "vite": "^6.1.0",
+    "vitest": "^3.0.5"
+  }
+}
+</file>
+
+<file path="tsconfig.tsbuildinfo">
+{"root":["./src/app.tsx","./src/game.test.ts","./src/main.tsx","./src/vite-env.d.ts","./src/components/gamehud.tsx","./src/components/minimap.tsx","./src/components/qrscannermodal.tsx","./src/components/startscreen.tsx","./src/components/stationmodal.tsx","./src/components/stationsticker.tsx","./src/components/minigames/autoenginegame.tsx","./src/components/minigames/electriccircuitgame.tsx","./src/components/minigames/itdebuggame.tsx","./src/components/minigames/kickgame.tsx","./src/components/minigames/viewfinder.tsx","./src/components/modals/certificatemodal.tsx","./src/components/modals/helpmodal.tsx","./src/components/modals/leaderboardmodal.tsx","./src/components/modals/partymodal.tsx","./src/components/modals/profilebadgesmodal.tsx","./src/components/modals/questsmodal.tsx","./src/data/campusbuildings.ts","./src/data/campuslayout.ts","./src/data/faculties.ts","./src/data/stations.ts","./src/engine/tdccampusengine.ts","./src/engine/audiosfx.ts","./src/engine/campusbuilder.ts","./src/engine/chibibuilder.ts","./src/engine/fogofwar.ts","./src/engine/natureandtrain.ts","./src/engine/threehelpers.ts","./src/pages/admindashboard.tsx","./src/services/adminservice.ts","./src/services/authservice.ts","./src/services/firebase.ts","./src/services/gameservice.ts","./src/services/gpsservice.ts","./src/services/partyservice.ts","./src/types/game.ts"],"version":"5.7.3"}
+</file>
+
+<file path="src/components/modals/HelpModal.tsx">
+import React from 'react';
+import { HelpCircle, X } from 'lucide-react';
+
+interface HelpModalProps {
+  onClose: () => void;
+}
+
+export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
+  return (
+    <div id="modal">
+      <div className="scrim" onClick={onClose} />
+      <div className="sheet card" role="dialog" aria-modal="true">
+        <div className="sh-head" style={{ '--c': '#00AEEF' } as React.CSSProperties}>
+          <span
+            className="sticker"
+            style={{ '--c': '#fff', color: '#00AEEF', width: 56, height: 56 } as React.CSSProperties}
+          >
+            <HelpCircle className="w-7 h-7" />
+          </span>
+          <div>
+            <h2>Hướng Dẫn Khám Phá TDC Travel</h2>
+            <p>Web Game 3D Tương tác Thực tế (O2O Gamification)</p>
+          </div>
+          <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="sh-body help">
+          <div>
+            <h3>1. Bản đồ 3D Khuôn viên TDC & Định vị GPS 3 Trục (X · Y · Z)</h3>
+            <p>
+              Hệ thống sử dụng tín hiệu <b>GPS độ chính xác cao (High-Accuracy WGS84 + Altitude)</b> kết hợp bộ lọc <b>Kalman 3D</b> để định vị vị trí thực tế của bạn trong khuôn viên Trường Cao đẳng Công nghệ Thủ Đức (53 Võ Văn Ngân) theo cả 3 trục:
+            </p>
+            <ul>
+              <li>
+                <b>Trục X (Đông – Tây) & Trục Z (Nam – Bắc):</b> Xác định vị trí của bạn trên mặt bằng khuôn viên và tự động nhận diện tòa nhà bạn đang đứng (Khu A, Khu B, Hội trường H, Tòa C, Tòa D, KTX, Xưởng Cơ khí).
+              </li>
+              <li>
+                <b>Trục Cao độ Y / Phân tầng (Floor Level):</b> Tính toán độ cao so với mặt sân trường (1 tầng = 4.2m) để hiển thị chính xác tầng bạn đang khám phá từ <b>Tầng Hầm B1 (-4.2m)</b> lên tới <b>Tầng 11 (+42.0m tại Tòa D)</b>.
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h3>2. Khám phá Phân tầng 3D & Chế độ Cắt lớp (3D Floor Cutaway)</h3>
+            <ul>
+              <li>
+                <b>Thanh Chọn Tầng 3D (B1 → T11):</b> Sử dụng thanh thang máy phân tầng ở cạnh trái màn hình hoặc nút <b>Chọn Tòa/Tầng</b> trên bảng GPS để chuyển nhanh giữa các tầng và xem danh sách Phòng ban / Khoa / Phòng Lab tại tầng đó.
+              </li>
+              <li>
+                <b>Cắt lớp Tầng 3D (Cutaway View):</b> Bấm nút <b>Cắt lớp Tầng 3D</b> trên bảng điều khiển GPS để ẩn các tầng phía trên và quan sát trực diện mặt sàn bên trong tầng bạn đang đứng.
+              </li>
+              <li>
+                <b>Chuẩn 0m (Tare Ground Altitude):</b> Khi đứng ở sân trường, bấm <b>Chuẩn 0m</b> để hiệu chuẩn áp kế / độ cao GPS của điện thoại về mốc chuẩn Tầng 1 (0.0m).
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h3>3. Check-in Thực địa (QR + Mật thư) & Tổ đội Liên khoa</h3>
+            <p>
+              Tại mỗi trạm, bạn có thể <b>Quét mã QR</b> qua Camera trình duyệt hoặc <b>Giải mật thư quan sát</b> để xóa tan sương mù (Fog of War) và nhận thêm điểm thưởng O2O. Hãy lập <b>Tổ đội 2–4 sinh viên khác Khoa</b> để kích hoạt <b>+20% điểm thưởng Liên khoa</b>!
+            </p>
+          </div>
+          <button type="button" className="btn big" onClick={onClose}>
+            Đã sẵn sàng Định vị & Khám phá!
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+</file>
+
+<file path="src/engine/TdcCampusEngine.ts">
+import * as THREE from 'three';
+import { AVATARS } from '../data/campusLayout';
+import { GpsTelemetry3D, Station, UnlockedStationRecord } from '../types/game';
+import { audioSfx } from './audioSfx';
+import { buildCampusEnvironment, FloorHighlightController } from './campusBuilder';
+import { animChibi, makeChibi } from './chibiBuilder';
+import { FogOfWarSystem } from './fogOfWar';
+import { buildNatureAndTrain } from './natureAndTrain';
+import {
+  AABB,
+  canvasTex,
+  clamp,
+  coinTex,
+  createMaterialCache,
+  createRng,
+  FH,
+  lerpAngle,
+  mesh,
+  pill,
+} from './threeHelpers';
+import {
+  buildTelemetryFromCampus3D,
+  clampToCampusBoundary,
+  detectBuildingAtPosition,
+  distance3D,
+  floorToElevationMeters,
+  GpsKalmanFilter3D,
+  gpsToCampus3D,
+  resolveFloorFromElevation,
+} from '../services/gpsService';
+import { TDC_GEO_ANCHORS } from '../data/campusBuildings';
+
+export interface FloatingTextItem {
+  id: number;
+  text: string;
+  x: number;
+  y: number;
+  opacity: number;
+  scale: number;
+  color?: string;
+}
+
+export interface GuideState {
+  station: Station | null;
+  distance: number;
+  horizDistance: number;
+  deltaFloor: number;
+  angleRad: number;
+  allDone: boolean;
+}
+
+export interface MinimapSnapshot {
+  playerX: number;
+  playerY: number;
+  playerZ: number;
+  playerFloor: number;
+  accuracyMeters: number;
+  playerRotY: number;
+  camYaw: number;
+  col: AABB[];
+}
+
+export interface EngineCallbacks {
+  onNearStationChange: (st: Station | null) => void;
+  onOpenStationRequest: (st: Station) => void;
+  onPlayerMoveSave: (pos: [number, number, number]) => void;
+  onFloatingTextsUpdate: (items: FloatingTextItem[]) => void;
+  onGuideUpdate: (guide: GuideState) => void;
+  onMinimapUpdate: (snap: MinimapSnapshot) => void;
+  onGpsTelemetryUpdate?: (telemetry: GpsTelemetry3D) => void;
+}
+
+interface Station3DNode {
+  g: THREE.Group;
+  ring: THREE.Mesh;
+  disc: THREE.Mesh;
+  beam: THREE.Mesh;
+  stem: THREE.Line | null;
+  icon: THREE.Sprite;
+  lab: THREE.Sprite;
+  baseY: number;
+}
+
+export class TdcCampusEngine {
+  private container: HTMLElement;
+  private callbacks: EngineCallbacks;
+  private renderer: THREE.WebGLRenderer;
+  private scene: THREE.Scene;
+  private camera: THREE.PerspectiveCamera;
+  private sun: THREE.DirectionalLight;
+  private col: AABB[] = [];
+  private mat = createMaterialCache();
+  private rng = createRng(20261021);
+  private fogOfWar: FogOfWarSystem;
+  private floorController?: FloorHighlightController;
+
+  private stations: Station[] = [];
+  private unlockedMap: Record<string, UnlockedStationRecord> = {};
+  private st3d: Record<string, Station3DNode> = {};
+  private parts: { m: THREE.Mesh; v: THREE.Vector3; life: number }[] = [];
+  private fxList: {
+    id: number;
+    text: string;
+    p: THREE.Vector3;
+    life: number;
+    color?: string;
+  }[] = [];
+  private fxSeq = 1;
+
+  // Player & 3D GPS Marker (X, Y, Z)
+  private player = {
+    obj: null as THREE.Group | null,
+    pos: new THREE.Vector3(-66, 0, 104),
+    targetPos: new THREE.Vector3(-66, 0, 104),
+    ph: 0,
+    tag: null as THREE.Sprite | null,
+    gpsAccuracyDisc: null as THREE.Mesh | null,
+    gpsVerticalLine: null as THREE.Line | null,
+    gpsGroundShadowRing: null as THREE.Mesh | null,
+  };
+
+  // Real-time 3-Axis GPS & Floor state
+  private kalman = new GpsKalmanFilter3D();
+  private gpsWatchId: number | null = null;
+  private gpsActive = false;
+  private groundAltitudeRefAsl = TDC_GEO_ANCHORS.GROUND_ALTITUDE_ASL_M;
+  private rawAltitudeAsl: number | null = null;
+  private lockedFloor: number | null = null;
+  private inspectedBuildingId: string | null = null;
+  private inspectedFloor: number | null = null;
+  private cutawayEnabled = false;
+  private currentTelemetry: GpsTelemetry3D;
+
+  private cam = {
+    yaw: 0.25,
+    pitch: 0.86,
+    dist: 48,
+    curD: null as number | null,
+    curP: null as number | null,
+    tgt: new THREE.Vector3(-5, 0, -5),
+  };
+
+  private running = false;
+  private paused = false;
+  private photoStation: Station | null = null;
+  private nearStation: Station | null = null;
+  private flagMesh: THREE.Mesh | null = null;
+
+  private disposed = false;
+  private rafId = 0;
+  private resizeObs: ResizeObserver;
+  private cleanupWindowListeners?: () => void;
+  private animateNatureAndTrain?: (dt: number, t: number) => void;
+
+  constructor(
+    container: HTMLElement,
+    initialStations: Station[],
+    initialUnlocked: Record<string, UnlockedStationRecord>,
+    callbacks: EngineCallbacks
+  ) {
+    this.container = container;
+    this.stations = initialStations;
+    this.unlockedMap = initialUnlocked;
+    this.callbacks = callbacks;
+
+    this.currentTelemetry = buildTelemetryFromCampus3D({
+      x: -66,
+      y: 0,
+      z: 104,
+      accuracyMeters: 2.4,
+      source: 'gps_calibrated',
+    });
+
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.localClippingEnabled = true;
+    this.container.appendChild(this.renderer.domElement);
+
+    this.scene = new THREE.Scene();
+    this.scene.fog = new THREE.Fog(0xd3eedf, 380, 1100);
+    this.camera = new THREE.PerspectiveCamera(42, 1, 0.5, 2600);
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8dbf73, 0.74));
+
+    this.sun = new THREE.DirectionalLight(0xfff2d8, 0.8);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048);
+    Object.assign(this.sun.shadow.camera, {
+      left: -150,
+      right: 150,
+      top: 150,
+      bottom: -150,
+      near: 10,
+      far: 500,
+    });
+    this.sun.shadow.bias = -0.0006;
+    this.sun.shadow.normalBias = 0.03;
+    this.scene.add(this.sun, this.sun.target);
+
+    this.fogOfWar = new FogOfWarSystem(this.scene);
+
+    this.resizeObs = new ResizeObserver(() => this.resize());
+    this.resizeObs.observe(this.container);
+    this.resize();
+
+    this.initWorld();
+    this.bindEvents();
+    this.startLoop();
+  }
+
+  private initWorld(): void {
+    const { flag, floorController } = buildCampusEnvironment({
+      scene: this.scene,
+      col: this.col,
+      mat: this.mat,
+      rng: this.rng,
+    });
+    this.flagMesh = flag;
+    this.floorController = floorController;
+
+    const nat = buildNatureAndTrain({
+      scene: this.scene,
+      col: this.col,
+      stations: this.stations,
+      mat: this.mat,
+      rng: this.rng,
+    });
+    this.animateNatureAndTrain = nat.animate;
+
+    // Build 3D station markers (at X, Y, Z elevation) & Fog of War
+    this.rebuildStations3D();
+
+    // GPS Accuracy Sphere/Disc & 3-Axis Z-Elevation Drop Line
+    const accDisc = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 36).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({
+        color: '#00AEEF',
+        transparent: true,
+        opacity: 0.22,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      })
+    );
+    accDisc.position.y = 0.14;
+    accDisc.visible = false;
+    this.scene.add(accDisc);
+    this.player.gpsAccuracyDisc = accDisc;
+
+    const shadowRing = new THREE.Mesh(
+      new THREE.RingGeometry(1.1, 1.55, 32).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({
+        color: '#00F0FF',
+        transparent: true,
+        opacity: 0.75,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      })
+    );
+    shadowRing.position.y = 0.15;
+    shadowRing.visible = false;
+    this.scene.add(shadowRing);
+    this.player.gpsGroundShadowRing = shadowRing;
+
+    const lineGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 1, 0),
+    ]);
+    const vertLine = new THREE.Line(
+      lineGeo,
+      new THREE.LineBasicMaterial({ color: '#00F0FF', transparent: true, opacity: 0.9 })
+    );
+    vertLine.visible = false;
+    this.scene.add(vertLine);
+    this.player.gpsVerticalLine = vertLine;
+
+    // Celebration particles
+    const pg = new THREE.OctahedronGeometry(0.28, 0);
+    for (let i = 0; i < 60; i++) {
+      const m = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ color: '#FFD23F' }));
+      m.visible = false;
+      this.scene.add(m);
+      this.parts.push({ m, v: new THREE.Vector3(), life: 0 });
+    }
+  }
+
+  public rebuildStations3D(): void {
+    Object.values(this.st3d).forEach((node) => {
+      this.scene.remove(node.g);
+    });
+    this.st3d = {};
+
+    const beamT = canvasTex(
+      4,
+      128,
+      (g, W, H) => {
+        const gr = g.createLinearGradient(0, 0, 0, H);
+        gr.addColorStop(0, 'rgba(255,255,255,0)');
+        gr.addColorStop(1, 'rgba(255,255,255,.75)');
+        g.fillStyle = gr;
+        g.fillRect(0, 0, W, H);
+      },
+      false
+    );
+
+    this.stations
+      .filter((st) => st.active !== false)
+      .forEach((st) => {
+        const baseY = st.y || 0;
+        const g = new THREE.Group();
+        g.position.set(st.x, baseY, st.z);
+        this.scene.add(g);
+
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(2.6, 3.3, 40).rotateX(-Math.PI / 2),
+          new THREE.MeshBasicMaterial({
+            color: st.col,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide,
+          })
+        );
+        ring.position.y = 0.16;
+        g.add(ring);
+
+        const disc = new THREE.Mesh(
+          new THREE.CircleGeometry(2.6, 40).rotateX(-Math.PI / 2),
+          new THREE.MeshBasicMaterial({
+            color: st.col,
+            transparent: true,
+            opacity: 0.22,
+            side: THREE.DoubleSide,
+          })
+        );
+        disc.position.y = 0.15;
+        g.add(disc);
+
+        const beam = new THREE.Mesh(
+          new THREE.CylinderGeometry(1.4, 2.2, 20, 20, 1, true),
+          new THREE.MeshBasicMaterial({
+            color: st.col,
+            map: beamT,
+            transparent: true,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+            opacity: 0.55,
+          })
+        );
+        beam.position.y = 10;
+        g.add(beam);
+
+        // Nếu trạm nằm ở tầng cao (baseY > 0.5) hoặc tầng hầm (baseY < -0.5), vẽ trục đứng nối xuống mặt đất
+        let stem: THREE.Line | null = null;
+        if (Math.abs(baseY) > 0.5) {
+          const stemGeo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, -baseY, 0),
+            new THREE.Vector3(0, 0.2, 0),
+          ]);
+          stem = new THREE.Line(
+            stemGeo,
+            new THREE.LineBasicMaterial({ color: st.col, transparent: true, opacity: 0.75 })
+          );
+          g.add(stem);
+        }
+
+        const ped = mesh(
+          new THREE.CylinderGeometry(0.9, 1.2, 0.8, 12),
+          this.mat('#FFFFFF'),
+          0,
+          0.4,
+          0
+        );
+        g.add(ped);
+
+        const isDone = this.unlockedMap[st.id] != null;
+        const icon = new THREE.Sprite(
+          new THREE.SpriteMaterial({ map: coinTex(st, isDone), transparent: true })
+        );
+        icon.scale.setScalar(4.6);
+        icon.position.y = 5.5;
+        g.add(icon);
+
+        const floorBadge = st.floor
+          ? st.floor === -1
+            ? ' [Hầm B1]'
+            : ` [Tầng ${st.floor}]`
+          : '';
+        const lab = pill(`${st.name}${floorBadge}`, { h: 2.2, dot: st.col });
+        lab.position.y = 9.2;
+        g.add(lab);
+
+        this.st3d[st.id] = { g, ring, disc, beam, stem, icon, lab, baseY };
+        this.applyStationVisualState(st);
+      });
+
+    this.fogOfWar.buildForStations(
+      this.stations.filter((s) => s.active !== false),
+      this.unlockedMap
+    );
+  }
+
+  private applyStationVisualState(st: Station): void {
+    const s = this.st3d[st.id];
+    if (!s) return;
+    const d = this.unlockedMap[st.id] != null;
+    s.icon.material.map = coinTex(st, d);
+    s.icon.material.needsUpdate = true;
+    s.beam.visible = !d;
+    (s.ring.material as THREE.MeshBasicMaterial).color.set(d ? '#3DAA5C' : st.col);
+    (s.disc.material as THREE.MeshBasicMaterial).color.set(d ? '#3DAA5C' : st.col);
+  }
+
+  public updateStationsAndProgress(
+    stations: Station[],
+    unlocked: Record<string, UnlockedStationRecord>
+  ): void {
+    const prevKey = this.stations
+      .map(
+        (s) =>
+          `${s.id}:${s.x}:${s.y || 0}:${s.z}:${s.floor || 1}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`
+      )
+      .join('|');
+    const nextKey = stations
+      .map(
+        (s) =>
+          `${s.id}:${s.x}:${s.y || 0}:${s.z}:${s.floor || 1}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`
+      )
+      .join('|');
+    const structureChanged = prevKey !== nextKey;
+
+    this.stations = stations;
+    this.unlockedMap = unlocked;
+
+    if (structureChanged) {
+      this.rebuildStations3D();
+    } else {
+      this.stations.forEach((st) => this.applyStationVisualState(st));
+      this.fogOfWar.syncUnlocked(this.unlockedMap);
+    }
+  }
+
+  public startPlayer(
+    name: string,
+    avatarIdx: number,
+    savedPos?: [number, number] | [number, number, number] | null,
+    hasProgress?: boolean
+  ): void {
+    audioSfx.init();
+    if (this.player.obj) {
+      this.scene.remove(this.player.obj);
+    }
+    const spec = AVATARS[avatarIdx] || AVATARS[0];
+    this.player.obj = makeChibi(spec, true, this.mat);
+    this.player.obj.traverse((m) => {
+      if ((m as THREE.Mesh).isMesh) m.castShadow = true;
+    });
+    this.player.tag = pill(`${name || 'Bạn'} · GPS 3D`, {
+      h: 1.3,
+      fs: 40,
+      bg: '#0F172A',
+      fg: '#38BDF8',
+    });
+    this.player.tag.position.y = 4.0;
+    this.player.obj.add(this.player.tag);
+    this.scene.add(this.player.obj);
+
+    if (savedPos && hasProgress) {
+      const sx = savedPos[0];
+      const sy = savedPos.length === 3 ? savedPos[1] : 0;
+      const sz = savedPos.length === 3 ? savedPos[2] : savedPos[1];
+      this.player.pos.set(sx, sy, sz);
+      this.player.targetPos.set(sx, sy, sz);
+    } else {
+      this.player.pos.set(-66, 0, 102);
+      this.player.targetPos.set(-66, 0, 102);
+    }
+    this.kalman.reset(this.player.pos.x, this.player.pos.y, this.player.pos.z);
+
+    this.player.obj.position.copy(this.player.pos);
+    this.player.obj.rotation.y = Math.PI;
+    this.cam.yaw = 0;
+    this.cam.tgt.set(this.player.pos.x, this.player.pos.y + 1.8, this.player.pos.z);
+    this.running = true;
+    this.paused = false;
+
+    if (this.player.gpsAccuracyDisc) this.player.gpsAccuracyDisc.visible = true;
+    if (this.player.gpsGroundShadowRing) this.player.gpsGroundShadowRing.visible = true;
+    if (this.player.gpsVerticalLine) this.player.gpsVerticalLine.visible = true;
+
+    this.syncTelemetryFromCurrentTarget('gps_calibrated', 2.2);
+    this.startGpsHardwareTracking();
+  }
+
+  /**
+   * Bật định vị GPS phần cứng thực tế theo chuẩn HTML5 Geolocation API (`enableHighAccuracy: true`)
+   * Tự động tính toán 3 trục (X, Y, Z) bao gồm cả Altitude (trục cao độ phân tầng) và Kalman Filter.
+   */
+  public startGpsHardwareTracking(): void {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      return;
+    }
+    if (this.gpsWatchId !== null) {
+      navigator.geolocation.clearWatch(this.gpsWatchId);
+    }
+    this.gpsActive = true;
+    this.gpsWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        if (!this.gpsActive || this.disposed) return;
+        const { latitude, longitude, altitude, accuracy, altitudeAccuracy, heading, speed } =
+          pos.coords;
+
+        this.rawAltitudeAsl = altitude;
+        const projected = gpsToCampus3D({
+          lat: latitude,
+          lng: longitude,
+          altitudeAsl: altitude,
+          groundAltitudeReferenceAsl: this.groundAltitudeRefAsl,
+        });
+
+        // Nếu người dùng đang đứng thực tế trong khuôn viên trường hoặc lân cận (< 450m), cập nhật vị trí GPS thực
+        if (Math.hypot(projected.x, projected.z) < 450) {
+          const clamped = clampToCampusBoundary(projected.x, projected.z);
+          const filtered = this.kalman.filter(
+            clamped.x,
+            projected.y,
+            clamped.z,
+            accuracy || 6,
+            altitudeAccuracy || 10
+          );
+
+          const bld = detectBuildingAtPosition(filtered.x, filtered.z);
+          const resolved =
+            this.lockedFloor !== null
+              ? {
+                  floor: this.lockedFloor,
+                  clampedY: floorToElevationMeters(this.lockedFloor, bld),
+                }
+              : resolveFloorFromElevation(filtered.y, bld);
+
+          this.player.targetPos.set(filtered.x, resolved.clampedY, filtered.z);
+          this.currentTelemetry = {
+            lat: +latitude.toFixed(6),
+            lng: +longitude.toFixed(6),
+            altitudeAsl: altitude != null ? +altitude.toFixed(2) : null,
+            accuracyMeters: +(accuracy || 4.0).toFixed(1),
+            altitudeAccuracyMeters:
+              altitudeAccuracy != null ? +altitudeAccuracy.toFixed(1) : null,
+            headingDeg: heading != null && Number.isFinite(heading) ? Math.round(heading) : null,
+            speedMps: speed != null && Number.isFinite(speed) ? +speed.toFixed(2) : null,
+            x: filtered.x,
+            y: resolved.clampedY,
+            z: filtered.z,
+            detectedFloor: resolved.floor,
+            detectedBuilding: bld,
+            insideCampus: projected.insideCampus,
+            source: 'gps_hardware',
+            timestamp: Date.now(),
+          };
+          this.updateFloorHighlightState();
+          this.callbacks.onGpsTelemetryUpdate?.(this.currentTelemetry);
+        } else {
+          // Người dùng đang mở web từ ngoài khuôn viên trường (> 450m): vẫn ghi nhận tọa độ GPS thật nhưng giữ mô hình ở chế độ Hiệu chuẩn Khuôn viên để khám phá
+          this.currentTelemetry = {
+            ...this.currentTelemetry,
+            lat: +latitude.toFixed(6),
+            lng: +longitude.toFixed(6),
+            altitudeAsl: altitude != null ? +altitude.toFixed(2) : this.currentTelemetry.altitudeAsl,
+            accuracyMeters: +(accuracy || 5.0).toFixed(1),
+            insideCampus: false,
+            timestamp: Date.now(),
+          };
+          this.callbacks.onGpsTelemetryUpdate?.(this.currentTelemetry);
+        }
+      },
+      () => {
+        // Khi thiết bị từ chối quyền GPS hoặc mất sóng trong nhà kín, giữ chế độ Định vị Hiệu chuẩn 3D
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 10000,
+      }
+    );
+  }
+
+  /**
+   * Hiệu chuẩn áp kế / cao độ mặt đất (Tare Ground Altitude = 0.0m / Tầng 1)
+   * Giúp loại bỏ sai số độ cao GPS giữa các dòng điện thoại khác nhau.
+   */
+  public calibrateGroundZeroAltitude(): void {
+    if (this.rawAltitudeAsl != null && Number.isFinite(this.rawAltitudeAsl)) {
+      this.groundAltitudeRefAsl = this.rawAltitudeAsl;
+    }
+    this.lockedFloor = 1;
+    this.setTargetPosition3D(this.player.targetPos.x, 0, this.player.targetPos.z, 'gps_calibrated');
+  }
+
+  /**
+   * Đặt tọa độ 3 trục (X, Y, Z) trực tiếp từ bộ định vị GPS / Chọn Tòa nhà & Tầng để khám phá
+   */
+  public setTargetPosition3D(
+    x: number,
+    y: number,
+    z: number,
+    source: GpsTelemetry3D['source'] = 'gps_calibrated'
+  ): void {
+    const clamped = clampToCampusBoundary(x, z);
+    const bld = detectBuildingAtPosition(clamped.x, clamped.z);
+    const resolved = resolveFloorFromElevation(y, bld);
+    const effectiveY = resolved.clampedY;
+
+    this.lockedFloor = resolved.floor;
+    this.player.targetPos.set(clamped.x, effectiveY, clamped.z);
+    this.kalman.reset(clamped.x, effectiveY, clamped.z);
+    this.inspectedBuildingId = bld?.id || null;
+    this.inspectedFloor = resolved.floor;
+
+    this.syncTelemetryFromCurrentTarget(source, source === 'gps_hardware' ? 3.2 : 1.5);
+  }
+
+  /**
+   * Chọn tầng cụ thể (Trục cao độ Y/Z: Tầng Hầm B1 = -1, Tầng 1..11) để khám phá mặt sàn phân tầng
+   */
+  public selectFloorLevel(floor: number | null, enableCutaway?: boolean): void {
+    this.lockedFloor = floor;
+    if (enableCutaway !== undefined) {
+      this.cutawayEnabled = enableCutaway;
+    }
+    if (floor !== null) {
+      const bld = detectBuildingAtPosition(this.player.targetPos.x, this.player.targetPos.z);
+      const validFloor = bld
+        ? clamp(floor, bld.minFloor, bld.maxFloor)
+        : clamp(floor, -1, 11);
+      this.lockedFloor = validFloor;
+      const nextY = floorToElevationMeters(validFloor, bld);
+      this.player.targetPos.y = nextY;
+      this.inspectedFloor = validFloor;
+      this.inspectedBuildingId = bld?.id || null;
+    } else {
+      this.inspectedFloor = null;
+    }
+    this.syncTelemetryFromCurrentTarget('manual_override', 1.5);
+  }
+
+  /**
+   * Bật / Tắt chế độ Cắt lớp Phân tầng 3D (3D Floor Cutaway) để nhìn xuyên vào bên trong tầng đang chọn
+   */
+  public setCutawayMode(enabled: boolean): void {
+    this.cutawayEnabled = enabled;
+    this.updateFloorHighlightState();
+  }
+
+  public getCutawayMode(): boolean {
+    return this.cutawayEnabled;
+  }
+
+  private updateFloorHighlightState(): void {
+    if (!this.floorController) return;
+    const activeFloor =
+      this.lockedFloor ?? this.inspectedFloor ?? this.currentTelemetry.detectedFloor;
+    const activeBldId =
+      this.inspectedBuildingId ?? this.currentTelemetry.detectedBuilding?.id ?? null;
+
+    this.floorController.setFloorView(activeBldId, activeFloor, this.cutawayEnabled);
+  }
+
+  private syncTelemetryFromCurrentTarget(
+    source: GpsTelemetry3D['source'],
+    accuracyMeters: number
+  ): void {
+    this.currentTelemetry = buildTelemetryFromCampus3D({
+      x: this.player.targetPos.x,
+      y: this.player.targetPos.y,
+      z: this.player.targetPos.z,
+      accuracyMeters,
+      source,
+      lockedFloor: this.lockedFloor,
+      groundAltitudeReferenceAsl: this.groundAltitudeRefAsl,
+    });
+    this.updateFloorHighlightState();
+    this.callbacks.onGpsTelemetryUpdate?.(this.currentTelemetry);
+  }
+
+  public setPaused(p: boolean): void {
+    this.paused = p;
+  }
+
+  public enterPhotoMode(st: Station): void {
+    this.photoStation = st;
+    if (this.player.obj) {
+      this.player.obj.rotation.y = Math.atan2(
+        Math.sin(this.cam.yaw),
+        Math.cos(this.cam.yaw)
+      );
+    }
+  }
+
+  public exitPhotoMode(): void {
+    this.photoStation = null;
+  }
+
+  public rotatePhotoCamera(): void {
+    this.cam.yaw += 0.6;
+    if (this.player.obj) {
+      this.player.obj.rotation.y = Math.atan2(
+        Math.sin(this.cam.yaw),
+        Math.cos(this.cam.yaw)
+      );
+    }
+  }
+
+  public capturePhotoDataUrl(): string {
+    this.renderer.render(this.scene, this.camera);
+    try {
+      return this.renderer.domElement.toDataURL('image/jpeg', 0.85);
+    } catch {
+      return '';
+    }
+  }
+
+  /**
+   * Định vị / Đồng bộ ngay tới tọa độ 3D (X, Y, Z) của một trạm hoặc tòa nhà
+   */
+  public navigateToStation(st: Station): void {
+    if (!this.running) return;
+    const targetY = st.y ?? (st.floor ? floorToElevationMeters(st.floor) : 0);
+    this.lockedFloor = st.floor ?? 1;
+    this.setTargetPosition3D(st.x, targetY, st.z, 'gps_calibrated');
+  }
+
+  public celebrateStationUnlock(st: Station, ptsText: string): void {
+    const sy = st.y || 0;
+    this.burst(
+      new THREE.Vector3(st.x, sy + 5, st.z),
+      ['#FFD23F', '#FF6F59', '#00AEEF', '#38B865', '#FF8FB1', '#9B6BFF'],
+      42
+    );
+    this.spawnFloatText(ptsText, new THREE.Vector3(st.x, sy + 4, st.z));
+  }
+
+  public spawnFloatText(text: string, worldPos: THREE.Vector3, color?: string): void {
+    this.fxList.push({
+      id: this.fxSeq++,
+      text,
+      p: worldPos.clone().add(new THREE.Vector3(0, 2.5, 0)),
+      life: 1,
+      color,
+    });
+  }
+
+  public burst(pos: THREE.Vector3, colors: string[], n: number): void {
+    let k = 0;
+    for (const p of this.parts) {
+      if (p.life > 0) continue;
+      p.life = 1;
+      p.m.visible = true;
+      p.m.position.copy(pos);
+      (p.m.material as THREE.MeshBasicMaterial).color.set(colors[k % colors.length]);
+      p.v.set(
+        (Math.random() - 0.5) * 10,
+        6 + Math.random() * 7,
+        (Math.random() - 0.5) * 10
+      );
+      if (++k >= n) break;
+    }
+  }
+
+  private bindEvents(): void {
+    // Chỉ giữ phím tắt xoay/zoom camera (+ / - / Enter mở trạm), loại bỏ hoàn toàn điều khiển nhân vật bằng WASD/click đất kiểu game giả lập
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (!this.running || this.paused || this.photoStation) return;
+      const k = e.key.toLowerCase();
+      if ((k === 'enter' || k === ' ') && this.nearStation) {
+        e.preventDefault();
+        this.callbacks.onOpenStationRequest(this.nearStation);
+        return;
+      }
+      if (k === '+' || k === '=') this.cam.dist = clamp(this.cam.dist * 0.85, 16, 160);
+      if (k === '-') this.cam.dist = clamp(this.cam.dist / 0.85, 16, 160);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    this.cleanupWindowListeners = () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+
+    const cv = this.renderer.domElement;
+    const ptrs = new Map<number, { x: number; y: number }>();
+    let drag: {
+      x: number;
+      y: number;
+      sx: number;
+      sy: number;
+      moved: boolean;
+    } | null = null;
+    let pinch: number | null = null;
+
+    cv.addEventListener('pointerdown', (e) => {
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      try {
+        cv.setPointerCapture(e.pointerId);
+      } catch {
+        // Ignore capture error
+      }
+      if (ptrs.size === 1) {
+        drag = {
+          x: e.clientX,
+          y: e.clientY,
+          sx: e.clientX,
+          sy: e.clientY,
+          moved: false,
+        };
+      } else if (ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()];
+        pinch = Math.hypot(a.x - b.x, a.y - b.y);
+        drag = null;
+      }
+    });
+
+    cv.addEventListener('pointermove', (e) => {
+      if (!ptrs.has(e.pointerId)) return;
+      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (!this.running) return;
+      if (pinch && ptrs.size === 2) {
+        const [a, b] = [...ptrs.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        this.cam.dist = clamp((this.cam.dist * pinch) / d, 16, 160);
+        pinch = d;
+        return;
+      }
+      if (!drag) return;
+      const dx = e.clientX - drag.x;
+      const dy = e.clientY - drag.y;
+      drag.x = e.clientX;
+      drag.y = e.clientY;
+      if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 6) drag.moved = true;
+      if (drag.moved) {
+        this.cam.yaw -= dx * 0.006;
+        this.cam.pitch = clamp(this.cam.pitch + dy * 0.004, 0.25, 1.42);
+      }
+    });
+
+    const endPtr = (e: PointerEvent) => {
+      ptrs.delete(e.pointerId);
+      if (ptrs.size < 2) pinch = null;
+      if (!ptrs.size) drag = null;
+    };
+
+    cv.addEventListener('pointerup', endPtr);
+    cv.addEventListener('pointercancel', (e) => {
+      ptrs.delete(e.pointerId);
+      drag = null;
+      pinch = null;
+    });
+    cv.addEventListener(
+      'wheel',
+      (e) => {
+        if (!this.running) return;
+        e.preventDefault();
+        this.cam.dist = clamp(this.cam.dist * (1 + e.deltaY * 0.0012), 16, 160);
+      },
+      { passive: false }
+    );
+    cv.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
+  private resize(): void {
+    const w = this.container.clientWidth;
+    const h = this.container.clientHeight;
+    if (!w || !h) return;
+    this.renderer.setSize(w, h, false);
+    this.renderer.domElement.style.width = `${w}px`;
+    this.renderer.domElement.style.height = `${h}px`;
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+  }
+
+  private startLoop(): void {
+    let last = performance.now();
+    let T = 0;
+    let saveT = 0;
+    let hudSyncT = 0;
+    const tmpV = new THREE.Vector3();
+
+    const frame = (now: number) => {
+      if (this.disposed) return;
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      T += dt;
+
+      if (this.running && !this.paused && !this.photoStation) {
+        this.updateGpsAvatar3D(dt, T);
+        saveT -= dt;
+        if (saveT <= 0) {
+          saveT = 2.0;
+          this.callbacks.onPlayerMoveSave([
+            +this.player.pos.x.toFixed(1),
+            +this.player.pos.y.toFixed(1),
+            +this.player.pos.z.toFixed(1),
+          ]);
+        }
+      } else if (this.running && this.player.obj) {
+        animChibi(this.player.obj, this.player.ph, 0, T);
+      }
+
+      // Camera tracks full 3D position (X, Y, Z) so rising to Floor 7 or Floor 11 smoothly elevates camera
+      let d: number;
+      let p: number;
+      if (this.running) {
+        this.cam.tgt.lerp(
+          tmpV.set(this.player.pos.x, this.player.pos.y + 1.8, this.player.pos.z),
+          1 - Math.exp(-dt * 7)
+        );
+        d = this.photoStation ? 15 : this.cam.dist;
+        p = this.photoStation ? 0.38 : this.cam.pitch;
+      } else {
+        this.cam.yaw += dt * 0.035;
+        this.cam.tgt.lerp(tmpV.set(10, 0, -2), 1 - Math.exp(-dt * 2));
+        const a = this.camera.aspect || 1;
+        d = a < 1 ? (430 / Math.max(a, 0.5)) * 0.75 : 300;
+        p = 0.74;
+      }
+      this.cam.curD =
+        this.cam.curD == null
+          ? d
+          : this.cam.curD + (d - this.cam.curD) * (1 - Math.exp(-dt * 4));
+      this.cam.curP =
+        this.cam.curP == null
+          ? p
+          : this.cam.curP + (p - this.cam.curP) * (1 - Math.exp(-dt * 4));
+
+      this.camera.position.set(
+        this.cam.tgt.x + Math.sin(this.cam.yaw) * Math.cos(this.cam.curP) * this.cam.curD,
+        this.cam.tgt.y + Math.sin(this.cam.curP) * this.cam.curD,
+        this.cam.tgt.z + Math.cos(this.cam.yaw) * Math.cos(this.cam.curP) * this.cam.curD
+      );
+      this.camera.lookAt(this.cam.tgt);
+      this.sun.position.set(this.cam.tgt.x + 70, 150, this.cam.tgt.z + 55);
+      this.sun.target.position.copy(this.cam.tgt);
+
+      // Animate world
+      this.animateWorld(dt, T);
+      this.fogOfWar.animate(dt, T);
+
+      this.renderer.render(this.scene, this.camera);
+
+      if (this.running) {
+        this.updateFloatingTexts(dt, tmpV);
+        hudSyncT -= dt;
+        if (hudSyncT <= 0) {
+          hudSyncT = 0.08;
+          this.emitGuideAndMinimap();
+        }
+      }
+
+      this.rafId = requestAnimationFrame(frame);
+    };
+
+    this.rafId = requestAnimationFrame(frame);
+  }
+
+  /**
+   * Nội suy mượt vị trí nhân vật 3D theo tín hiệu GPS 3 trục (X, Y, Z)
+   * và cập nhật bán kính sai số GPS, đường chiếu đứng từ tầng cao xuống mặt đất.
+   */
+  private updateGpsAvatar3D(dt: number, t: number): void {
+    const dx = this.player.targetPos.x - this.player.pos.x;
+    const dy = this.player.targetPos.y - this.player.pos.y;
+    const dz = this.player.targetPos.z - this.player.pos.z;
+    const distHoriz = Math.hypot(dx, dz);
+    const dist3D = Math.hypot(dx, dy, dz);
+
+    const lerpFactor = 1 - Math.exp(-dt * 8.5);
+    this.player.pos.x += dx * lerpFactor;
+    this.player.pos.y += dy * lerpFactor;
+    this.player.pos.z += dz * lerpFactor;
+
+    const moveAmt = clamp(dist3D * 0.45, 0, 1);
+    if (distHoriz > 0.08 && this.player.obj) {
+      this.player.obj.rotation.y = lerpAngle(
+        this.player.obj.rotation.y,
+        Math.atan2(dx, dz),
+        1 - Math.exp(-dt * 10)
+      );
+    }
+    this.player.ph += dt * (2.5 + moveAmt * 9);
+
+    if (this.player.obj) {
+      animChibi(this.player.obj, this.player.ph, moveAmt > 0.05 ? moveAmt : 0, t);
+      this.player.obj.position.copy(this.player.pos);
+    }
+
+    // Cập nhật vòng tròn sai số GPS tại độ cao Y của người dùng
+    if (this.player.gpsAccuracyDisc) {
+      const r = clamp(this.currentTelemetry.accuracyMeters, 1.8, 18);
+      const pulse = 1 + Math.sin(t * 3.2) * 0.08;
+      this.player.gpsAccuracyDisc.position.set(
+        this.player.pos.x,
+        this.player.pos.y + 0.14,
+        this.player.pos.z
+      );
+      this.player.gpsAccuracyDisc.scale.set(r * pulse, 1, r * pulse);
+    }
+
+    // Cập nhật hình chiếu trên mặt sân trường (y = 0.15) và trục đứng Z-Elevation
+    if (this.player.gpsGroundShadowRing) {
+      this.player.gpsGroundShadowRing.position.set(
+        this.player.pos.x,
+        0.15,
+        this.player.pos.z
+      );
+    }
+
+    if (this.player.gpsVerticalLine) {
+      const posAttr = this.player.gpsVerticalLine.geometry.getAttribute(
+        'position'
+      ) as THREE.BufferAttribute;
+      posAttr.setXYZ(0, this.player.pos.x, 0.15, this.player.pos.z);
+      posAttr.setXYZ(1, this.player.pos.x, this.player.pos.y + 0.2, this.player.pos.z);
+      posAttr.needsUpdate = true;
+      this.player.gpsVerticalLine.visible = Math.abs(this.player.pos.y) > 0.35;
+    }
+
+    // Kiểm tra khoảng cách không gian 3 chiều (X, Y, Z) tới các trạm
+    let near: Station | null = null;
+    let best = 9.5; // Bán kính nhận diện GPS 3D tại trạm
+    this.stations
+      .filter((st) => st.active !== false)
+      .forEach((st) => {
+        const d3 = distance3D(
+          { x: st.x, y: st.y || 0, z: st.z },
+          { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z }
+        );
+        if (d3 < best) {
+          best = d3;
+          near = st;
+        }
+      });
+
+    if (near !== this.nearStation) {
+      this.nearStation = near;
+      this.callbacks.onNearStationChange(near);
+    }
+  }
+
+  private animateWorld(dt: number, t: number): void {
+    this.animateNatureAndTrain?.(dt, t);
+
+    if (this.flagMesh) {
+      this.flagMesh.rotation.y = Math.sin(t * 3) * 0.25;
+    }
+
+    this.stations.forEach((st, i) => {
+      const s = this.st3d[st.id];
+      if (!s) return;
+      s.icon.position.y = 5.5 + Math.sin(t * 2 + i) * 0.45;
+      const k = 1 + ((t * 0.8 + i * 0.3) % 1) * 0.35;
+      s.ring.scale.set(k, 1, k);
+      (s.ring.material as THREE.MeshBasicMaterial).opacity =
+        0.95 - ((t * 0.8 + i * 0.3) % 1) * 0.6;
+    });
+
+    this.parts.forEach((p) => {
+      if (p.life <= 0) return;
+      p.life -= dt * 1.1;
+      p.v.y -= 22 * dt;
+      p.m.position.addScaledVector(p.v, dt);
+      p.m.rotation.x += dt * 6;
+      p.m.scale.setScalar(Math.max(0.05, p.life * 1.3));
+      if (p.life <= 0) p.m.visible = false;
+    });
+  }
+
+  private updateFloatingTexts(dt: number, tmpV: THREE.Vector3): void {
+    if (this.fxList.length === 0) return;
+    const w = this.container.clientWidth;
+    const h = this.container.clientHeight;
+    const out: FloatingTextItem[] = [];
+
+    for (let i = this.fxList.length - 1; i >= 0; i--) {
+      const f = this.fxList[i];
+      f.life -= dt * 0.9;
+      f.p.y += dt * 3;
+      if (f.life <= 0) {
+        this.fxList.splice(i, 1);
+        continue;
+      }
+      tmpV.copy(f.p).project(this.camera);
+      out.push({
+        id: f.id,
+        text: f.text,
+        x: ((tmpV.x + 1) / 2) * w,
+        y: ((1 - tmpV.y) / 2) * h,
+        opacity: Math.min(1, f.life * 2),
+        scale: 0.8 + f.life * 0.4,
+        color: f.color,
+      });
+    }
+    this.callbacks.onFloatingTextsUpdate(out);
+  }
+
+  private emitGuideAndMinimap(): void {
+    let best: Station | null = null;
+    let bd3 = 1e9;
+    let bHoriz = 0;
+    const activeStations = this.stations.filter((st) => st.active !== false);
+    activeStations.forEach((st) => {
+      if (this.unlockedMap[st.id] != null) return;
+      const d3 = distance3D(
+        { x: st.x, y: st.y || 0, z: st.z },
+        { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z }
+      );
+      if (d3 < bd3) {
+        bd3 = d3;
+        bHoriz = Math.hypot(st.x - this.player.pos.x, st.z - this.player.pos.z);
+        best = st;
+      }
+    });
+
+    let angleRad = 0;
+    let deltaFloor = 0;
+    if (best) {
+      const target = best as Station;
+      const vx = target.x - this.player.pos.x;
+      const vz = target.z - this.player.pos.z;
+      const fx = -Math.sin(this.cam.yaw);
+      const fz = -Math.cos(this.cam.yaw);
+      const rx = Math.cos(this.cam.yaw);
+      const rz = -Math.sin(this.cam.yaw);
+      angleRad = Math.atan2(vx * rx + vz * rz, vx * fx + vz * fz);
+      const targetFloor = target.floor || 1;
+      deltaFloor = targetFloor - this.currentTelemetry.detectedFloor;
+    }
+
+    this.callbacks.onGuideUpdate({
+      station: best,
+      distance: best ? bd3 : 0,
+      horizDistance: best ? bHoriz : 0,
+      deltaFloor,
+      angleRad,
+      allDone: best === null && activeStations.length > 0,
+    });
+
+    this.callbacks.onMinimapUpdate({
+      playerX: this.player.pos.x,
+      playerY: this.player.pos.y,
+      playerZ: this.player.pos.z,
+      playerFloor: this.currentTelemetry.detectedFloor,
+      accuracyMeters: this.currentTelemetry.accuracyMeters,
+      playerRotY: this.player.obj ? this.player.obj.rotation.y : 0,
+      camYaw: this.cam.yaw,
+      col: this.col,
+    });
+  }
+
+  public dispose(): void {
+    this.disposed = true;
+    this.gpsActive = false;
+    if (this.gpsWatchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.clearWatch(this.gpsWatchId);
+    }
+    cancelAnimationFrame(this.rafId);
+    this.cleanupWindowListeners?.();
+    this.resizeObs.disconnect();
+    this.renderer.dispose();
+    if (this.renderer.domElement.parentNode === this.container) {
+      this.container.removeChild(this.renderer.domElement);
+    }
+  }
+}
+</file>
+
 <file path="src/pages/AdminDashboard.tsx">
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
@@ -10871,1802 +12633,6 @@ export async function fetchLeaderboardData(
 }
 </file>
 
-<file path="src/services/partyService.ts">
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { FACULTIES } from '../data/faculties';
-import { FacultyId, PartyMember, PartyRoom, UserProfile } from '../types/game';
-import { syncProfileToCloud } from './authService';
-import { db, isFirebaseConfigured } from './firebase';
-
-const LOCAL_PARTIES_KEY = 'tdc_go_parties_v2';
-
-const SAMPLE_PARTIES: PartyRoom[] = [
-  {
-    code: 'TDC26A',
-    hostUid: 'sample_1',
-    name: 'Biệt đội Liên Khoa TDC',
-    memberUids: ['sample_1', 'sample_2', 'sample_3'],
-    members: [
-      {
-        uid: 'sample_1',
-        name: 'Minh Anh',
-        mssv: '24211TT0124',
-        facultyId: 'cntt',
-        avatar: 0,
-        points: 1420,
-      },
-      {
-        uid: 'sample_2',
-        name: 'Gia Huy',
-        mssv: '24211DD0089',
-        facultyId: 'dien_dt',
-        avatar: 1,
-        points: 1280,
-      },
-      {
-        uid: 'sample_3',
-        name: 'Thảo Vy',
-        mssv: '24211KT0215',
-        facultyId: 'kinh_te',
-        avatar: 2,
-        points: 1150,
-      },
-    ],
-    isCrossFaculty: true,
-    bonusMultiplier: 1.2,
-    totalPoints: 3850,
-    createdAt: Date.now() - 7200000,
-  },
-  {
-    code: 'CNTT99',
-    hostUid: 'sample_4',
-    name: 'Chiến thần Code & Cơ khí',
-    memberUids: ['sample_4', 'sample_6'],
-    members: [
-      {
-        uid: 'sample_4',
-        name: 'Quốc Bảo',
-        mssv: '24211OT0042',
-        facultyId: 'co_khi_oto',
-        avatar: 0,
-        points: 990,
-      },
-      {
-        uid: 'sample_6',
-        name: 'Tuấn Kiệt',
-        mssv: '24211CK0071',
-        facultyId: 'co_khi_ctm',
-        avatar: 1,
-        points: 740,
-      },
-    ],
-    isCrossFaculty: true,
-    bonusMultiplier: 1.2,
-    totalPoints: 1730,
-    createdAt: Date.now() - 5400000,
-  },
-];
-
-export function evaluateCrossFacultyBonus(members: PartyMember[]): {
-  isCrossFaculty: boolean;
-  bonusMultiplier: number;
-} {
-  const uniqueFaculties = new Set(members.map((m) => m.facultyId));
-  const isCross = uniqueFaculties.size >= 2;
-  return {
-    isCrossFaculty: isCross,
-    bonusMultiplier: isCross ? 1.2 : 1.0,
-  };
-}
-
-export function loadLocalParties(): PartyRoom[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_PARTIES_KEY);
-    if (!raw) {
-      localStorage.setItem(LOCAL_PARTIES_KEY, JSON.stringify(SAMPLE_PARTIES));
-      return [...SAMPLE_PARTIES];
-    }
-    const parsed = JSON.parse(raw) as PartyRoom[];
-    return Array.isArray(parsed) ? parsed : [...SAMPLE_PARTIES];
-  } catch {
-    return [...SAMPLE_PARTIES];
-  }
-}
-
-export function saveLocalParties(parties: PartyRoom[]): void {
-  try {
-    localStorage.setItem(LOCAL_PARTIES_KEY, JSON.stringify(parties));
-  } catch {
-    // Ignore
-  }
-}
-
-function generateRoomCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let out = '';
-  for (let i = 0; i < 6; i++) {
-    out += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return out;
-}
-
-export async function getPartyByCode(code: string): Promise<PartyRoom | null> {
-  const cleanCode = code.trim().toUpperCase();
-  if (!cleanCode) return null;
-
-  if (isFirebaseConfigured && db) {
-    try {
-      const snap = await getDoc(doc(db, 'parties', cleanCode));
-      if (snap.exists()) return snap.data() as PartyRoom;
-    } catch {
-      // Fallback local
-    }
-  }
-  const parties = loadLocalParties();
-  return parties.find((p) => p.code === cleanCode) || null;
-}
-
-export async function createPartyRoom(
-  profile: UserProfile,
-  partyName: string
-): Promise<{ room: PartyRoom; updatedProfile: UserProfile }> {
-  const code = generateRoomCode();
-  const hostMember: PartyMember = {
-    uid: profile.uid,
-    name: profile.name,
-    mssv: profile.mssv,
-    facultyId: profile.facultyId,
-    avatar: profile.avatar,
-    points: profile.points,
-  };
-
-  const room: PartyRoom = {
-    code,
-    hostUid: profile.uid,
-    name: partyName.trim().slice(0, 45) || `Tổ đội của ${profile.name}`,
-    memberUids: [profile.uid],
-    members: [hostMember],
-    isCrossFaculty: false,
-    bonusMultiplier: 1.0,
-    totalPoints: profile.points,
-    createdAt: Date.now(),
-  };
-
-  if (isFirebaseConfigured && db) {
-    try {
-      await setDoc(doc(db, 'parties', code), room);
-    } catch {
-      // Fallback local
-    }
-  }
-
-  const parties = loadLocalParties().filter((p) => p.code !== code);
-  parties.unshift(room);
-  saveLocalParties(parties);
-
-  const updatedProfile: UserProfile = {
-    ...profile,
-    partyId: code,
-    updatedAt: Date.now(),
-  };
-  await syncProfileToCloud(updatedProfile);
-  return { room, updatedProfile };
-}
-
-export async function joinPartyRoom(
-  profile: UserProfile,
-  codeInput: string
-): Promise<{ room: PartyRoom; updatedProfile: UserProfile }> {
-  const code = codeInput.trim().toUpperCase();
-  const room = await getPartyByCode(code);
-  if (!room) {
-    throw new Error(`Không tìm thấy phòng Tổ đội với mã "${code}".`);
-  }
-  if (!room.memberUids.includes(profile.uid) && room.members.length >= 4) {
-    throw new Error('Phòng Tổ đội này đã đủ tối đa 4 thành viên.');
-  }
-
-  const me: PartyMember = {
-    uid: profile.uid,
-    name: profile.name,
-    mssv: profile.mssv,
-    facultyId: profile.facultyId,
-    avatar: profile.avatar,
-    points: profile.points,
-  };
-
-  const filteredMembers = room.members.filter((m) => m.uid !== profile.uid);
-  const nextMembers = [...filteredMembers, me];
-  const nextUids = nextMembers.map((m) => m.uid);
-  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
-  const totalPoints = nextMembers.reduce((sum, m) => sum + m.points, 0);
-
-  const updatedRoom: PartyRoom = {
-    ...room,
-    memberUids: nextUids,
-    members: nextMembers,
-    isCrossFaculty,
-    bonusMultiplier,
-    totalPoints,
-  };
-
-  if (isFirebaseConfigured && db) {
-    try {
-      await setDoc(doc(db, 'parties', code), updatedRoom);
-    } catch {
-      // Fallback local
-    }
-  }
-
-  const parties = loadLocalParties();
-  const idx = parties.findIndex((p) => p.code === code);
-  if (idx >= 0) parties[idx] = updatedRoom;
-  else parties.unshift(updatedRoom);
-  saveLocalParties(parties);
-
-  const updatedProfile: UserProfile = {
-    ...profile,
-    partyId: code,
-    updatedAt: Date.now(),
-  };
-  await syncProfileToCloud(updatedProfile);
-
-  return { room: updatedRoom, updatedProfile };
-}
-
-export async function simulateTeammateJoin(
-  roomCode: string,
-  currentFacultyId: FacultyId
-): Promise<PartyRoom> {
-  const room = await getPartyByCode(roomCode);
-  if (!room) throw new Error('Không tìm thấy phòng tổ đội.');
-  if (room.members.length >= 4) {
-    throw new Error('Tổ đội đã đủ 4 thành viên.');
-  }
-
-  const otherFaculties = FACULTIES.filter((f) => f.id !== currentFacultyId);
-  const pickedFaculty =
-    otherFaculties[room.members.length % otherFaculties.length] || FACULTIES[1];
-  const sampleNames = ['Hoàng Nam', 'Khánh Linh', 'Đức Trọng', 'Phương Thảo'];
-  const idx = room.members.length;
-  const teammate: PartyMember = {
-    uid: `coop_ally_${Date.now()}`,
-    name: sampleNames[idx % sampleNames.length],
-    mssv: `25211${pickedFaculty.id.slice(0, 2).toUpperCase()}0${10 + idx}`,
-    facultyId: pickedFaculty.id,
-    avatar: idx % 3,
-    points: 240 + idx * 80,
-  };
-
-  const nextMembers = [...room.members, teammate];
-  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
-  const updatedRoom: PartyRoom = {
-    ...room,
-    memberUids: nextMembers.map((m) => m.uid),
-    members: nextMembers,
-    isCrossFaculty,
-    bonusMultiplier,
-    totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
-  };
-
-  if (isFirebaseConfigured && db) {
-    try {
-      await setDoc(doc(db, 'parties', room.code), updatedRoom);
-    } catch {
-      // Ignore
-    }
-  }
-
-  const parties = loadLocalParties();
-  const pIdx = parties.findIndex((p) => p.code === room.code);
-  if (pIdx >= 0) parties[pIdx] = updatedRoom;
-  else parties.unshift(updatedRoom);
-  saveLocalParties(parties);
-
-  return updatedRoom;
-}
-
-export async function syncMemberPointsInParty(profile: UserProfile): Promise<PartyRoom | null> {
-  if (!profile.partyId) return null;
-  const room = await getPartyByCode(profile.partyId);
-  if (!room) return null;
-
-  const nextMembers = room.members.map((m) =>
-    m.uid === profile.uid
-      ? {
-          ...m,
-          name: profile.name,
-          facultyId: profile.facultyId,
-          avatar: profile.avatar,
-          points: profile.points,
-        }
-      : m
-  );
-  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
-  const updatedRoom: PartyRoom = {
-    ...room,
-    members: nextMembers,
-    isCrossFaculty,
-    bonusMultiplier,
-    totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
-  };
-
-  if (isFirebaseConfigured && db) {
-    try {
-      await setDoc(doc(db, 'parties', room.code), updatedRoom);
-    } catch {
-      // Ignore
-    }
-  }
-
-  const parties = loadLocalParties();
-  const idx = parties.findIndex((p) => p.code === room.code);
-  if (idx >= 0) parties[idx] = updatedRoom;
-  saveLocalParties(parties);
-  return updatedRoom;
-}
-
-export async function leavePartyRoom(profile: UserProfile): Promise<UserProfile> {
-  if (profile.partyId) {
-    const code = profile.partyId.trim().toUpperCase();
-    const room = await getPartyByCode(code);
-    if (room) {
-      const nextMembers = room.members.filter((m) => m.uid !== profile.uid);
-      const nextUids = nextMembers.map((m) => m.uid);
-      const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
-      const updatedRoom: PartyRoom = {
-        ...room,
-        hostUid: nextMembers[0]?.uid || room.hostUid,
-        memberUids: nextUids,
-        members: nextMembers,
-        isCrossFaculty,
-        bonusMultiplier,
-        totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
-      };
-
-      if (isFirebaseConfigured && db && nextMembers.length > 0) {
-        try {
-          await setDoc(doc(db, 'parties', room.code), updatedRoom);
-        } catch {
-          // Ignore
-        }
-      }
-
-      const parties = loadLocalParties();
-      const idx = parties.findIndex((p) => p.code === room.code);
-      if (idx >= 0) {
-        if (nextMembers.length > 0) {
-          parties[idx] = updatedRoom;
-        } else {
-          parties.splice(idx, 1);
-        }
-        saveLocalParties(parties);
-      }
-    }
-  }
-
-  const updated: UserProfile = {
-    ...profile,
-    partyId: undefined,
-    updatedAt: Date.now(),
-  };
-  await syncProfileToCloud(updated);
-  return updated;
-}
-</file>
-
-<file path="src/types/game.ts">
-export type FacultyId =
-  | 'cntt'
-  | 'dien_dt'
-  | 'co_khi_oto'
-  | 'co_khi_ctm'
-  | 'kinh_te'
-  | 'ngoai_ngu'
-  | 'du_lich'
-  | 'khac';
-
-export interface Faculty {
-  id: FacultyId;
-  name: string;
-  shortName: string;
-  color: string;
-  badgeColor: string;
-}
-
-export type StationType =
-  | 'checkin'
-  | 'photo'
-  | 'quiz'
-  | 'kick'
-  | 'it_debug'
-  | 'electric_circuit'
-  | 'auto_engine';
-
-export interface QuizItem {
-  q: string;
-  opts: string[];
-  ans: number;
-  ex: string;
-}
-
-export interface StationRiddle {
-  prompt: string;
-  answer: string;
-  hint: string;
-}
-
-export interface Station {
-  id: string;
-  name: string;
-  sub: string;
-  facultyId: string;
-  x: number;
-  y?: number;
-  z: number;
-  floor?: number;
-  buildingId?: string;
-  fogRadius: number;
-  col: string;
-  type: StationType;
-  pts: number;
-  badge: string;
-  info: string;
-  funFact: string;
-  directions: string;
-  qrSecretToken: string;
-  riddle?: StationRiddle;
-  questions?: QuizItem[];
-  active: boolean;
-}
-
-export interface BuildingFloorSpec {
-  floor: number;
-  label: string;
-  elevationMeters: number;
-  departments: string;
-  highlights: string;
-}
-
-export interface CampusBuildingZone {
-  id: string;
-  code: string;
-  name: string;
-  bounds: [number, number, number, number]; // [x0, z0, x1, z1]
-  minFloor: number;
-  maxFloor: number;
-  floorHeightMeters: number;
-  color: string;
-  floors: BuildingFloorSpec[];
-}
-
-export interface GpsTelemetry3D {
-  lat: number;
-  lng: number;
-  altitudeAsl: number | null;
-  accuracyMeters: number;
-  altitudeAccuracyMeters: number | null;
-  headingDeg: number | null;
-  speedMps: number | null;
-  x: number;
-  y: number;
-  z: number;
-  detectedFloor: number;
-  detectedBuilding: CampusBuildingZone | null;
-  insideCampus: boolean;
-  source: 'gps_hardware' | 'gps_calibrated' | 'manual_override';
-  timestamp: number;
-}
-
-export type VerificationMethod = 'qr' | 'riddle' | 'demo';
-
-export interface UnlockedStationRecord {
-  pts: number;
-  unlockedAt: number;
-  method: VerificationMethod;
-  photoDataUrl?: string;
-}
-
-export interface UserProfile {
-  uid: string;
-  name: string;
-  mssv: string;
-  email: string;
-  facultyId: FacultyId;
-  role: 'student' | 'admin';
-  avatar: number;
-  points: number;
-  stars: number;
-  quizOk: number;
-  photos: number;
-  done: Record<string, UnlockedStationRecord>;
-  bonus: Record<string, boolean>;
-  partyId?: string;
-  pos?: [number, number] | [number, number, number] | null;
-  certClaimed?: boolean;
-  updatedAt: number;
-}
-
-export interface PublicLeaderboardUser {
-  uid: string;
-  name: string;
-  mssv: string;
-  facultyId: FacultyId;
-  avatar: number;
-  points: number;
-  unlockedCount: number;
-  partyId?: string;
-  updatedAt: number;
-}
-
-export interface PartyMember {
-  uid: string;
-  name: string;
-  mssv: string;
-  facultyId: FacultyId;
-  avatar: number;
-  points: number;
-}
-
-export interface PartyRoom {
-  code: string;
-  hostUid: string;
-  name: string;
-  memberUids: string[];
-  members: PartyMember[];
-  isCrossFaculty: boolean;
-  bonusMultiplier: number;
-  totalPoints: number;
-  createdAt: number;
-}
-
-export interface Quest {
-  id: string;
-  name: string;
-  description: string;
-  need: number;
-  reward: number;
-  icon: StationType | 'star' | 'explorer' | 'party';
-  col: string;
-  getValue: (profile: UserProfile, totalStations: number) => number;
-}
-
-export interface CampaignEvent {
-  id: string;
-  title: string;
-  description: string;
-  startDate: string;
-  endDate: string;
-  active: boolean;
-  bonusMultiplier: number;
-}
-
-export interface CheckinLog {
-  id: string;
-  uid: string;
-  userName: string;
-  stationId: string;
-  facultyId: FacultyId;
-  method: VerificationMethod;
-  pts: number;
-  timestamp: number;
-}
-</file>
-
-<file path="firebase.json">
-{
-  "auth": {
-    "providers": {
-      "anonymous": true,
-      "emailPassword": true,
-      "googleSignIn": {
-        "oAuthBrandDisplayName": "TDC Travel",
-        "supportEmail": "kuganagia@gmail.com"
-      }
-    }
-  },
-  "firestore": {
-    "database": "(default)",
-    "location": "asia-southeast1",
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  },
-  "hosting": {
-    "public": "dist",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
-  }
-}
-</file>
-
-<file path="tsconfig.tsbuildinfo">
-{"root":["./src/app.tsx","./src/game.test.ts","./src/main.tsx","./src/vite-env.d.ts","./src/components/gamehud.tsx","./src/components/minimap.tsx","./src/components/qrscannermodal.tsx","./src/components/startscreen.tsx","./src/components/stationmodal.tsx","./src/components/stationsticker.tsx","./src/components/minigames/autoenginegame.tsx","./src/components/minigames/electriccircuitgame.tsx","./src/components/minigames/itdebuggame.tsx","./src/components/minigames/kickgame.tsx","./src/components/minigames/viewfinder.tsx","./src/components/modals/certificatemodal.tsx","./src/components/modals/helpmodal.tsx","./src/components/modals/leaderboardmodal.tsx","./src/components/modals/partymodal.tsx","./src/components/modals/profilebadgesmodal.tsx","./src/components/modals/questsmodal.tsx","./src/data/campusbuildings.ts","./src/data/campuslayout.ts","./src/data/faculties.ts","./src/data/stations.ts","./src/engine/tdccampusengine.ts","./src/engine/audiosfx.ts","./src/engine/campusbuilder.ts","./src/engine/chibibuilder.ts","./src/engine/fogofwar.ts","./src/engine/natureandtrain.ts","./src/engine/threehelpers.ts","./src/pages/admindashboard.tsx","./src/services/adminservice.ts","./src/services/authservice.ts","./src/services/firebase.ts","./src/services/gameservice.ts","./src/services/gpsservice.ts","./src/services/partyservice.ts","./src/types/game.ts"],"version":"5.7.3"}
-</file>
-
-<file path="src/engine/TdcCampusEngine.ts">
-import * as THREE from 'three';
-import { AVATARS } from '../data/campusLayout';
-import { GpsTelemetry3D, Station, UnlockedStationRecord } from '../types/game';
-import { audioSfx } from './audioSfx';
-import { buildCampusEnvironment, FloorHighlightController } from './campusBuilder';
-import { animChibi, makeChibi } from './chibiBuilder';
-import { FogOfWarSystem } from './fogOfWar';
-import { buildNatureAndTrain } from './natureAndTrain';
-import {
-  AABB,
-  canvasTex,
-  clamp,
-  coinTex,
-  createMaterialCache,
-  createRng,
-  FH,
-  lerpAngle,
-  mesh,
-  pill,
-} from './threeHelpers';
-import {
-  buildTelemetryFromCampus3D,
-  clampToCampusBoundary,
-  detectBuildingAtPosition,
-  distance3D,
-  floorToElevationMeters,
-  GpsKalmanFilter3D,
-  gpsToCampus3D,
-  resolveFloorFromElevation,
-} from '../services/gpsService';
-import { TDC_GEO_ANCHORS } from '../data/campusBuildings';
-
-export interface FloatingTextItem {
-  id: number;
-  text: string;
-  x: number;
-  y: number;
-  opacity: number;
-  scale: number;
-  color?: string;
-}
-
-export interface GuideState {
-  station: Station | null;
-  distance: number;
-  horizDistance: number;
-  deltaFloor: number;
-  angleRad: number;
-  allDone: boolean;
-}
-
-export interface MinimapSnapshot {
-  playerX: number;
-  playerY: number;
-  playerZ: number;
-  playerFloor: number;
-  accuracyMeters: number;
-  playerRotY: number;
-  camYaw: number;
-  col: AABB[];
-}
-
-export interface EngineCallbacks {
-  onNearStationChange: (st: Station | null) => void;
-  onOpenStationRequest: (st: Station) => void;
-  onPlayerMoveSave: (pos: [number, number, number]) => void;
-  onFloatingTextsUpdate: (items: FloatingTextItem[]) => void;
-  onGuideUpdate: (guide: GuideState) => void;
-  onMinimapUpdate: (snap: MinimapSnapshot) => void;
-  onGpsTelemetryUpdate?: (telemetry: GpsTelemetry3D) => void;
-}
-
-interface Station3DNode {
-  g: THREE.Group;
-  ring: THREE.Mesh;
-  disc: THREE.Mesh;
-  beam: THREE.Mesh;
-  stem: THREE.Line | null;
-  icon: THREE.Sprite;
-  lab: THREE.Sprite;
-  baseY: number;
-}
-
-export class TdcCampusEngine {
-  private container: HTMLElement;
-  private callbacks: EngineCallbacks;
-  private renderer: THREE.WebGLRenderer;
-  private scene: THREE.Scene;
-  private camera: THREE.PerspectiveCamera;
-  private sun: THREE.DirectionalLight;
-  private col: AABB[] = [];
-  private mat = createMaterialCache();
-  private rng = createRng(20261021);
-  private fogOfWar: FogOfWarSystem;
-  private floorController?: FloorHighlightController;
-
-  private stations: Station[] = [];
-  private unlockedMap: Record<string, UnlockedStationRecord> = {};
-  private st3d: Record<string, Station3DNode> = {};
-  private parts: { m: THREE.Mesh; v: THREE.Vector3; life: number }[] = [];
-  private fxList: {
-    id: number;
-    text: string;
-    p: THREE.Vector3;
-    life: number;
-    color?: string;
-  }[] = [];
-  private fxSeq = 1;
-
-  // Player & 3D GPS Marker (X, Y, Z)
-  private player = {
-    obj: null as THREE.Group | null,
-    pos: new THREE.Vector3(-66, 0, 104),
-    targetPos: new THREE.Vector3(-66, 0, 104),
-    ph: 0,
-    tag: null as THREE.Sprite | null,
-    gpsAccuracyDisc: null as THREE.Mesh | null,
-    gpsVerticalLine: null as THREE.Line | null,
-    gpsGroundShadowRing: null as THREE.Mesh | null,
-  };
-
-  // Real-time 3-Axis GPS & Floor state
-  private kalman = new GpsKalmanFilter3D();
-  private gpsWatchId: number | null = null;
-  private gpsActive = false;
-  private groundAltitudeRefAsl = TDC_GEO_ANCHORS.GROUND_ALTITUDE_ASL_M;
-  private rawAltitudeAsl: number | null = null;
-  private lockedFloor: number | null = null;
-  private inspectedBuildingId: string | null = null;
-  private inspectedFloor: number | null = null;
-  private cutawayEnabled = false;
-  private currentTelemetry: GpsTelemetry3D;
-
-  private cam = {
-    yaw: 0.25,
-    pitch: 0.86,
-    dist: 48,
-    curD: null as number | null,
-    curP: null as number | null,
-    tgt: new THREE.Vector3(-5, 0, -5),
-  };
-
-  private running = false;
-  private paused = false;
-  private photoStation: Station | null = null;
-  private nearStation: Station | null = null;
-  private flagMesh: THREE.Mesh | null = null;
-
-  private disposed = false;
-  private rafId = 0;
-  private resizeObs: ResizeObserver;
-  private cleanupWindowListeners?: () => void;
-  private animateNatureAndTrain?: (dt: number, t: number) => void;
-
-  constructor(
-    container: HTMLElement,
-    initialStations: Station[],
-    initialUnlocked: Record<string, UnlockedStationRecord>,
-    callbacks: EngineCallbacks
-  ) {
-    this.container = container;
-    this.stations = initialStations;
-    this.unlockedMap = initialUnlocked;
-    this.callbacks = callbacks;
-
-    this.currentTelemetry = buildTelemetryFromCampus3D({
-      x: -66,
-      y: 0,
-      z: 104,
-      accuracyMeters: 2.4,
-      source: 'gps_calibrated',
-    });
-
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.localClippingEnabled = true;
-    this.container.appendChild(this.renderer.domElement);
-
-    this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.Fog(0xd3eedf, 380, 1100);
-    this.camera = new THREE.PerspectiveCamera(42, 1, 0.5, 2600);
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8dbf73, 0.74));
-
-    this.sun = new THREE.DirectionalLight(0xfff2d8, 0.8);
-    this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(2048, 2048);
-    Object.assign(this.sun.shadow.camera, {
-      left: -150,
-      right: 150,
-      top: 150,
-      bottom: -150,
-      near: 10,
-      far: 500,
-    });
-    this.sun.shadow.bias = -0.0006;
-    this.sun.shadow.normalBias = 0.03;
-    this.scene.add(this.sun, this.sun.target);
-
-    this.fogOfWar = new FogOfWarSystem(this.scene);
-
-    this.resizeObs = new ResizeObserver(() => this.resize());
-    this.resizeObs.observe(this.container);
-    this.resize();
-
-    this.initWorld();
-    this.bindEvents();
-    this.startLoop();
-  }
-
-  private initWorld(): void {
-    const { flag, floorController } = buildCampusEnvironment({
-      scene: this.scene,
-      col: this.col,
-      mat: this.mat,
-      rng: this.rng,
-    });
-    this.flagMesh = flag;
-    this.floorController = floorController;
-
-    const nat = buildNatureAndTrain({
-      scene: this.scene,
-      col: this.col,
-      stations: this.stations,
-      mat: this.mat,
-      rng: this.rng,
-    });
-    this.animateNatureAndTrain = nat.animate;
-
-    // Build 3D station markers (at X, Y, Z elevation) & Fog of War
-    this.rebuildStations3D();
-
-    // GPS Accuracy Sphere/Disc & 3-Axis Z-Elevation Drop Line
-    const accDisc = new THREE.Mesh(
-      new THREE.CircleGeometry(1, 36).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({
-        color: '#00AEEF',
-        transparent: true,
-        opacity: 0.22,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      })
-    );
-    accDisc.position.y = 0.14;
-    accDisc.visible = false;
-    this.scene.add(accDisc);
-    this.player.gpsAccuracyDisc = accDisc;
-
-    const shadowRing = new THREE.Mesh(
-      new THREE.RingGeometry(1.1, 1.55, 32).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({
-        color: '#00F0FF',
-        transparent: true,
-        opacity: 0.75,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      })
-    );
-    shadowRing.position.y = 0.15;
-    shadowRing.visible = false;
-    this.scene.add(shadowRing);
-    this.player.gpsGroundShadowRing = shadowRing;
-
-    const lineGeo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(0, 1, 0),
-    ]);
-    const vertLine = new THREE.Line(
-      lineGeo,
-      new THREE.LineBasicMaterial({ color: '#00F0FF', transparent: true, opacity: 0.9 })
-    );
-    vertLine.visible = false;
-    this.scene.add(vertLine);
-    this.player.gpsVerticalLine = vertLine;
-
-    // Celebration particles
-    const pg = new THREE.OctahedronGeometry(0.28, 0);
-    for (let i = 0; i < 60; i++) {
-      const m = new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ color: '#FFD23F' }));
-      m.visible = false;
-      this.scene.add(m);
-      this.parts.push({ m, v: new THREE.Vector3(), life: 0 });
-    }
-  }
-
-  public rebuildStations3D(): void {
-    Object.values(this.st3d).forEach((node) => {
-      this.scene.remove(node.g);
-    });
-    this.st3d = {};
-
-    const beamT = canvasTex(
-      4,
-      128,
-      (g, W, H) => {
-        const gr = g.createLinearGradient(0, 0, 0, H);
-        gr.addColorStop(0, 'rgba(255,255,255,0)');
-        gr.addColorStop(1, 'rgba(255,255,255,.75)');
-        g.fillStyle = gr;
-        g.fillRect(0, 0, W, H);
-      },
-      false
-    );
-
-    this.stations
-      .filter((st) => st.active !== false)
-      .forEach((st) => {
-        const baseY = st.y || 0;
-        const g = new THREE.Group();
-        g.position.set(st.x, baseY, st.z);
-        this.scene.add(g);
-
-        const ring = new THREE.Mesh(
-          new THREE.RingGeometry(2.6, 3.3, 40).rotateX(-Math.PI / 2),
-          new THREE.MeshBasicMaterial({
-            color: st.col,
-            transparent: true,
-            opacity: 0.9,
-            side: THREE.DoubleSide,
-          })
-        );
-        ring.position.y = 0.16;
-        g.add(ring);
-
-        const disc = new THREE.Mesh(
-          new THREE.CircleGeometry(2.6, 40).rotateX(-Math.PI / 2),
-          new THREE.MeshBasicMaterial({
-            color: st.col,
-            transparent: true,
-            opacity: 0.22,
-            side: THREE.DoubleSide,
-          })
-        );
-        disc.position.y = 0.15;
-        g.add(disc);
-
-        const beam = new THREE.Mesh(
-          new THREE.CylinderGeometry(1.4, 2.2, 20, 20, 1, true),
-          new THREE.MeshBasicMaterial({
-            color: st.col,
-            map: beamT,
-            transparent: true,
-            depthWrite: false,
-            side: THREE.DoubleSide,
-            opacity: 0.55,
-          })
-        );
-        beam.position.y = 10;
-        g.add(beam);
-
-        // Nếu trạm nằm ở tầng cao (baseY > 0.5) hoặc tầng hầm (baseY < -0.5), vẽ trục đứng nối xuống mặt đất
-        let stem: THREE.Line | null = null;
-        if (Math.abs(baseY) > 0.5) {
-          const stemGeo = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(0, -baseY, 0),
-            new THREE.Vector3(0, 0.2, 0),
-          ]);
-          stem = new THREE.Line(
-            stemGeo,
-            new THREE.LineBasicMaterial({ color: st.col, transparent: true, opacity: 0.75 })
-          );
-          g.add(stem);
-        }
-
-        const ped = mesh(
-          new THREE.CylinderGeometry(0.9, 1.2, 0.8, 12),
-          this.mat('#FFFFFF'),
-          0,
-          0.4,
-          0
-        );
-        g.add(ped);
-
-        const isDone = this.unlockedMap[st.id] != null;
-        const icon = new THREE.Sprite(
-          new THREE.SpriteMaterial({ map: coinTex(st, isDone), transparent: true })
-        );
-        icon.scale.setScalar(4.6);
-        icon.position.y = 5.5;
-        g.add(icon);
-
-        const floorBadge = st.floor
-          ? st.floor === -1
-            ? ' [Hầm B1]'
-            : ` [Tầng ${st.floor}]`
-          : '';
-        const lab = pill(`${st.name}${floorBadge}`, { h: 2.2, dot: st.col });
-        lab.position.y = 9.2;
-        g.add(lab);
-
-        this.st3d[st.id] = { g, ring, disc, beam, stem, icon, lab, baseY };
-        this.applyStationVisualState(st);
-      });
-
-    this.fogOfWar.buildForStations(
-      this.stations.filter((s) => s.active !== false),
-      this.unlockedMap
-    );
-  }
-
-  private applyStationVisualState(st: Station): void {
-    const s = this.st3d[st.id];
-    if (!s) return;
-    const d = this.unlockedMap[st.id] != null;
-    s.icon.material.map = coinTex(st, d);
-    s.icon.material.needsUpdate = true;
-    s.beam.visible = !d;
-    (s.ring.material as THREE.MeshBasicMaterial).color.set(d ? '#3DAA5C' : st.col);
-    (s.disc.material as THREE.MeshBasicMaterial).color.set(d ? '#3DAA5C' : st.col);
-  }
-
-  public updateStationsAndProgress(
-    stations: Station[],
-    unlocked: Record<string, UnlockedStationRecord>
-  ): void {
-    const prevKey = this.stations
-      .map(
-        (s) =>
-          `${s.id}:${s.x}:${s.y || 0}:${s.z}:${s.floor || 1}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`
-      )
-      .join('|');
-    const nextKey = stations
-      .map(
-        (s) =>
-          `${s.id}:${s.x}:${s.y || 0}:${s.z}:${s.floor || 1}:${s.fogRadius}:${s.col}:${s.type}:${s.name}:${s.active}`
-      )
-      .join('|');
-    const structureChanged = prevKey !== nextKey;
-
-    this.stations = stations;
-    this.unlockedMap = unlocked;
-
-    if (structureChanged) {
-      this.rebuildStations3D();
-    } else {
-      this.stations.forEach((st) => this.applyStationVisualState(st));
-      this.fogOfWar.syncUnlocked(this.unlockedMap);
-    }
-  }
-
-  public startPlayer(
-    name: string,
-    avatarIdx: number,
-    savedPos?: [number, number] | [number, number, number] | null,
-    hasProgress?: boolean
-  ): void {
-    audioSfx.init();
-    if (this.player.obj) {
-      this.scene.remove(this.player.obj);
-    }
-    const spec = AVATARS[avatarIdx] || AVATARS[0];
-    this.player.obj = makeChibi(spec, true, this.mat);
-    this.player.obj.traverse((m) => {
-      if ((m as THREE.Mesh).isMesh) m.castShadow = true;
-    });
-    this.player.tag = pill(`${name || 'Bạn'} · GPS 3D`, {
-      h: 1.3,
-      fs: 40,
-      bg: '#0F172A',
-      fg: '#38BDF8',
-    });
-    this.player.tag.position.y = 4.0;
-    this.player.obj.add(this.player.tag);
-    this.scene.add(this.player.obj);
-
-    if (savedPos && hasProgress) {
-      const sx = savedPos[0];
-      const sy = savedPos.length === 3 ? savedPos[1] : 0;
-      const sz = savedPos.length === 3 ? savedPos[2] : savedPos[1];
-      this.player.pos.set(sx, sy, sz);
-      this.player.targetPos.set(sx, sy, sz);
-    } else {
-      this.player.pos.set(-66, 0, 102);
-      this.player.targetPos.set(-66, 0, 102);
-    }
-    this.kalman.reset(this.player.pos.x, this.player.pos.y, this.player.pos.z);
-
-    this.player.obj.position.copy(this.player.pos);
-    this.player.obj.rotation.y = Math.PI;
-    this.cam.yaw = 0;
-    this.cam.tgt.set(this.player.pos.x, this.player.pos.y + 1.8, this.player.pos.z);
-    this.running = true;
-    this.paused = false;
-
-    if (this.player.gpsAccuracyDisc) this.player.gpsAccuracyDisc.visible = true;
-    if (this.player.gpsGroundShadowRing) this.player.gpsGroundShadowRing.visible = true;
-    if (this.player.gpsVerticalLine) this.player.gpsVerticalLine.visible = true;
-
-    this.syncTelemetryFromCurrentTarget('gps_calibrated', 2.2);
-    this.startGpsHardwareTracking();
-  }
-
-  /**
-   * Bật định vị GPS phần cứng thực tế theo chuẩn HTML5 Geolocation API (`enableHighAccuracy: true`)
-   * Tự động tính toán 3 trục (X, Y, Z) bao gồm cả Altitude (trục cao độ phân tầng) và Kalman Filter.
-   */
-  public startGpsHardwareTracking(): void {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      return;
-    }
-    if (this.gpsWatchId !== null) {
-      navigator.geolocation.clearWatch(this.gpsWatchId);
-    }
-    this.gpsActive = true;
-    this.gpsWatchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        if (!this.gpsActive || this.disposed) return;
-        const { latitude, longitude, altitude, accuracy, altitudeAccuracy, heading, speed } =
-          pos.coords;
-
-        this.rawAltitudeAsl = altitude;
-        const projected = gpsToCampus3D({
-          lat: latitude,
-          lng: longitude,
-          altitudeAsl: altitude,
-          groundAltitudeReferenceAsl: this.groundAltitudeRefAsl,
-        });
-
-        // Nếu người dùng đang đứng thực tế trong khuôn viên trường hoặc lân cận (< 450m), cập nhật vị trí GPS thực
-        if (Math.hypot(projected.x, projected.z) < 450) {
-          const clamped = clampToCampusBoundary(projected.x, projected.z);
-          const filtered = this.kalman.filter(
-            clamped.x,
-            projected.y,
-            clamped.z,
-            accuracy || 6,
-            altitudeAccuracy || 10
-          );
-
-          const bld = detectBuildingAtPosition(filtered.x, filtered.z);
-          const resolved =
-            this.lockedFloor !== null
-              ? {
-                  floor: this.lockedFloor,
-                  clampedY: floorToElevationMeters(this.lockedFloor, bld),
-                }
-              : resolveFloorFromElevation(filtered.y, bld);
-
-          this.player.targetPos.set(filtered.x, resolved.clampedY, filtered.z);
-          this.currentTelemetry = {
-            lat: +latitude.toFixed(6),
-            lng: +longitude.toFixed(6),
-            altitudeAsl: altitude != null ? +altitude.toFixed(2) : null,
-            accuracyMeters: +(accuracy || 4.0).toFixed(1),
-            altitudeAccuracyMeters:
-              altitudeAccuracy != null ? +altitudeAccuracy.toFixed(1) : null,
-            headingDeg: heading != null && Number.isFinite(heading) ? Math.round(heading) : null,
-            speedMps: speed != null && Number.isFinite(speed) ? +speed.toFixed(2) : null,
-            x: filtered.x,
-            y: resolved.clampedY,
-            z: filtered.z,
-            detectedFloor: resolved.floor,
-            detectedBuilding: bld,
-            insideCampus: projected.insideCampus,
-            source: 'gps_hardware',
-            timestamp: Date.now(),
-          };
-          this.updateFloorHighlightState();
-          this.callbacks.onGpsTelemetryUpdate?.(this.currentTelemetry);
-        } else {
-          // Người dùng đang mở web từ ngoài khuôn viên trường (> 450m): vẫn ghi nhận tọa độ GPS thật nhưng giữ mô hình ở chế độ Hiệu chuẩn Khuôn viên để khám phá
-          this.currentTelemetry = {
-            ...this.currentTelemetry,
-            lat: +latitude.toFixed(6),
-            lng: +longitude.toFixed(6),
-            altitudeAsl: altitude != null ? +altitude.toFixed(2) : this.currentTelemetry.altitudeAsl,
-            accuracyMeters: +(accuracy || 5.0).toFixed(1),
-            insideCampus: false,
-            timestamp: Date.now(),
-          };
-          this.callbacks.onGpsTelemetryUpdate?.(this.currentTelemetry);
-        }
-      },
-      () => {
-        // Khi thiết bị từ chối quyền GPS hoặc mất sóng trong nhà kín, giữ chế độ Định vị Hiệu chuẩn 3D
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 1000,
-        timeout: 10000,
-      }
-    );
-  }
-
-  /**
-   * Hiệu chuẩn áp kế / cao độ mặt đất (Tare Ground Altitude = 0.0m / Tầng 1)
-   * Giúp loại bỏ sai số độ cao GPS giữa các dòng điện thoại khác nhau.
-   */
-  public calibrateGroundZeroAltitude(): void {
-    if (this.rawAltitudeAsl != null && Number.isFinite(this.rawAltitudeAsl)) {
-      this.groundAltitudeRefAsl = this.rawAltitudeAsl;
-    }
-    this.lockedFloor = 1;
-    this.setTargetPosition3D(this.player.targetPos.x, 0, this.player.targetPos.z, 'gps_calibrated');
-  }
-
-  /**
-   * Đặt tọa độ 3 trục (X, Y, Z) trực tiếp từ bộ định vị GPS / Chọn Tòa nhà & Tầng để khám phá
-   */
-  public setTargetPosition3D(
-    x: number,
-    y: number,
-    z: number,
-    source: GpsTelemetry3D['source'] = 'gps_calibrated'
-  ): void {
-    const clamped = clampToCampusBoundary(x, z);
-    const bld = detectBuildingAtPosition(clamped.x, clamped.z);
-    const resolved = resolveFloorFromElevation(y, bld);
-    const effectiveY = resolved.clampedY;
-
-    this.lockedFloor = resolved.floor;
-    this.player.targetPos.set(clamped.x, effectiveY, clamped.z);
-    this.kalman.reset(clamped.x, effectiveY, clamped.z);
-    this.inspectedBuildingId = bld?.id || null;
-    this.inspectedFloor = resolved.floor;
-
-    this.syncTelemetryFromCurrentTarget(source, source === 'gps_hardware' ? 3.2 : 1.5);
-  }
-
-  /**
-   * Chọn tầng cụ thể (Trục cao độ Y/Z: Tầng Hầm B1 = -1, Tầng 1..11) để khám phá mặt sàn phân tầng
-   */
-  public selectFloorLevel(floor: number | null, enableCutaway?: boolean): void {
-    this.lockedFloor = floor;
-    if (enableCutaway !== undefined) {
-      this.cutawayEnabled = enableCutaway;
-    }
-    if (floor !== null) {
-      const bld = detectBuildingAtPosition(this.player.targetPos.x, this.player.targetPos.z);
-      const validFloor = bld
-        ? clamp(floor, bld.minFloor, bld.maxFloor)
-        : clamp(floor, -1, 11);
-      this.lockedFloor = validFloor;
-      const nextY = floorToElevationMeters(validFloor, bld);
-      this.player.targetPos.y = nextY;
-      this.inspectedFloor = validFloor;
-      this.inspectedBuildingId = bld?.id || null;
-    } else {
-      this.inspectedFloor = null;
-    }
-    this.syncTelemetryFromCurrentTarget('manual_override', 1.5);
-  }
-
-  /**
-   * Bật / Tắt chế độ Cắt lớp Phân tầng 3D (3D Floor Cutaway) để nhìn xuyên vào bên trong tầng đang chọn
-   */
-  public setCutawayMode(enabled: boolean): void {
-    this.cutawayEnabled = enabled;
-    this.updateFloorHighlightState();
-  }
-
-  public getCutawayMode(): boolean {
-    return this.cutawayEnabled;
-  }
-
-  private updateFloorHighlightState(): void {
-    if (!this.floorController) return;
-    const activeFloor =
-      this.lockedFloor ?? this.inspectedFloor ?? this.currentTelemetry.detectedFloor;
-    const activeBldId =
-      this.inspectedBuildingId ?? this.currentTelemetry.detectedBuilding?.id ?? null;
-
-    this.floorController.setFloorView(activeBldId, activeFloor, this.cutawayEnabled);
-  }
-
-  private syncTelemetryFromCurrentTarget(
-    source: GpsTelemetry3D['source'],
-    accuracyMeters: number
-  ): void {
-    this.currentTelemetry = buildTelemetryFromCampus3D({
-      x: this.player.targetPos.x,
-      y: this.player.targetPos.y,
-      z: this.player.targetPos.z,
-      accuracyMeters,
-      source,
-      lockedFloor: this.lockedFloor,
-      groundAltitudeReferenceAsl: this.groundAltitudeRefAsl,
-    });
-    this.updateFloorHighlightState();
-    this.callbacks.onGpsTelemetryUpdate?.(this.currentTelemetry);
-  }
-
-  public setPaused(p: boolean): void {
-    this.paused = p;
-  }
-
-  public enterPhotoMode(st: Station): void {
-    this.photoStation = st;
-    if (this.player.obj) {
-      this.player.obj.rotation.y = Math.atan2(
-        Math.sin(this.cam.yaw),
-        Math.cos(this.cam.yaw)
-      );
-    }
-  }
-
-  public exitPhotoMode(): void {
-    this.photoStation = null;
-  }
-
-  public rotatePhotoCamera(): void {
-    this.cam.yaw += 0.6;
-    if (this.player.obj) {
-      this.player.obj.rotation.y = Math.atan2(
-        Math.sin(this.cam.yaw),
-        Math.cos(this.cam.yaw)
-      );
-    }
-  }
-
-  public capturePhotoDataUrl(): string {
-    this.renderer.render(this.scene, this.camera);
-    try {
-      return this.renderer.domElement.toDataURL('image/jpeg', 0.85);
-    } catch {
-      return '';
-    }
-  }
-
-  /**
-   * Định vị / Đồng bộ ngay tới tọa độ 3D (X, Y, Z) của một trạm hoặc tòa nhà
-   */
-  public navigateToStation(st: Station): void {
-    if (!this.running) return;
-    const targetY = st.y ?? (st.floor ? floorToElevationMeters(st.floor) : 0);
-    this.lockedFloor = st.floor ?? 1;
-    this.setTargetPosition3D(st.x, targetY, st.z, 'gps_calibrated');
-  }
-
-  public celebrateStationUnlock(st: Station, ptsText: string): void {
-    const sy = st.y || 0;
-    this.burst(
-      new THREE.Vector3(st.x, sy + 5, st.z),
-      ['#FFD23F', '#FF6F59', '#00AEEF', '#38B865', '#FF8FB1', '#9B6BFF'],
-      42
-    );
-    this.spawnFloatText(ptsText, new THREE.Vector3(st.x, sy + 4, st.z));
-  }
-
-  public spawnFloatText(text: string, worldPos: THREE.Vector3, color?: string): void {
-    this.fxList.push({
-      id: this.fxSeq++,
-      text,
-      p: worldPos.clone().add(new THREE.Vector3(0, 2.5, 0)),
-      life: 1,
-      color,
-    });
-  }
-
-  public burst(pos: THREE.Vector3, colors: string[], n: number): void {
-    let k = 0;
-    for (const p of this.parts) {
-      if (p.life > 0) continue;
-      p.life = 1;
-      p.m.visible = true;
-      p.m.position.copy(pos);
-      (p.m.material as THREE.MeshBasicMaterial).color.set(colors[k % colors.length]);
-      p.v.set(
-        (Math.random() - 0.5) * 10,
-        6 + Math.random() * 7,
-        (Math.random() - 0.5) * 10
-      );
-      if (++k >= n) break;
-    }
-  }
-
-  private bindEvents(): void {
-    // Chỉ giữ phím tắt xoay/zoom camera (+ / - / Enter mở trạm), loại bỏ hoàn toàn điều khiển nhân vật bằng WASD/click đất kiểu game giả lập
-    const onKeyDown = (e: KeyboardEvent) => {
-      const tag = document.activeElement?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      if (!this.running || this.paused || this.photoStation) return;
-      const k = e.key.toLowerCase();
-      if ((k === 'enter' || k === ' ') && this.nearStation) {
-        e.preventDefault();
-        this.callbacks.onOpenStationRequest(this.nearStation);
-        return;
-      }
-      if (k === '+' || k === '=') this.cam.dist = clamp(this.cam.dist * 0.85, 16, 160);
-      if (k === '-') this.cam.dist = clamp(this.cam.dist / 0.85, 16, 160);
-    };
-
-    window.addEventListener('keydown', onKeyDown);
-    this.cleanupWindowListeners = () => {
-      window.removeEventListener('keydown', onKeyDown);
-    };
-
-    const cv = this.renderer.domElement;
-    const ptrs = new Map<number, { x: number; y: number }>();
-    let drag: {
-      x: number;
-      y: number;
-      sx: number;
-      sy: number;
-      moved: boolean;
-    } | null = null;
-    let pinch: number | null = null;
-
-    cv.addEventListener('pointerdown', (e) => {
-      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      try {
-        cv.setPointerCapture(e.pointerId);
-      } catch {
-        // Ignore capture error
-      }
-      if (ptrs.size === 1) {
-        drag = {
-          x: e.clientX,
-          y: e.clientY,
-          sx: e.clientX,
-          sy: e.clientY,
-          moved: false,
-        };
-      } else if (ptrs.size === 2) {
-        const [a, b] = [...ptrs.values()];
-        pinch = Math.hypot(a.x - b.x, a.y - b.y);
-        drag = null;
-      }
-    });
-
-    cv.addEventListener('pointermove', (e) => {
-      if (!ptrs.has(e.pointerId)) return;
-      ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (!this.running) return;
-      if (pinch && ptrs.size === 2) {
-        const [a, b] = [...ptrs.values()];
-        const d = Math.hypot(a.x - b.x, a.y - b.y);
-        this.cam.dist = clamp((this.cam.dist * pinch) / d, 16, 160);
-        pinch = d;
-        return;
-      }
-      if (!drag) return;
-      const dx = e.clientX - drag.x;
-      const dy = e.clientY - drag.y;
-      drag.x = e.clientX;
-      drag.y = e.clientY;
-      if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 6) drag.moved = true;
-      if (drag.moved) {
-        this.cam.yaw -= dx * 0.006;
-        this.cam.pitch = clamp(this.cam.pitch + dy * 0.004, 0.25, 1.42);
-      }
-    });
-
-    const endPtr = (e: PointerEvent) => {
-      ptrs.delete(e.pointerId);
-      if (ptrs.size < 2) pinch = null;
-      if (!ptrs.size) drag = null;
-    };
-
-    cv.addEventListener('pointerup', endPtr);
-    cv.addEventListener('pointercancel', (e) => {
-      ptrs.delete(e.pointerId);
-      drag = null;
-      pinch = null;
-    });
-    cv.addEventListener(
-      'wheel',
-      (e) => {
-        if (!this.running) return;
-        e.preventDefault();
-        this.cam.dist = clamp(this.cam.dist * (1 + e.deltaY * 0.0012), 16, 160);
-      },
-      { passive: false }
-    );
-    cv.addEventListener('contextmenu', (e) => e.preventDefault());
-  }
-
-  private resize(): void {
-    const w = this.container.clientWidth;
-    const h = this.container.clientHeight;
-    if (!w || !h) return;
-    this.renderer.setSize(w, h, false);
-    this.renderer.domElement.style.width = `${w}px`;
-    this.renderer.domElement.style.height = `${h}px`;
-    this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
-  }
-
-  private startLoop(): void {
-    let last = performance.now();
-    let T = 0;
-    let saveT = 0;
-    let hudSyncT = 0;
-    const tmpV = new THREE.Vector3();
-
-    const frame = (now: number) => {
-      if (this.disposed) return;
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      T += dt;
-
-      if (this.running && !this.paused && !this.photoStation) {
-        this.updateGpsAvatar3D(dt, T);
-        saveT -= dt;
-        if (saveT <= 0) {
-          saveT = 2.0;
-          this.callbacks.onPlayerMoveSave([
-            +this.player.pos.x.toFixed(1),
-            +this.player.pos.y.toFixed(1),
-            +this.player.pos.z.toFixed(1),
-          ]);
-        }
-      } else if (this.running && this.player.obj) {
-        animChibi(this.player.obj, this.player.ph, 0, T);
-      }
-
-      // Camera tracks full 3D position (X, Y, Z) so rising to Floor 7 or Floor 11 smoothly elevates camera
-      let d: number;
-      let p: number;
-      if (this.running) {
-        this.cam.tgt.lerp(
-          tmpV.set(this.player.pos.x, this.player.pos.y + 1.8, this.player.pos.z),
-          1 - Math.exp(-dt * 7)
-        );
-        d = this.photoStation ? 15 : this.cam.dist;
-        p = this.photoStation ? 0.38 : this.cam.pitch;
-      } else {
-        this.cam.yaw += dt * 0.035;
-        this.cam.tgt.lerp(tmpV.set(10, 0, -2), 1 - Math.exp(-dt * 2));
-        const a = this.camera.aspect || 1;
-        d = a < 1 ? (430 / Math.max(a, 0.5)) * 0.75 : 300;
-        p = 0.74;
-      }
-      this.cam.curD =
-        this.cam.curD == null
-          ? d
-          : this.cam.curD + (d - this.cam.curD) * (1 - Math.exp(-dt * 4));
-      this.cam.curP =
-        this.cam.curP == null
-          ? p
-          : this.cam.curP + (p - this.cam.curP) * (1 - Math.exp(-dt * 4));
-
-      this.camera.position.set(
-        this.cam.tgt.x + Math.sin(this.cam.yaw) * Math.cos(this.cam.curP) * this.cam.curD,
-        this.cam.tgt.y + Math.sin(this.cam.curP) * this.cam.curD,
-        this.cam.tgt.z + Math.cos(this.cam.yaw) * Math.cos(this.cam.curP) * this.cam.curD
-      );
-      this.camera.lookAt(this.cam.tgt);
-      this.sun.position.set(this.cam.tgt.x + 70, 150, this.cam.tgt.z + 55);
-      this.sun.target.position.copy(this.cam.tgt);
-
-      // Animate world
-      this.animateWorld(dt, T);
-      this.fogOfWar.animate(dt, T);
-
-      this.renderer.render(this.scene, this.camera);
-
-      if (this.running) {
-        this.updateFloatingTexts(dt, tmpV);
-        hudSyncT -= dt;
-        if (hudSyncT <= 0) {
-          hudSyncT = 0.08;
-          this.emitGuideAndMinimap();
-        }
-      }
-
-      this.rafId = requestAnimationFrame(frame);
-    };
-
-    this.rafId = requestAnimationFrame(frame);
-  }
-
-  /**
-   * Nội suy mượt vị trí nhân vật 3D theo tín hiệu GPS 3 trục (X, Y, Z)
-   * và cập nhật bán kính sai số GPS, đường chiếu đứng từ tầng cao xuống mặt đất.
-   */
-  private updateGpsAvatar3D(dt: number, t: number): void {
-    const dx = this.player.targetPos.x - this.player.pos.x;
-    const dy = this.player.targetPos.y - this.player.pos.y;
-    const dz = this.player.targetPos.z - this.player.pos.z;
-    const distHoriz = Math.hypot(dx, dz);
-    const dist3D = Math.hypot(dx, dy, dz);
-
-    const lerpFactor = 1 - Math.exp(-dt * 8.5);
-    this.player.pos.x += dx * lerpFactor;
-    this.player.pos.y += dy * lerpFactor;
-    this.player.pos.z += dz * lerpFactor;
-
-    const moveAmt = clamp(dist3D * 0.45, 0, 1);
-    if (distHoriz > 0.08 && this.player.obj) {
-      this.player.obj.rotation.y = lerpAngle(
-        this.player.obj.rotation.y,
-        Math.atan2(dx, dz),
-        1 - Math.exp(-dt * 10)
-      );
-    }
-    this.player.ph += dt * (2.5 + moveAmt * 9);
-
-    if (this.player.obj) {
-      animChibi(this.player.obj, this.player.ph, moveAmt > 0.05 ? moveAmt : 0, t);
-      this.player.obj.position.copy(this.player.pos);
-    }
-
-    // Cập nhật vòng tròn sai số GPS tại độ cao Y của người dùng
-    if (this.player.gpsAccuracyDisc) {
-      const r = clamp(this.currentTelemetry.accuracyMeters, 1.8, 18);
-      const pulse = 1 + Math.sin(t * 3.2) * 0.08;
-      this.player.gpsAccuracyDisc.position.set(
-        this.player.pos.x,
-        this.player.pos.y + 0.14,
-        this.player.pos.z
-      );
-      this.player.gpsAccuracyDisc.scale.set(r * pulse, 1, r * pulse);
-    }
-
-    // Cập nhật hình chiếu trên mặt sân trường (y = 0.15) và trục đứng Z-Elevation
-    if (this.player.gpsGroundShadowRing) {
-      this.player.gpsGroundShadowRing.position.set(
-        this.player.pos.x,
-        0.15,
-        this.player.pos.z
-      );
-    }
-
-    if (this.player.gpsVerticalLine) {
-      const posAttr = this.player.gpsVerticalLine.geometry.getAttribute(
-        'position'
-      ) as THREE.BufferAttribute;
-      posAttr.setXYZ(0, this.player.pos.x, 0.15, this.player.pos.z);
-      posAttr.setXYZ(1, this.player.pos.x, this.player.pos.y + 0.2, this.player.pos.z);
-      posAttr.needsUpdate = true;
-      this.player.gpsVerticalLine.visible = Math.abs(this.player.pos.y) > 0.35;
-    }
-
-    // Kiểm tra khoảng cách không gian 3 chiều (X, Y, Z) tới các trạm
-    let near: Station | null = null;
-    let best = 9.5; // Bán kính nhận diện GPS 3D tại trạm
-    this.stations
-      .filter((st) => st.active !== false)
-      .forEach((st) => {
-        const d3 = distance3D(
-          { x: st.x, y: st.y || 0, z: st.z },
-          { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z }
-        );
-        if (d3 < best) {
-          best = d3;
-          near = st;
-        }
-      });
-
-    if (near !== this.nearStation) {
-      this.nearStation = near;
-      this.callbacks.onNearStationChange(near);
-    }
-  }
-
-  private animateWorld(dt: number, t: number): void {
-    this.animateNatureAndTrain?.(dt, t);
-
-    if (this.flagMesh) {
-      this.flagMesh.rotation.y = Math.sin(t * 3) * 0.25;
-    }
-
-    this.stations.forEach((st, i) => {
-      const s = this.st3d[st.id];
-      if (!s) return;
-      s.icon.position.y = 5.5 + Math.sin(t * 2 + i) * 0.45;
-      const k = 1 + ((t * 0.8 + i * 0.3) % 1) * 0.35;
-      s.ring.scale.set(k, 1, k);
-      (s.ring.material as THREE.MeshBasicMaterial).opacity =
-        0.95 - ((t * 0.8 + i * 0.3) % 1) * 0.6;
-    });
-
-    this.parts.forEach((p) => {
-      if (p.life <= 0) return;
-      p.life -= dt * 1.1;
-      p.v.y -= 22 * dt;
-      p.m.position.addScaledVector(p.v, dt);
-      p.m.rotation.x += dt * 6;
-      p.m.scale.setScalar(Math.max(0.05, p.life * 1.3));
-      if (p.life <= 0) p.m.visible = false;
-    });
-  }
-
-  private updateFloatingTexts(dt: number, tmpV: THREE.Vector3): void {
-    if (this.fxList.length === 0) return;
-    const w = this.container.clientWidth;
-    const h = this.container.clientHeight;
-    const out: FloatingTextItem[] = [];
-
-    for (let i = this.fxList.length - 1; i >= 0; i--) {
-      const f = this.fxList[i];
-      f.life -= dt * 0.9;
-      f.p.y += dt * 3;
-      if (f.life <= 0) {
-        this.fxList.splice(i, 1);
-        continue;
-      }
-      tmpV.copy(f.p).project(this.camera);
-      out.push({
-        id: f.id,
-        text: f.text,
-        x: ((tmpV.x + 1) / 2) * w,
-        y: ((1 - tmpV.y) / 2) * h,
-        opacity: Math.min(1, f.life * 2),
-        scale: 0.8 + f.life * 0.4,
-        color: f.color,
-      });
-    }
-    this.callbacks.onFloatingTextsUpdate(out);
-  }
-
-  private emitGuideAndMinimap(): void {
-    let best: Station | null = null;
-    let bd3 = 1e9;
-    let bHoriz = 0;
-    const activeStations = this.stations.filter((st) => st.active !== false);
-    activeStations.forEach((st) => {
-      if (this.unlockedMap[st.id] != null) return;
-      const d3 = distance3D(
-        { x: st.x, y: st.y || 0, z: st.z },
-        { x: this.player.pos.x, y: this.player.pos.y, z: this.player.pos.z }
-      );
-      if (d3 < bd3) {
-        bd3 = d3;
-        bHoriz = Math.hypot(st.x - this.player.pos.x, st.z - this.player.pos.z);
-        best = st;
-      }
-    });
-
-    let angleRad = 0;
-    let deltaFloor = 0;
-    if (best) {
-      const target = best as Station;
-      const vx = target.x - this.player.pos.x;
-      const vz = target.z - this.player.pos.z;
-      const fx = -Math.sin(this.cam.yaw);
-      const fz = -Math.cos(this.cam.yaw);
-      const rx = Math.cos(this.cam.yaw);
-      const rz = -Math.sin(this.cam.yaw);
-      angleRad = Math.atan2(vx * rx + vz * rz, vx * fx + vz * fz);
-      const targetFloor = target.floor || 1;
-      deltaFloor = targetFloor - this.currentTelemetry.detectedFloor;
-    }
-
-    this.callbacks.onGuideUpdate({
-      station: best,
-      distance: best ? bd3 : 0,
-      horizDistance: best ? bHoriz : 0,
-      deltaFloor,
-      angleRad,
-      allDone: best === null && activeStations.length > 0,
-    });
-
-    this.callbacks.onMinimapUpdate({
-      playerX: this.player.pos.x,
-      playerY: this.player.pos.y,
-      playerZ: this.player.pos.z,
-      playerFloor: this.currentTelemetry.detectedFloor,
-      accuracyMeters: this.currentTelemetry.accuracyMeters,
-      playerRotY: this.player.obj ? this.player.obj.rotation.y : 0,
-      camYaw: this.cam.yaw,
-      col: this.col,
-    });
-  }
-
-  public dispose(): void {
-    this.disposed = true;
-    this.gpsActive = false;
-    if (this.gpsWatchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.geolocation.clearWatch(this.gpsWatchId);
-    }
-    cancelAnimationFrame(this.rafId);
-    this.cleanupWindowListeners?.();
-    this.resizeObs.disconnect();
-    this.renderer.dispose();
-    if (this.renderer.domElement.parentNode === this.container) {
-      this.container.removeChild(this.renderer.domElement);
-    }
-  }
-}
-</file>
-
 <file path="src/App.tsx">
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GameHud } from './components/GameHud';
@@ -13249,6 +13215,41 @@ export const App: React.FC = () => {
     </div>
   );
 };
+</file>
+
+<file path="firebase.json">
+{
+  "auth": {
+    "providers": {
+      "anonymous": true,
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "TDC Travel",
+        "supportEmail": "kuganagia@gmail.com"
+      }
+    }
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "asia-southeast1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
 </file>
 
 <file path="src/game.test.ts">
