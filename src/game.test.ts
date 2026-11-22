@@ -56,7 +56,7 @@ import {
 import { TDC_GEO_ANCHORS } from './data/campusBuildings';
 import { PartyMember, PartyRoom, UserProfile } from './types/game';
 
-describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
+describe('TDC Travel Core Business Logic & Anti-Cheat Tests', () => {
   it('1. Normalizes Vietnamese riddle answers accurately (case, accents, punctuation)', () => {
     expect(normalizeVietnameseAnswer('  Kỹ Năng! ')).toBe('ky nang');
     expect(normalizeVietnameseAnswer('Đạo đức - Tri thức')).toBe('dao duc tri thuc');
@@ -182,7 +182,7 @@ describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
     expect(summary.facultyStats.length).toBeGreaterThan(0);
 
     const csv = generateAnalyticsCsv(summary);
-    expect(csv).toContain('BAO CAO THONG KE HE THONG TDC GO');
+    expect(csv).toContain('BAO CAO THONG KE HE THONG TDC TRAVEL');
     expect(csv).toContain('Tòa D');
   });
 

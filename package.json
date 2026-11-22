@@ -1,8 +1,8 @@
 {
-  "name": "tdc-go",
+  "name": "tdc-travel",
   "private": true,
   "version": "1.0.0",
-  "description": "TDC GO - Web Game 3D Khám phá Khuôn viên Trường Cao đẳng Công nghệ Thủ Đức",
+  "description": "TDC Travel - Web Game 3D Khám phá Khuôn viên Trường Cao đẳng Công nghệ Thủ Đức",
   "type": "module",
   "scripts": {
     "dev": "vite",

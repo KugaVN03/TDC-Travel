@@ -42,7 +42,7 @@ const IT_CHALLENGES: DebugQuestion[] = [
   },
   {
     id: 3,
-    title: 'Bug #3: Truy vấn API Bản đồ số TDC GO',
+    title: 'Bug #3: Truy vấn API Bản đồ số TDC Travel',
     snippet: `async function fetchStationData(stationId) {\n  const res = fetch('/api/stations/' + stationId);\n  return res.json(); // Lỗi: res.json is not a function\n}`,
     question: 'Thiếu từ khóa nào trước hàm bất đồng bộ `fetch(...)`?',
     options: [

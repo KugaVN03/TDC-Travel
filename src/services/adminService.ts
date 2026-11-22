@@ -95,7 +95,7 @@ export async function saveCampaignEvent(evt: CampaignEvent): Promise<CampaignEve
 
 export function buildStationQrPayload(station: Station): string {
   return JSON.stringify({
-    app: 'TDC_GO',
+    app: 'TDC_TRAVEL',
     stationId: station.id,
     token: station.qrSecretToken,
   });
@@ -167,7 +167,7 @@ export function getAdminAnalytics(stations: Station[]): AnalyticsSummary {
 
 export function generateAnalyticsCsv(summary: AnalyticsSummary): string {
   const lines: string[] = [];
-  lines.push('BAO CAO THONG KE HE THONG TDC GO - TRUONG CAO DANG CONG NGHE THU DUC');
+  lines.push('BAO CAO THONG KE HE THONG TDC TRAVEL - TRUONG CAO DANG CONG NGHE THU DUC');
   lines.push(`Ngay xuat bao cao,${new Date().toISOString()}`);
   lines.push(`Tong so Sinh vien tham gia,${summary.totalUsers}`);
   lines.push(`Tong luot Check-in & Mo khoa Tram,${summary.totalCheckins}`);

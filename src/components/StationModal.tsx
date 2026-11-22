@@ -226,7 +226,7 @@ export const StationModal: React.FC<StationModalProps> = ({
                 <p>
                   {profile.name} @ {station.name}
                   <small>
-                    TDC GO ·{' '}
+                    TDC Travel ·{' '}
                     {new Date(existingRecord.unlockedAt).toLocaleDateString('vi-VN')}
                   </small>
                 </p>

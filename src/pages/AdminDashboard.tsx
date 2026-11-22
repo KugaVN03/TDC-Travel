@@ -144,7 +144,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `bao-cao-thong-ke-tdc-go-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `bao-cao-thong-ke-tdc-travel-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     showNotice('Đã xuất file Báo cáo Thống kê CSV thành công!');
@@ -162,7 +162,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
           <div>
             <h1 className="m-0 font-black text-xl sm:text-2xl tracking-tight">
-              TDC GO · Hệ Thống Quản Trị (Admin CMS)
+              TDC Travel · Hệ Thống Quản Trị (Admin CMS)
             </h1>
             <p className="m-0 text-xs font-bold text-slate-500">
               Quản lý Trạm 3D, Mật thư O2O, In ấn Mã QR Thực địa & Thống kê Đoàn – Hội
@@ -638,7 +638,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <path fill="#00AEEF" d={TDC_LOGO} />
                     </svg>
                     <span className="font-black text-xs uppercase tracking-wider text-sky-700">
-                      TRƯỜNG CĐ CÔNG NGHỆ THỦ ĐỨC · TDC GO
+                      TRƯỜNG CĐ CÔNG NGHỆ THỦ ĐỨC · TDC TRAVEL
                     </span>
                   </div>
 
@@ -671,7 +671,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   <p className="m-0 text-[11px] font-bold text-slate-500">
-                    Quét mã bằng Camera Web Game <b>TDC GO</b> để xóa sương mù 3D và nhận huy hiệu <b>“{st.badge}” (+{st.pts}đ)</b>
+                    Quét mã bằng Camera Web Game <b>TDC Travel</b> để xóa sương mù 3D và nhận huy hiệu <b>“{st.badge}” (+{st.pts}đ)</b>
                   </p>
                 </div>
               ))}

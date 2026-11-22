@@ -20,7 +20,7 @@ export const Viewfinder: React.FC<ViewfinderProps> = ({
   return (
     <div id="viewfinder">
       <div className="fr" />
-      <div className="cap">{station.name} · TDC GO 3D Polaroid</div>
+      <div className="cap">{station.name} · TDC Travel 3D Polaroid</div>
       <div className="vf-btns">
         <button
           type="button"

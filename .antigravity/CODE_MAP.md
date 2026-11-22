@@ -107,721 +107,6 @@ vite.config.ts
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/data/campusBuildings.ts">
-import { CampusBuildingZone } from '../types/game';
-import { FH } from '../engine/threeHelpers';
-
-/**
- * Hệ quy chiếu Địa không gian 3D (WGS84 GPS + Altitude <-> Local 3D Campus X, Y, Z)
- * Trường Cao đẳng Công nghệ Thủ Đức (TDC)
- * Địa chỉ: 53 Võ Văn Ngân, Phường Linh Chiểu, TP. Thủ Đức, TP. Hồ Chí Minh
- */
-
-export const TDC_GEO_ANCHORS = {
-  // Tâm khuôn viên 3D tại (x = 0, y = 0, z = 0)
-  ORIGIN_LAT: 10.85142,
-  ORIGIN_LNG: 106.75818,
-  // Độ cao nền sân trường chuẩn so với mực nước biển (ASL - Above Sea Level) tại Linh Chiểu, Thủ Đức (~12.0m)
-  GROUND_ALTITUDE_ASL_M: 12.0,
-  // Chiều cao chuẩn mỗi tầng trong mô hình 3D (1 tầng = 4.2m)
-  FLOOR_HEIGHT_M: FH,
-  // Góc xoay hướng Bắc của bản đồ 3D so với Bắc địa lý (radian)
-  MAP_ROTATION_RAD: 0.0,
-  // Hệ số quy đổi mét kinh độ / vĩ độ tại vĩ độ 10.8514° Bắc
-  METERS_PER_DEG_LAT: 110609.0,
-  METERS_PER_DEG_LNG: 109345.0,
-};
-
-/**
- * Danh sách chi tiết các Tòa nhà & Khu vực trong khuôn viên TDC kèm biên tọa độ (x0, z0, x1, z1) và cấu trúc phân tầng (Y/Floor)
- */
-export const CAMPUS_BUILDINGS: CampusBuildingZone[] = [
-  {
-    id: 'bld_a1',
-    code: 'A1',
-    name: 'Tòa A1 · Khu Hành chính & Phòng Đào tạo',
-    bounds: [-141.5, 48.0, -76.5, 67.5],
-    minFloor: 1,
-    maxFloor: 3,
-    floorHeightMeters: FH,
-    color: '#E2574C',
-    floors: [
-      {
-        floor: 1,
-        label: 'Tầng 1 (Trệt)',
-        elevationMeters: 0,
-        departments: 'Phòng Đào tạo (A101–A104), Phòng Công tác Chính trị HSSV, Bộ phận Một cửa',
-        highlights: 'Nơi tiếp nhận hồ sơ, giải quyết thủ tục học vụ, cấp giấy xác nhận sinh viên',
-      },
-      {
-        floor: 2,
-        label: 'Tầng 2',
-        elevationMeters: FH,
-        departments: 'Ban Giám hiệu, Phòng Tổ chức Hành chính, Phòng Tài chính Kế toán (A201–A208)',
-        highlights: 'Khu vực điều hành trung tâm và hành lang cầu nối sang dãy A2',
-      },
-      {
-        floor: 3,
-        label: 'Tầng 3',
-        elevationMeters: 2 * FH,
-        departments: 'Phòng học Lý thuyết Đại cương & Khoa Kinh tế – Quản trị (A301–A310)',
-        highlights: 'Hệ thống giảng đường lý thuyết dưới mái ngói đỏ truyền thống',
-      },
-    ],
-  },
-  {
-    id: 'bld_a2',
-    code: 'A2',
-    name: 'Tòa A2 · Giảng đường Lý thuyết & Khoa Kinh tế',
-    bounds: [-76.5, 50.0, -21.0, 64.0],
-    minFloor: 1,
-    maxFloor: 3,
-    floorHeightMeters: FH,
-    color: '#FF8A4C',
-    floors: [
-      {
-        floor: 1,
-        label: 'Tầng 1 (Trệt)',
-        elevationMeters: 0,
-        departments: 'Văn phòng Khoa Tài chính – Kế toán, Phòng Tư vấn Tuyển sinh',
-        highlights: 'Kết nối trực tiếp trục đường chính từ Cổng 1 Võ Văn Ngân',
-      },
-      {
-        floor: 2,
-        label: 'Tầng 2',
-        elevationMeters: FH,
-        departments: 'Phòng Thực hành Nghiệp vụ Kế toán & Quản trị Doanh nghiệp (A209–A215)',
-        highlights: 'Trang bị hệ thống máy tính phần mềm kế toán MISA, ERP',
-      },
-      {
-        floor: 3,
-        label: 'Tầng 3',
-        elevationMeters: 2 * FH,
-        departments: 'Phòng học chuyên đề Logistics & Thương mại điện tử (A311–A318)',
-        highlights: 'Tầm nhìn hướng ra cụm sân thể thao trung tâm',
-      },
-    ],
-  },
-  {
-    id: 'bld_h',
-    code: 'H',
-    name: 'Tòa H · Hội trường Lớn & Trung tâm Sự kiện',
-    bounds: [-99.5, -0.5, -76.5, 49.0],
-    minFloor: 1,
-    maxFloor: 3,
-    floorHeightMeters: FH,
-    color: '#9B6BFF',
-    floors: [
-      {
-        floor: 1,
-        label: 'Tầng 1 (Sảnh Hội trường)',
-        elevationMeters: 0,
-        departments: 'Sảnh đón đại biểu, Văn phòng Đoàn Thanh niên – Hội Sinh viên TDC',
-        highlights: 'Bậc tam cấp lớn nhìn thẳng ra 3 sân bóng chuyền và cột cờ trường',
-      },
-      {
-        floor: 2,
-        label: 'Tầng 2 (Khán phòng Hội trường H)',
-        elevationMeters: FH,
-        departments: 'Hội trường Lớn sức chứa hơn 800 chỗ ngồi, Sân khấu chính',
-        highlights: 'Nơi tổ chức Lễ Khai giảng, Tốt nghiệp, Hội diễn Văn nghệ & Talkshow',
-      },
-      {
-        floor: 3,
-        label: 'Tầng 3 (Ban công & Phòng Kỹ thuật Âm thanh – Ánh sáng)',
-        elevationMeters: 2 * FH,
-        departments: 'Tầng lửng khán đài B, Trung tâm điều khiển âm thanh ánh sáng & Khoa Ngoại ngữ',
-        highlights: 'Phía trên mặt tiền gắn khẩu hiệu "Đạo đức – Tri thức – Kỹ năng"',
-      },
-    ],
-  },
-  {
-    id: 'bld_b_west',
-    code: 'B-Tây',
-    name: 'Tòa B (Cánh Tây) · Khoa Công nghệ Thông tin & Y tế',
-    bounds: [-123.5, -32.5, -93.1, -1.0],
-    minFloor: 1,
-    maxFloor: 4,
-    floorHeightMeters: FH,
-    color: '#2FA8F0',
-    floors: [
-      {
-        floor: 1,
-        label: 'Tầng 1 (Trệt)',
-        elevationMeters: 0,
-        departments: 'Phòng Y tế Trường (+ Y Tế), Văn phòng Khoa CNTT, Phòng Lab Mạng cơ bản',
-        highlights: 'Hỗ trợ sơ cấp cứu, chăm sóc sức khỏe HSSV ngay đầu hành lang Tây',
-      },
-      {
-        floor: 2,
-        label: 'Tầng 2',
-        elevationMeters: FH,
-        departments: 'Phòng Lab Lập trình Phần mềm, Phát triển Web & Mobile (B201–B206)',
-        highlights: 'Trang bị dàn PC cấu hình cao phục vụ thực hành Full-stack & CSDL',
-      },
-      {
-        floor: 3,
-        label: 'Tầng 3',
-        elevationMeters: 2 * FH,
-        departments: 'Phòng Lab Đồ họa Đa phương tiện, Thiết kế UI/UX & Xử lý ảnh (B301–B306)',
-        highlights: 'Trung tâm sáng tạo nội dung số và truyền thông đa phương tiện',
-      },
-      {
-        floor: 4,
-        label: 'Tầng 4',
-        elevationMeters: 3 * FH,
-        departments: 'Phòng Lab An toàn thông tin, Điện toán đám mây & AI/IoT (B401–B405)',
-        highlights: 'Nơi sinh hoạt CLB Học thuật CNTT và đội tuyển Hackathon TDC',
-      },
-    ],
-  },
-  {
-    id: 'bld_b_east',
-    code: 'B-Đông',
-    name: 'Tòa B (Cánh Đông) · Khoa Điện – Điện tử',
-    bounds: [-93.1, -30.5, -46.0, -1.0],
-    minFloor: 1,
-    maxFloor: 5,
-    floorHeightMeters: FH,
-    color: '#F07F55',
-    floors: [
-      {
-        floor: 1,
-        label: 'Tầng 1 (Trệt)',
-        elevationMeters: 0,
-        departments: 'Xưởng Thực hành Điện Công nghiệp, Máy điện & Khí cụ điện',
-        highlights: 'Hệ thống tủ điện công nghiệp, bàn thực hành đấu nối động cơ 3 pha',
-      },
-      {
-        floor: 2,
-        label: 'Tầng 2',
-        elevationMeters: FH,
-        departments: 'Văn phòng Khoa Điện – Điện tử, Phòng Thực hành Điện tử Cơ bản',
-        highlights: 'Trưng bày các mô hình nghiên cứu khoa học sinh viên ngành Điện',
-      },
-      {
-        floor: 3,
-        label: 'Tầng 3',
-        elevationMeters: 2 * FH,
-        departments: 'Phòng Lab Vi điều khiển, Hệ thống Nhúng & Điện tử Viễn thông',
-        highlights: 'Thực hành thiết kế mạch PCB, lập trình ARM, ESP32 và cảm biến',
-      },
-      {
-        floor: 4,
-        label: 'Tầng 4',
-        elevationMeters: 3 * FH,
-        departments: 'Phòng Lab Tự động hóa PLC, Khí nén – Thủy lực & Robot công nghiệp',
-        highlights: 'Trang bị trạm PLC Siemens/Mitsubishi và dây chuyền phân loại tự động',
-      },
-      {
-        floor: 5,
-        label: 'Tầng 5',
-        elevationMeters: 4 * FH,
-        departments: 'Phòng Thực hành Năng lượng Tái tạo, Điện Mặt trời & Nhà thông minh (Smart Home)',
-        highlights: 'Tầng cao nhất Khu B với hệ thống pin quang điện thực nghiệm',
-      },
-    ],
-  },
-  {
-    id: 'bld_workshop',
-    code: 'Xưởng CK',
-    name: 'Xưởng Thực hành Cơ khí – Công nghệ Ô tô',
-    bounds: [1.0, 39.0, 21.0, 53.0],
-    minFloor: 1,
-    maxFloor: 1,
-    floorHeightMeters: 6.5,
-    color: '#6F93B8',
-    floors: [
-      {
-        floor: 1,
-        label: 'Tầng 1 (Nhà xưởng Mái răng cưa)',
-        elevationMeters: 0,
-        departments: 'Xưởng Động cơ đốt trong, Khung gầm Ô tô, Máy cắt gọt kim loại & CNC',
-        highlights: 'Kiến trúc 3 nhịp mái răng cưa cao 6.5m thông gió và lấy sáng tự nhiên',
-      },
-    ],
-  },
-  {
-    id: 'bld_c',
-    code: 'C',
-    name: 'Tòa C · Giảng đường Khu Đông & Khoa Cơ khí – Ngoại ngữ',
-    bounds: [52.5, -23.0, 129.0, 1.0],
-    minFloor: 1,
-    maxFloor: 3,
-    floorHeightMeters: FH,
-    color: '#6F8CF0',
-    floors: [
-      {
-        floor: 1,
-        label: 'Tầng 1 (Trệt)',
-        elevationMeters: 0,
-        departments: 'Phòng Thực hành CAD/CAM – CNC, Văn phòng Khoa Cơ khí Chế tạo máy (C101–C108)',
-        highlights: 'Kết nối trực tiếp với Khu B qua hành lang mái che dài gần 100m',
-      },
-      {
-        floor: 2,
-        label: 'Tầng 2',
-        elevationMeters: FH,
-        departments: 'Phòng Lab Ngoại ngữ Đa phương tiện (Tiếng Anh, Tiếng Nhật, Tiếng Hàn) (C201–C210)',
-        highlights: 'Hệ thống cabin luyện âm tiêu chuẩn quốc tế',
-      },
-      {
-        floor: 3,
-        label: 'Tầng 3',
-        elevationMeters: 2 * FH,
-        departments: 'Khoa Du lịch, Thực hành Nghiệp vụ Nhà hàng – Khách sạn & Hướng dẫn (C301–C310)',
-        highlights: 'Phòng mô phỏng buồng phòng khách sạn và quầy Bar thực hành',
-      },
-    ],
-  },
-  {
-    id: 'bld_ktx',
-    code: 'KTX',
-    name: 'Ký túc xá Sinh viên TDC',
-    bounds: [57.5, -46.0, 101.5, -28.5],
-    minFloor: 1,
-    maxFloor: 3,
-    floorHeightMeters: FH,
-    color: '#E8608C',
-    floors: [
-      {
-        floor: 1,
-        label: 'Tầng 1 (Trệt)',
-        elevationMeters: 0,
-        departments: 'Ban Quản lý Ký túc xá, Phòng Sinh hoạt chung, Khu vực Căng-tin & Tự học',
-        highlights: 'Không gian xanh mát, an ninh 24/7 ngay trong khuôn viên trường',
-      },
-      {
-        floor: 2,
-        label: 'Tầng 2',
-        elevationMeters: FH,
-        departments: 'Khu Phòng ở Nội trú Sinh viên (P.201 – P.216)',
-        highlights: 'Phòng ở thoáng mát có ban công nhìn ra khu vực cây xanh phía Bắc',
-      },
-      {
-        floor: 3,
-        label: 'Tầng 3',
-        elevationMeters: 2 * FH,
-        departments: 'Khu Phòng ở Nội trú Sinh viên (P.301 – P.316)',
-        highlights: 'Tiện lợi di chuyển sang Tòa C và Tòa D chỉ trong 2 phút đi bộ',
-      },
-    ],
-  },
-  {
-    id: 'bld_d',
-    code: 'D',
-    name: 'Tòa D · Trung tâm Công nghệ Cao & Thư viện (11 Tầng nổi + 1 Tầng hầm)',
-    bounds: [23.0, 5.0, 86.5, 50.5],
-    minFloor: -1,
-    maxFloor: 11,
-    floorHeightMeters: FH,
-    color: '#00AEEF',
-    floors: [
-      {
-        floor: -1,
-        label: 'Tầng Hầm (B1)',
-        elevationMeters: -FH,
-        departments: 'Hầm giữ xe Cán bộ – Giảng viên, Trạm biến áp, Hệ thống kỹ thuật tòa nhà & PCCC',
-        highlights: 'Tầng hầm bê tông cốt thép hiện đại nằm dưới toàn bộ khối đế Tòa D',
-      },
-      {
-        floor: 1,
-        label: 'Tầng 1 (Sảnh chính Tòa D)',
-        elevationMeters: 0,
-        departments: 'Sảnh lễ tân trung tâm, Không gian Triển lãm Công nghệ TDC & Cụm 4 thang máy tốc độ cao',
-        highlights: 'Lối vào chính mở ra quảng trường Cổng 2 đường Chương Dương',
-      },
-      {
-        floor: 2,
-        label: 'Tầng 2 (Khối đế bo cong)',
-        elevationMeters: FH,
-        departments: 'Thư viện Số Thông minh (Smart Library) & Không gian Học tập Mở (Learning Commons)',
-        highlights: 'Thiết kế mặt dựng kính bo cong tầm nhìn 180 độ ra khuôn viên trường',
-      },
-      {
-        floor: 3,
-        label: 'Tầng 3 (Khối đế bo cong)',
-        elevationMeters: 2 * FH,
-        departments: 'Trung tâm Đổi mới Sáng tạo, Khởi nghiệp Sinh viên & Phòng Hội thảo Quốc tế',
-        highlights: 'Không gian Co-working space dành cho các dự án NCKH sinh viên',
-      },
-      {
-        floor: 4,
-        label: 'Tầng 4',
-        elevationMeters: 3 * FH,
-        departments: 'Cụm Phòng Máy tính Chuyên ngành Công nghệ Thông tin & Phần mềm (D04-01 – D04-12)',
-        highlights: 'Hệ thống phòng Lab máy trạm hiệu năng cao',
-      },
-      {
-        floor: 5,
-        label: 'Tầng 5',
-        elevationMeters: 4 * FH,
-        departments: 'Cụm Phòng Thực hành Thiết kế Đồ họa, Truyền thông & Thương mại Điện tử (D05-01 – D05-12)',
-        highlights: 'Studio thực hành quay dựng và xử lý đa phương tiện',
-      },
-      {
-        floor: 6,
-        label: 'Tầng 6',
-        elevationMeters: 5 * FH,
-        departments: 'Cụm Phòng Lab Điện tử – Viễn thông & Tự động hóa Công nghiệp 4.0 (D06-01 – D06-10)',
-        highlights: 'Kết nối giữa khối tháp chữ L và khối đế bo cong',
-      },
-      {
-        floor: 7,
-        label: 'Tầng 7 (Đỉnh khối đế bo cong)',
-        elevationMeters: 6 * FH,
-        departments: 'Phòng Học Thông minh (Smart Classrooms) & Sân vườn Thượng uyển Tầng 7',
-        highlights: 'Tầng kết thúc khối đế bo cong 7 tầng với tầm nhìn toàn cảnh sân trường',
-      },
-      {
-        floor: 8,
-        label: 'Tầng 8 (Khối tháp chữ L)',
-        elevationMeters: 7 * FH,
-        departments: 'Giảng đường Lý thuyết Chất lượng cao Khoa Kinh tế & Quản trị (D08-01 – D08-08)',
-        highlights: 'Hành lang thoáng đãng đón gió tự nhiên từ hướng Đông Nam',
-      },
-      {
-        floor: 9,
-        label: 'Tầng 9 (Khối tháp chữ L)',
-        elevationMeters: 8 * FH,
-        departments: 'Giảng đường Chuyên ngành Ngôn ngữ Anh, Nhật, Hàn & Du lịch (D09-01 – D09-08)',
-        highlights: 'Trang bị màn hình tương tác thông minh tại tất cả các phòng',
-      },
-      {
-        floor: 10,
-        label: 'Tầng 10 (Khối tháp chữ L)',
-        elevationMeters: 9 * FH,
-        departments: 'Trung tâm Nghiên cứu Ứng dụng Khoa học Công nghệ & Hợp tác Doanh nghiệp',
-        highlights: 'Nơi đặt các phòng Lab hợp tác cùng doanh nghiệp trong và ngoài nước',
-      },
-      {
-        floor: 11,
-        label: 'Tầng 11 (Tầng cao nhất Tòa D)',
-        elevationMeters: 10 * FH,
-        departments: 'Hội trường Đa năng Tầng 11, Đài quan sát Toàn cảnh TP. Thủ Đức & Tháp Logo TDC',
-        highlights: 'Độ cao hơn 42m so với sân trường, ngắm trọn vẹn tuyến Metro số 1 và trung tâm Thủ Đức',
-      },
-    ],
-  },
-];
-</file>
-
-<file path="src/services/gpsService.ts">
-import { CAMPUS_BUILDINGS, TDC_GEO_ANCHORS } from '../data/campusBuildings';
-import { CAMP } from '../data/campusLayout';
-import { ell } from '../engine/threeHelpers';
-import { CampusBuildingZone, GpsTelemetry3D } from '../types/game';
-
-/**
- * Chuyển đổi tọa độ GPS thực tế (WGS84 Latitude, Longitude, Altitude ASL)
- * sang hệ tọa độ không gian 3 chiều của khuôn viên TDC (X: Đông/Tây, Y: Cao độ phân tầng, Z: Nam/Bắc)
- */
-export function gpsToCampus3D(params: {
-  lat: number;
-  lng: number;
-  altitudeAsl?: number | null;
-  groundAltitudeReferenceAsl?: number;
-}): {
-  x: number;
-  y: number;
-  z: number;
-  insideCampus: boolean;
-} {
-  const dLat = params.lat - TDC_GEO_ANCHORS.ORIGIN_LAT;
-  const dLng = params.lng - TDC_GEO_ANCHORS.ORIGIN_LNG;
-
-  const eastMeters = dLng * TDC_GEO_ANCHORS.METERS_PER_DEG_LNG;
-  const northMeters = dLat * TDC_GEO_ANCHORS.METERS_PER_DEG_LAT;
-
-  const cosR = Math.cos(TDC_GEO_ANCHORS.MAP_ROTATION_RAD);
-  const sinR = Math.sin(TDC_GEO_ANCHORS.MAP_ROTATION_RAD);
-
-  // Trong Three.js: +X là hướng Đông, -Z là hướng Bắc (+Z là hướng Nam về phía Võ Văn Ngân)
-  const x = +(eastMeters * cosR - northMeters * sinR).toFixed(2);
-  const z = +(-northMeters * cosR - eastMeters * sinR).toFixed(2);
-
-  const groundRef =
-    params.groundAltitudeReferenceAsl ?? TDC_GEO_ANCHORS.GROUND_ALTITUDE_ASL_M;
-  const rawY =
-    params.altitudeAsl != null && Number.isFinite(params.altitudeAsl)
-      ? params.altitudeAsl - groundRef
-      : 0;
-  // Giới hạn độ cao hợp lệ trong khuôn viên từ tầng hầm (-4.2m) tới đỉnh tháp Tòa D (+50m)
-  const y = +Math.max(-TDC_GEO_ANCHORS.FLOOR_HEIGHT_M, Math.min(52, rawY)).toFixed(2);
-
-  const insideCampus = ell(x, z) <= 1.05;
-
-  return { x, y, z, insideCampus };
-}
-
-/**
- * Chuyển đổi ngược từ tọa độ 3D khuôn viên TDC (X, Y, Z) sang tọa độ GPS (Lat, Lng, Altitude ASL)
- */
-export function campus3DToGps(params: {
-  x: number;
-  y?: number;
-  z: number;
-  groundAltitudeReferenceAsl?: number;
-}): {
-  lat: number;
-  lng: number;
-  altitudeAsl: number;
-} {
-  const cosR = Math.cos(-TDC_GEO_ANCHORS.MAP_ROTATION_RAD);
-  const sinR = Math.sin(-TDC_GEO_ANCHORS.MAP_ROTATION_RAD);
-
-  const eastMeters = params.x * cosR + params.z * sinR;
-  const northMeters = -params.z * cosR + params.x * sinR;
-
-  const lat = +(
-    TDC_GEO_ANCHORS.ORIGIN_LAT +
-    northMeters / TDC_GEO_ANCHORS.METERS_PER_DEG_LAT
-  ).toFixed(6);
-  const lng = +(
-    TDC_GEO_ANCHORS.ORIGIN_LNG +
-    eastMeters / TDC_GEO_ANCHORS.METERS_PER_DEG_LNG
-  ).toFixed(6);
-
-  const groundRef =
-    params.groundAltitudeReferenceAsl ?? TDC_GEO_ANCHORS.GROUND_ALTITUDE_ASL_M;
-  const altitudeAsl = +(groundRef + (params.y || 0)).toFixed(2);
-
-  return { lat, lng, altitudeAsl };
-}
-
-/**
- * Nhận diện tòa nhà sinh viên đang đứng (dựa theo mặt phẳng X, Z với dung sai biên GPS)
- */
-export function detectBuildingAtPosition(
-  x: number,
-  z: number,
-  marginMeters = 2.5
-): CampusBuildingZone | null {
-  let bestMatch: CampusBuildingZone | null = null;
-  let bestDist = Infinity;
-
-  for (const b of CAMPUS_BUILDINGS) {
-    const [x0, z0, x1, z1] = b.bounds;
-    if (
-      x >= x0 - marginMeters &&
-      x <= x1 + marginMeters &&
-      z >= z0 - marginMeters &&
-      z <= z1 + marginMeters
-    ) {
-      // Khoảng cách vào tâm tòa nhà để ưu tiên tòa gần nhất nếu đứng ở ranh giới nối
-      const cx = (x0 + x1) / 2;
-      const cz = (z0 + z1) / 2;
-      const d = Math.hypot(x - cx, z - cz);
-      if (d < bestDist) {
-        bestDist = d;
-        bestMatch = b;
-      }
-    }
-  }
-  return bestMatch;
-}
-
-/**
- * Tính toán Tầng hiện tại (Floor) từ cao độ tương đối Y (mét so với mặt sân trường)
- * và giới hạn theo số tầng thực tế của tòa nhà đang đứng.
- * - Tầng hầm B1: floor = -1 (y <= -1.8m, chỉ có tại Tòa D)
- * - Tầng trệt (Tầng 1): floor = 1 (0m <= y < 4.2m)
- * - Tầng N (N >= 1): floor = 1 + Math.floor((y + 1.2) / 4.2)
- */
-export function resolveFloorFromElevation(
-  yMeters: number,
-  building: CampusBuildingZone | null
-): {
-  floor: number;
-  clampedY: number;
-} {
-  const fh = building?.floorHeightMeters || TDC_GEO_ANCHORS.FLOOR_HEIGHT_M;
-
-  let floor: number;
-  if (yMeters <= -1.8) {
-    floor = -1;
-  } else {
-    floor = Math.max(1, 1 + Math.floor((yMeters + 1.1) / fh));
-  }
-
-  if (building) {
-    if (floor < building.minFloor) floor = building.minFloor;
-    if (floor > building.maxFloor) floor = building.maxFloor;
-  } else {
-    // Ngoài sân trường không thuộc tòa nhà nào thì mặc định ở mặt đất (Tầng 1 / y = 0)
-    if (floor < 1) floor = 1;
-    if (floor > 11) floor = 11;
-  }
-
-  const clampedY = floor === -1 ? -fh : (floor - 1) * fh;
-  return { floor, clampedY: +clampedY.toFixed(2) };
-}
-
-/**
- * Chuyển số tầng (floor) sang độ cao Y (mét) trong không gian 3D
- */
-export function floorToElevationMeters(
-  floor: number,
-  building?: CampusBuildingZone | null
-): number {
-  const fh = building?.floorHeightMeters || TDC_GEO_ANCHORS.FLOOR_HEIGHT_M;
-  if (floor === -1) return -fh;
-  return Math.max(0, (floor - 1) * fh);
-}
-
-/**
- * Tính khoảng cách không gian 3 chiều thực tế (Euclidean 3D distance) giữa 2 điểm (X, Y, Z)
- */
-export function distance3D(
-  a: { x: number; y?: number; z: number },
-  b: { x: number; y?: number; z: number }
-): number {
-  const dx = a.x - b.x;
-  const dy = (a.y || 0) - (b.y || 0);
-  const dz = a.z - b.z;
-  return Math.hypot(dx, dy, dz);
-}
-
-/**
- * Bộ lọc Kalman 1 chiều đơn giản giúp làm mượt nhiễu GPS thực tế trên thiết bị di động
- * đặc biệt là trục cao độ (Altitude) và tọa độ ngang khi đứng gần các tòa nhà cao tầng như Tòa D.
- */
-export class GpsKalmanFilter3D {
-  private xEst: number | null = null;
-  private yEst: number | null = null;
-  private zEst: number | null = null;
-  private pX = 1;
-  private pY = 1;
-  private pZ = 1;
-
-  // Nhiễu quá trình (Process noise Q)
-  private readonly qHoriz = 0.35;
-  private readonly qVert = 0.2;
-
-  public reset(x?: number, y?: number, z?: number): void {
-    this.xEst = x ?? null;
-    this.yEst = y ?? null;
-    this.zEst = z ?? null;
-    this.pX = 1;
-    this.pY = 1;
-    this.pZ = 1;
-  }
-
-  public filter(
-    rawX: number,
-    rawY: number,
-    rawZ: number,
-    horizAccuracyMeters = 8,
-    vertAccuracyMeters = 10
-  ): { x: number; y: number; z: number } {
-    const rH = Math.max(0.5, Math.min(50, horizAccuracyMeters * 0.25));
-    const rV = Math.max(0.5, Math.min(50, vertAccuracyMeters * 0.35));
-
-    if (this.xEst === null || this.yEst === null || this.zEst === null) {
-      this.xEst = rawX;
-      this.yEst = rawY;
-      this.zEst = rawZ;
-      return { x: rawX, y: rawY, z: rawZ };
-    }
-
-    // Cập nhật trục X
-    this.pX += this.qHoriz;
-    const kX = this.pX / (this.pX + rH);
-    this.xEst = this.xEst + kX * (rawX - this.xEst);
-    this.pX = (1 - kX) * this.pX;
-
-    // Cập nhật trục Z
-    this.pZ += this.qHoriz;
-    const kZ = this.pZ / (this.pZ + rH);
-    this.zEst = this.zEst + kZ * (rawZ - this.zEst);
-    this.pZ = (1 - kZ) * this.pZ;
-
-    // Cập nhật trục Y (Cao độ)
-    this.pY += this.qVert;
-    const kY = this.pY / (this.pY + rV);
-    this.yEst = this.yEst + kY * (rawY - this.yEst);
-    this.pY = (1 - kY) * this.pY;
-
-    return {
-      x: +this.xEst.toFixed(2),
-      y: +this.yEst.toFixed(2),
-      z: +this.zEst.toFixed(2),
-    };
-  }
-}
-
-/**
- * Kẹp tọa độ (X, Z) vào biên elip của khuôn viên TDC nếu bật chế độ giữ trong khuôn viên
- */
-export function clampToCampusBoundary(x: number, z: number): { x: number; z: number } {
-  const d = ell(x, z);
-  if (d <= 0.985) return { x, z };
-  const k = 0.985 / d;
-  return {
-    x: +(CAMP.cx + (x - CAMP.cx) * k).toFixed(2),
-    z: +(CAMP.cz + (z - CAMP.cz) * k).toFixed(2),
-  };
-}
-
-/**
- * Tạo gói dữ liệu Telemetry 3D đầy đủ từ tọa độ 3D hoặc tín hiệu Geolocation
- */
-export function buildTelemetryFromCampus3D(params: {
-  x: number;
-  y: number;
-  z: number;
-  accuracyMeters?: number;
-  altitudeAccuracyMeters?: number | null;
-  headingDeg?: number | null;
-  speedMps?: number | null;
-  source: GpsTelemetry3D['source'];
-  lockedFloor?: number | null;
-  groundAltitudeReferenceAsl?: number;
-}): GpsTelemetry3D {
-  const building = detectBuildingAtPosition(params.x, params.z);
-  const clampedLockedFloor =
-    params.lockedFloor != null
-      ? building
-        ? Math.max(building.minFloor, Math.min(building.maxFloor, params.lockedFloor))
-        : Math.max(-1, Math.min(11, params.lockedFloor))
-      : null;
-
-  const resolved =
-    clampedLockedFloor != null
-      ? {
-          floor: clampedLockedFloor,
-          clampedY: floorToElevationMeters(clampedLockedFloor, building),
-        }
-      : resolveFloorFromElevation(params.y, building);
-
-  const effectiveY = clampedLockedFloor != null ? resolved.clampedY : params.y;
-  const gps = campus3DToGps({
-    x: params.x,
-    y: effectiveY,
-    z: params.z,
-    groundAltitudeReferenceAsl: params.groundAltitudeReferenceAsl,
-  });
-
-  return {
-    lat: gps.lat,
-    lng: gps.lng,
-    altitudeAsl: gps.altitudeAsl,
-    accuracyMeters: params.accuracyMeters ?? 2.5,
-    altitudeAccuracyMeters: params.altitudeAccuracyMeters ?? 3.0,
-    headingDeg: params.headingDeg ?? null,
-    speedMps: params.speedMps ?? null,
-    x: +params.x.toFixed(2),
-    y: +effectiveY.toFixed(2),
-    z: +params.z.toFixed(2),
-    detectedFloor: resolved.floor,
-    detectedBuilding: building,
-    insideCampus: ell(params.x, params.z) <= 1.05,
-    source: params.source,
-    timestamp: Date.now(),
-  };
-}
-</file>
-
 <file path="src/components/minigames/AutoEngineGame.tsx">
 import React, { useState } from 'react';
 import { audioSfx } from '../../engine/audioSfx';
@@ -1167,7 +452,7 @@ const IT_CHALLENGES: DebugQuestion[] = [
   },
   {
     id: 3,
-    title: 'Bug #3: Truy vấn API Bản đồ số TDC GO',
+    title: 'Bug #3: Truy vấn API Bản đồ số TDC Travel',
     snippet: `async function fetchStationData(stationId) {\n  const res = fetch('/api/stations/' + stationId);\n  return res.json(); // Lỗi: res.json is not a function\n}`,
     question: 'Thiếu từ khóa nào trước hàm bất đồng bộ `fetch(...)`?',
     options: [
@@ -1464,7 +749,7 @@ export const Viewfinder: React.FC<ViewfinderProps> = ({
   return (
     <div id="viewfinder">
       <div className="fr" />
-      <div className="cap">{station.name} · TDC GO 3D Polaroid</div>
+      <div className="cap">{station.name} · TDC Travel 3D Polaroid</div>
       <div className="vf-btns">
         <button
           type="button"
@@ -1531,7 +816,7 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
           </span>
           <div>
             <h2>Chinh Phục 100% Khuôn Viên!</h2>
-            <p>Chứng nhận Nhà Thám Hiểm TDC GO 2026–2027</p>
+            <p>Chứng nhận Nhà Thám Hiểm TDC Travel 2026–2027</p>
           </div>
           <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
             <X className="w-5 h-5" />
@@ -1540,7 +825,7 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
 
         <div className="sh-body">
           <div className="cert">
-            <small>GIẤY CHỨNG NHẬN ĐIỆN TỬ · TDC GO</small>
+            <small>GIẤY CHỨNG NHẬN ĐIỆN TỬ · TDC TRAVEL</small>
             <h3>{profile.name}</h3>
             <div className="text-xs font-extrabold text-slate-600">
               MSSV: {profile.mssv} · {fac.name}
@@ -1566,7 +851,7 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
                   <StationSticker key={st.id} col={st.col} type={st.type} size={32} />
                 ))}
             </div>
-            <p className="note">Cấp ngày {today} · Ban Tổ chức Sự kiện TDC GO</p>
+            <p className="note">Cấp ngày {today} · Ban Tổ chức Sự kiện TDC Travel</p>
           </div>
 
           <p className="note text-center">
@@ -1593,80 +878,6 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
               Tiếp tục Dạo trường
             </button>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-</file>
-
-<file path="src/components/modals/HelpModal.tsx">
-import React from 'react';
-import { HelpCircle, X } from 'lucide-react';
-
-interface HelpModalProps {
-  onClose: () => void;
-}
-
-export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
-  return (
-    <div id="modal">
-      <div className="scrim" onClick={onClose} />
-      <div className="sheet card" role="dialog" aria-modal="true">
-        <div className="sh-head" style={{ '--c': '#00AEEF' } as React.CSSProperties}>
-          <span
-            className="sticker"
-            style={{ '--c': '#fff', color: '#00AEEF', width: 56, height: 56 } as React.CSSProperties}
-          >
-            <HelpCircle className="w-7 h-7" />
-          </span>
-          <div>
-            <h2>Hướng Dẫn Khám Phá TDC GO</h2>
-            <p>Web Game 3D Tương tác Thực tế (O2O Gamification)</p>
-          </div>
-          <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="sh-body help">
-          <div>
-            <h3>1. Bản đồ 3D Khuôn viên TDC & Định vị GPS 3 Trục (X · Y · Z)</h3>
-            <p>
-              Hệ thống sử dụng tín hiệu <b>GPS độ chính xác cao (High-Accuracy WGS84 + Altitude)</b> kết hợp bộ lọc <b>Kalman 3D</b> để định vị vị trí thực tế của bạn trong khuôn viên Trường Cao đẳng Công nghệ Thủ Đức (53 Võ Văn Ngân) theo cả 3 trục:
-            </p>
-            <ul>
-              <li>
-                <b>Trục X (Đông – Tây) & Trục Z (Nam – Bắc):</b> Xác định vị trí của bạn trên mặt bằng khuôn viên và tự động nhận diện tòa nhà bạn đang đứng (Khu A, Khu B, Hội trường H, Tòa C, Tòa D, KTX, Xưởng Cơ khí).
-              </li>
-              <li>
-                <b>Trục Cao độ Y / Phân tầng (Floor Level):</b> Tính toán độ cao so với mặt sân trường (1 tầng = 4.2m) để hiển thị chính xác tầng bạn đang khám phá từ <b>Tầng Hầm B1 (-4.2m)</b> lên tới <b>Tầng 11 (+42.0m tại Tòa D)</b>.
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h3>2. Khám phá Phân tầng 3D & Chế độ Cắt lớp (3D Floor Cutaway)</h3>
-            <ul>
-              <li>
-                <b>Thanh Chọn Tầng 3D (B1 → T11):</b> Sử dụng thanh thang máy phân tầng ở cạnh trái màn hình hoặc nút <b>Chọn Tòa/Tầng</b> trên bảng GPS để chuyển nhanh giữa các tầng và xem danh sách Phòng ban / Khoa / Phòng Lab tại tầng đó.
-              </li>
-              <li>
-                <b>Cắt lớp Tầng 3D (Cutaway View):</b> Bấm nút <b>Cắt lớp Tầng 3D</b> trên bảng điều khiển GPS để ẩn các tầng phía trên và quan sát trực diện mặt sàn bên trong tầng bạn đang đứng.
-              </li>
-              <li>
-                <b>Chuẩn 0m (Tare Ground Altitude):</b> Khi đứng ở sân trường, bấm <b>Chuẩn 0m</b> để hiệu chuẩn áp kế / độ cao GPS của điện thoại về mốc chuẩn Tầng 1 (0.0m).
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h3>3. Check-in Thực địa (QR + Mật thư) & Tổ đội Liên khoa</h3>
-            <p>
-              Tại mỗi trạm, bạn có thể <b>Quét mã QR</b> qua Camera trình duyệt hoặc <b>Giải mật thư quan sát</b> để xóa tan sương mù (Fog of War) và nhận thêm điểm thưởng O2O. Hãy lập <b>Tổ đội 2–4 sinh viên khác Khoa</b> để kích hoạt <b>+20% điểm thưởng Liên khoa</b>!
-            </p>
-          </div>
-          <button type="button" className="btn big" onClick={onClose}>
-            Đã sẵn sàng Định vị & Khám phá!
-          </button>
         </div>
       </div>
     </div>
@@ -1725,7 +936,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
             <Trophy className="w-7 h-7" />
           </span>
           <div>
-            <h2>Bảng Xếp Hạng TDC GO</h2>
+            <h2>Bảng Xếp Hạng TDC Travel</h2>
             <p>Học kỳ I · Năm học 2026–2027</p>
           </div>
           <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
@@ -2256,6 +1467,5009 @@ export const ProfileBadgesModal: React.FC<ProfileBadgesModalProps> = ({
               Sưu tầm đủ {activeStations.length} huy hiệu tại các tòa nhà để nhận Chứng nhận Nhà thám hiểm TDC!
             </p>
           )}
+        </div>
+      </div>
+    </div>
+  );
+};
+</file>
+
+<file path="src/components/QrScannerModal.tsx">
+import React, { useEffect, useRef, useState } from 'react';
+import { Html5Qrcode } from 'html5-qrcode';
+import { Camera, KeyRound, QrCode, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { Station } from '../types/game';
+
+interface QrScannerModalProps {
+  stations: Station[];
+  targetStation?: Station | null;
+  onClose: () => void;
+  onQrDetected: (rawCode: string) => void;
+}
+
+export const QrScannerModal: React.FC<QrScannerModalProps> = ({
+  stations,
+  targetStation,
+  onClose,
+  onQrDetected,
+}) => {
+  const [manualToken, setManualToken] = useState('');
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  const stopCamera = async () => {
+    if (scannerRef.current) {
+      try {
+        if (scannerRef.current.isScanning) {
+          await scannerRef.current.stop();
+        }
+        scannerRef.current.clear();
+      } catch {
+        // Ignore cleanup errors
+      }
+      scannerRef.current = null;
+    }
+    setCameraActive(false);
+  };
+
+  const startCamera = async () => {
+    setCameraError(null);
+    try {
+      const qr = new Html5Qrcode('tdc-qr-reader');
+      scannerRef.current = qr;
+      setCameraActive(true);
+      await qr.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 220, height: 220 } },
+        (decodedText) => {
+          void stopCamera();
+          onQrDetected(decodedText);
+        },
+        () => {
+          // frame scan ignore
+        }
+      );
+    } catch {
+      setCameraActive(false);
+      setCameraError(
+        'Thiết bị chưa cấp quyền Camera hoặc đang chạy trên máy tính không có Webcam. Bạn có thể nhập mã Token trạm hoặc bấm "Mô phỏng Quét QR" bên dưới!'
+      );
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      void stopCamera();
+    };
+  }, []);
+
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualToken.trim()) return;
+    onQrDetected(manualToken.trim());
+  };
+
+  return (
+    <div id="modal">
+      <div className="scrim" onClick={onClose} />
+      <div className="sheet card" role="dialog" aria-modal="true">
+        <div className="sh-head" style={{ '--c': '#00AEEF' } as React.CSSProperties}>
+          <span
+            className="sticker"
+            style={{ '--c': '#fff', color: '#00AEEF', width: 54, height: 54 } as React.CSSProperties}
+          >
+            <QrCode className="w-7 h-7" />
+          </span>
+          <div>
+            <h2>Quét Mã QR Thực Địa</h2>
+            <p>
+              {targetStation
+                ? `Xác thực O2O tại: ${targetStation.name}`
+                : 'Hệ thống Check-in WebRTC Camera TDC Travel'}
+            </p>
+          </div>
+          <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="sh-body">
+          <div className="know">
+            <b>Cơ chế Xác thực Kép (O2O Verification)</b>
+            Hướng camera điện thoại vào bảng mã QR đặt tại trạm thực tế trong khuôn viên TDC để mở khóa sương mù và nhận thêm <b>+15 điểm thưởng thực địa</b>.
+          </div>
+
+          <div className="rounded-2xl overflow-hidden bg-slate-900 border-2 border-sky-400 min-h-[210px] flex flex-col items-center justify-center relative p-3">
+            <div id="tdc-qr-reader" className="w-full max-w-[280px]" />
+            {!cameraActive && (
+              <div className="flex flex-col items-center text-center gap-2.5 py-4 text-white">
+                <Camera className="w-10 h-10 text-sky-400" />
+                <p className="text-xs text-slate-300 max-w-xs m-0">
+                  Sử dụng Camera trình duyệt (WebRTC) để quét trực tiếp không cần cài App
+                </p>
+                <button type="button" className="btn blue" onClick={startCamera}>
+                  <Camera className="w-4 h-4" /> Bật Camera Quét QR
+                </button>
+              </div>
+            )}
+          </div>
+
+          {cameraError && (
+            <div className="bg-amber-50 border border-amber-300 text-amber-900 p-3 rounded-xl text-xs font-bold">
+              ℹ️ {cameraError}
+            </div>
+          )}
+
+          <form onSubmit={handleManualSubmit} className="flex flex-col gap-2">
+            <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <KeyRound className="w-3.5 h-3.5" /> Hoặc nhập Mã định danh in dưới bảng QR:
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={manualToken}
+                onChange={(e) => setManualToken(e.target.value)}
+                placeholder={
+                  targetStation
+                    ? `Ví dụ: ${targetStation.qrSecretToken}`
+                    : 'Nhập mã TDC-QR-...'
+                }
+                className="flex-1 px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-[#FFFBEF] font-extrabold text-sm"
+              />
+              <button type="submit" className="btn">
+                Xác nhận
+              </button>
+            </div>
+          </form>
+
+          <div className="border-t border-slate-200 pt-3 flex flex-col gap-2">
+            <span className="text-xs font-extrabold text-slate-500 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Chế độ Giả lập Quét QR (Dành cho Demo trên PC):
+            </span>
+            {targetStation ? (
+              <button
+                type="button"
+                className="btn sun w-full"
+                onClick={() => onQrDetected(targetStation.qrSecretToken)}
+              >
+                <ShieldCheck className="w-5 h-5" /> Mô phỏng Quét QR Trạm {targetStation.name}
+              </button>
+            ) : (
+              <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
+                {stations
+                  .filter((s) => s.active !== false)
+                  .map((st) => (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => onQrDetected(st.qrSecretToken)}
+                      className="text-left px-2.5 py-2 rounded-xl border border-slate-200 hover:border-sky-400 bg-slate-50 text-xs font-extrabold truncate cursor-pointer"
+                    >
+                      📲 {st.name}
+                    </button>
+                  ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+</file>
+
+<file path="src/components/StartScreen.tsx">
+import React, { useState } from 'react';
+import { Compass, RotateCcw, Shield, Sparkles } from 'lucide-react';
+import { AVATARS, TDC_LOGO } from '../data/campusLayout';
+import { FACULTIES } from '../data/faculties';
+import { getAvatarSvg } from '../engine/chibiBuilder';
+import { isFirebaseConfigured } from '../services/firebase';
+import { FacultyId, UserProfile } from '../types/game';
+
+interface StartScreenProps {
+  existingProfile: UserProfile | null;
+  totalStations: number;
+  onStartGame: (params: {
+    name: string;
+    mssv: string;
+    email?: string;
+    password?: string;
+    facultyId: FacultyId;
+    avatar: number;
+    mode: 'demo' | 'email_login' | 'email_register' | 'google';
+  }) => Promise<void>;
+  onResetProgress: () => void;
+  onOpenAdmin: () => void;
+}
+
+export const StartScreen: React.FC<StartScreenProps> = ({
+  existingProfile,
+  totalStations,
+  onStartGame,
+  onResetProgress,
+  onOpenAdmin,
+}) => {
+  const [name, setName] = useState(existingProfile?.name || '');
+  const [mssv, setMssv] = useState(existingProfile?.mssv || '26211TT0102');
+  const [facultyId, setFacultyId] = useState<FacultyId>(
+    existingProfile?.facultyId || 'cntt'
+  );
+  const [avatar, setAvatar] = useState<number>(existingProfile?.avatar || 0);
+  const [authTab, setAuthTab] = useState<'quick' | 'cloud'>('quick');
+  const [email, setEmail] = useState(existingProfile?.email || '');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const unlockedCount = Object.keys(existingProfile?.done || {}).length;
+
+  const handleSubmit = async (
+    mode: 'demo' | 'email_login' | 'email_register' | 'google'
+  ) => {
+    setError(null);
+    setLoading(true);
+    try {
+      await onStartGame({
+        name: name.trim() || 'Minh Anh',
+        mssv: mssv.trim() || '26211TT0102',
+        email: email.trim() || undefined,
+        password: password || undefined,
+        facultyId,
+        avatar,
+        mode,
+      });
+    } catch (err) {
+      setError((err as Error).message || 'Đăng nhập thất bại.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div id="start">
+      <div className="st-wrap">
+        <div className="flex items-center justify-between">
+          <div className="logo">
+            <div className="seal">
+              <svg
+                viewBox="118 118 332 332"
+                role="img"
+                aria-label="Logo Trường Cao đẳng Công nghệ Thủ Đức"
+              >
+                <path fill="#00AEEF" d={TDC_LOGO} />
+              </svg>
+            </div>
+            <h1>
+              TDC<span>Travel</span>
+            </h1>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenAdmin}
+            className="px-3.5 py-2 rounded-2xl bg-white/95 border-2 border-slate-200 shadow-sm text-xs font-extrabold text-slate-700 hover:border-sky-400 flex items-center gap-1.5 cursor-pointer"
+            title="Mở Cổng Quản trị Hệ thống (Admin CMS)"
+          >
+            <Shield className="w-4 h-4 text-sky-600" /> Admin CMS
+          </button>
+        </div>
+
+        <p className="tag">
+          Khám phá bản đồ 3D khuôn viên Trường Cao đẳng Công nghệ Thủ Đức, mở khóa sương mù tại {totalStations} trạm thực địa, kết nối tổ đội liên khoa và sưu tầm huy hiệu!
+        </p>
+
+        <div className="st-card card">
+          {/* Auth Mode Switcher */}
+          <div className="grid grid-cols-2 gap-1.5 bg-[#FFFBEF] p-1 rounded-xl border border-slate-200">
+            <button
+              type="button"
+              onClick={() => setAuthTab('quick')}
+              className={`py-1.5 rounded-lg text-xs font-extrabold cursor-pointer ${
+                authTab === 'quick'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-slate-600 hover:bg-white'
+              }`}
+            >
+              ⚡ Hồ sơ Sinh viên / Demo
+            </button>
+            <button
+              type="button"
+              onClick={() => setAuthTab('cloud')}
+              className={`py-1.5 rounded-lg text-xs font-extrabold cursor-pointer ${
+                authTab === 'cloud'
+                  ? 'bg-sky-600 text-white'
+                  : 'text-slate-600 hover:bg-white'
+              }`}
+            >
+              ☁️ Tài khoản Email TDC
+            </button>
+          </div>
+
+          {error && (
+            <div className="bg-rose-50 border border-rose-300 text-rose-800 px-3 py-2 rounded-xl text-xs font-extrabold">
+              ⚠️ {error}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label htmlFor="inName">Họ tên Sinh viên</label>
+              <input
+                id="inName"
+                type="text"
+                maxLength={24}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ví dụ: Minh Anh"
+              />
+            </div>
+            <div>
+              <label htmlFor="inMssv">Mã số SV (MSSV)</label>
+              <input
+                id="inMssv"
+                type="text"
+                maxLength={14}
+                value={mssv}
+                onChange={(e) => setMssv(e.target.value.toUpperCase())}
+                placeholder="26211TT0102"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="inFaculty">Khoa / Ngành đào tạo tại TDC</label>
+            <select
+              id="inFaculty"
+              value={facultyId}
+              onChange={(e) => setFacultyId(e.target.value as FacultyId)}
+              className="w-full px-3.5 py-2.5 rounded-xl border-2 border-[#E2EBDA] bg-[#FFFBEF] font-extrabold text-sm text-[#1E3528]"
+            >
+              {FACULTIES.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name} ({f.shortName})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {authTab === 'cloud' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-sky-50/70 p-2.5 rounded-xl border border-sky-200">
+              <div>
+                <label htmlFor="inEmail">Email Sinh viên (@mail.tdc.edu.vn)</label>
+                <input
+                  id="inEmail"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="26211tt0102@mail.tdc.edu.vn"
+                  className="!text-xs !py-2"
+                />
+              </div>
+              <div>
+                <label htmlFor="inPass">Mật khẩu</label>
+                <input
+                  id="inPass"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="!text-xs !py-2"
+                />
+              </div>
+            </div>
+          )}
+
+          <span className="lbl">Chọn Nhân vật Chibi 3D</span>
+          <div className="avas">
+            {AVATARS.map((a, i) => (
+              <button
+                key={a.name}
+                type="button"
+                className={i === avatar ? 'on' : ''}
+                onClick={() => setAvatar(i)}
+                aria-pressed={i === avatar}
+              >
+                <div
+                  className="w-14 h-14"
+                  dangerouslySetInnerHTML={{ __html: getAvatarSvg(i) }}
+                />
+                {a.name}
+              </button>
+            ))}
+          </div>
+
+          {authTab === 'quick' ? (
+            <button
+              type="button"
+              disabled={loading}
+              className="btn big sun"
+              onClick={() => handleSubmit('demo')}
+            >
+              <Compass className="w-5 h-5" />
+              {existingProfile && existingProfile.points > 0
+                ? `Tiếp tục Hành trình · ${existingProfile.points.toLocaleString('vi-VN')} điểm (${unlockedCount}/${totalStations} trạm)`
+                : 'Bắt đầu Khám phá Khuôn viên 3D'}
+            </button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={loading}
+                  className="btn blue text-sm"
+                  onClick={() => handleSubmit('email_login')}
+                >
+                  Đăng nhập Email
+                </button>
+                <button
+                  type="button"
+                  disabled={loading}
+                  className="btn sun text-sm"
+                  onClick={() => handleSubmit('email_register')}
+                >
+                  Đăng ký Mới
+                </button>
+              </div>
+              {isFirebaseConfigured && (
+                <button
+                  type="button"
+                  disabled={loading}
+                  className="btn ghost text-xs"
+                  onClick={() => handleSubmit('google')}
+                >
+                  Đăng nhập nhanh với Google (@mail.tdc.edu.vn)
+                </button>
+              )}
+            </div>
+          )}
+
+          {existingProfile && (existingProfile.points > 0 || unlockedCount > 0) && (
+            <div className="st-row">
+              <button
+                type="button"
+                className="btn ghost text-sm"
+                onClick={onResetProgress}
+              >
+                <RotateCcw className="w-4 h-4" /> Đặt lại tiến độ & Phủ lại sương mù từ đầu
+              </button>
+            </div>
+          )}
+
+          <p className="fine flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+            <span>
+              Đề tài NCKH 2026–2027: Tích hợp Bản đồ 3D + Sương mù (Fog of War), Quét QR thực địa O2O, Mini-game chuyên ngành các Khoa, Tổ đội Liên khoa & Admin CMS.
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+</file>
+
+<file path="src/components/StationModal.tsx">
+import React, { useMemo, useState } from 'react';
+import {
+  Camera,
+  CheckCircle2,
+  Compass,
+  Eye,
+  Flag,
+  HelpCircle,
+  Lightbulb,
+  QrCode,
+  ShieldAlert,
+  Sparkles,
+  Users,
+  X,
+} from 'lucide-react';
+import { TYPE_LABEL } from '../data/campusLayout';
+import { audioSfx } from '../engine/audioSfx';
+import {
+  checkAntiCheatCooldown,
+  verifyStationQrPayload,
+  verifyStationRiddle,
+} from '../services/gameService';
+import {
+  PartyRoom,
+  QuizItem,
+  Station,
+  UnlockedStationRecord,
+  UserProfile,
+  VerificationMethod,
+} from '../types/game';
+import { AutoEngineGame } from './minigames/AutoEngineGame';
+import { ElectricCircuitGame } from './minigames/ElectricCircuitGame';
+import { ItDebugGame } from './minigames/ItDebugGame';
+import { KickGame } from './minigames/KickGame';
+import { StationSticker } from './StationSticker';
+
+interface StationModalProps {
+  station: Station;
+  profile: UserProfile;
+  party: PartyRoom | null;
+  totalStations: number;
+  nextStationName?: string;
+  preverifiedMethod?: VerificationMethod | null;
+  onClose: () => void;
+  onOpenQrScanner: (st: Station) => void;
+  onRequestPhotoMode: (st: Station, method: VerificationMethod) => void;
+  onCompleteStation: (params: {
+    station: Station;
+    basePoints: number;
+    method: VerificationMethod;
+    isQuizOrGameSuccess: boolean;
+    summaryHtml?: string;
+  }) => Promise<{
+    finalPoints: number;
+    crossFacultyBonus: number;
+    qrBonus: number;
+  }>;
+  onShowCertificate: () => void;
+}
+
+export const StationModal: React.FC<StationModalProps> = ({
+  station,
+  profile,
+  party,
+  totalStations,
+  nextStationName,
+  preverifiedMethod,
+  onClose,
+  onOpenQrScanner,
+  onRequestPhotoMode,
+  onCompleteStation,
+  onShowCertificate,
+}) => {
+  const existingRecord: UnlockedStationRecord | undefined = profile.done?.[station.id];
+
+  // Step 1: O2O Field Verification ('qr' | 'riddle' | 'demo')
+  const [verifiedMethod, setVerifiedMethod] = useState<VerificationMethod | null>(
+    preverifiedMethod || (station.id === 'g1' ? 'demo' : null)
+  );
+  const [riddleInput, setRiddleInput] = useState('');
+  const [showRiddleHint, setShowRiddleHint] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [qrTokenInput, setQrTokenInput] = useState('');
+
+  // Step 2: Quiz state (if type === 'quiz')
+  const pickedQuiz: QuizItem | null = useMemo(() => {
+    if (!station.questions || station.questions.length === 0) return null;
+    const idx = Math.floor(Math.random() * station.questions.length);
+    return station.questions[idx];
+  }, [station]);
+
+  const shuffledOptionIndices = useMemo(() => {
+    if (!pickedQuiz) return [0, 1, 2, 3];
+    return pickedQuiz.opts.map((_, i) => i).sort(() => Math.random() - 0.5);
+  }, [pickedQuiz]);
+
+  const [selectedQuizAns, setSelectedQuizAns] = useState<number | null>(null);
+
+  // Step 3: Completion Reveal state
+  const [completionResult, setCompletionResult] = useState<{
+    finalPoints: number;
+    crossFacultyBonus: number;
+    qrBonus: number;
+    summaryHtml?: string;
+  } | null>(null);
+
+  const unlockedCount = Object.keys(profile.done || {}).length;
+
+  const handleRiddleVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cooldown = checkAntiCheatCooldown(profile, 'riddle');
+    if (!cooldown.allowed) {
+      setVerifyError(
+        `Chống gian lận (Anti-cheat): Bạn di chuyển giữa 2 trạm quá nhanh! Vui lòng đợi ${cooldown.waitSeconds} giây.`
+      );
+      audioSfx.play('bad');
+      return;
+    }
+
+    if (verifyStationRiddle(station, riddleInput)) {
+      audioSfx.play('ok');
+      setVerifyError(null);
+      setVerifiedMethod('riddle');
+    } else {
+      audioSfx.play('bad');
+      setVerifyError('Mật thư thực địa chưa chính xác. Hãy quan sát mô hình 3D hoặc bấm xem Gợi ý!');
+    }
+  };
+
+  const handleInlineQrTokenVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cooldown = checkAntiCheatCooldown(profile, 'qr');
+    if (!cooldown.allowed) {
+      setVerifyError(
+        `Chống gian lận: Vui lòng chờ ${cooldown.waitSeconds}s trước khi quét trạm tiếp theo.`
+      );
+      audioSfx.play('bad');
+      return;
+    }
+    const res = verifyStationQrPayload(station, qrTokenInput);
+    if (res.valid) {
+      audioSfx.play('ok');
+      setVerifyError(null);
+      setVerifiedMethod('qr');
+    } else {
+      audioSfx.play('bad');
+      setVerifyError(res.message);
+    }
+  };
+
+  const handleDemoBypass = () => {
+    audioSfx.play('tap');
+    setVerifyError(null);
+    setVerifiedMethod('demo');
+  };
+
+  const triggerComplete = async (
+    basePoints: number,
+    isQuizOrGameSuccess: boolean,
+    summaryHtml?: string
+  ) => {
+    const method = verifiedMethod || 'demo';
+    const res = await onCompleteStation({
+      station,
+      basePoints,
+      method,
+      isQuizOrGameSuccess,
+      summaryHtml,
+    });
+    setCompletionResult({
+      ...res,
+      summaryHtml,
+    });
+  };
+
+  const handleQuizOptionClick = (originalIdx: number) => {
+    if (selectedQuizAns !== null || !pickedQuiz) return;
+    setSelectedQuizAns(originalIdx);
+    const ok = originalIdx === pickedQuiz.ans;
+    audioSfx.play(ok ? 'ok' : 'bad');
+  };
+
+  // CASE A: Already unlocked previously (Review station info, fun facts & directions)
+  if (existingRecord && !completionResult) {
+    return (
+      <div id="modal">
+        <div className="scrim" onClick={onClose} />
+        <div className="sheet card" role="dialog" aria-modal="true">
+          <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
+            <StationSticker col={station.col} type={station.type} size={56} done />
+            <div>
+              <h2>{station.name}</h2>
+              <p>{station.sub}</p>
+            </div>
+            <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="sh-body">
+            <div className="know">
+              <b>Thông tin Khu vực</b>
+              {station.info}
+            </div>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs font-bold text-emerald-950 flex flex-col gap-1">
+              <span className="uppercase tracking-wider text-emerald-700 font-black">
+                🌟 Fun Fact Đã Mở Khóa:
+              </span>
+              <span>{station.funFact}</span>
+            </div>
+            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-xs font-bold text-sky-950 flex items-start gap-2">
+              <Compass className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
+              <div>
+                <div className="uppercase tracking-wider text-sky-700 font-black">
+                  Chỉ dẫn Lộ trình Tiếp theo:
+                </div>
+                <div>{station.directions}</div>
+              </div>
+            </div>
+
+            {existingRecord.photoDataUrl && (
+              <div className="polar">
+                <img
+                  src={existingRecord.photoDataUrl}
+                  alt={`Ảnh check-in tại ${station.name}`}
+                />
+                <p>
+                  {profile.name} @ {station.name}
+                  <small>
+                    TDC Travel ·{' '}
+                    {new Date(existingRecord.unlockedAt).toLocaleDateString('vi-VN')}
+                  </small>
+                </p>
+              </div>
+            )}
+
+            <div className="reveal">
+              <StationSticker col={station.col} type={station.type} size={84} />
+              <h3>{station.badge}</h3>
+              <p className="note">
+                Đã mở khóa sương mù với <b>+{existingRecord.pts} điểm</b> (Phương thức:{' '}
+                {existingRecord.method.toUpperCase()}).
+              </p>
+            </div>
+            <button type="button" className="btn big" onClick={onClose}>
+              Tiếp tục Khám phá
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // CASE B: Just completed right now -> Celebration & Badge Reveal
+  if (completionResult) {
+    const allUnlocked = unlockedCount >= totalStations;
+    return (
+      <div id="modal">
+        <div className="scrim" onClick={onClose} />
+        <div className="sheet card" role="dialog" aria-modal="true">
+          <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
+            <StationSticker col={station.col} type={station.type} size={56} />
+            <div>
+              <h2>Sương mù Đã Tan!</h2>
+              <p>{station.name}</p>
+            </div>
+            <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="sh-body">
+            {completionResult.summaryHtml && (
+              <div
+                dangerouslySetInnerHTML={{ __html: completionResult.summaryHtml }}
+              />
+            )}
+
+            <div className="reveal">
+              <StationSticker col={station.col} type={station.type} size={104} />
+              <h3>{station.badge}</h3>
+              <span className="plus">+{completionResult.finalPoints} điểm</span>
+
+              <div className="flex flex-wrap gap-1.5 justify-center text-xs font-extrabold">
+                {completionResult.qrBonus > 0 && (
+                  <span className="bg-sky-100 text-sky-800 px-2.5 py-0.5 rounded-full">
+                    +{completionResult.qrBonus} Điểm Xác thực Thực địa ({verifiedMethod?.toUpperCase()})
+                  </span>
+                )}
+                {completionResult.crossFacultyBonus > 0 && (
+                  <span className="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <Users className="w-3.5 h-3.5" /> +{completionResult.crossFacultyBonus} Thưởng Tổ đội Liên Khoa (+20%)
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs font-bold text-amber-950">
+              <div className="uppercase tracking-wider text-amber-700 font-black mb-0.5">
+                💡 Kiến thức Thú vị (Fun Fact):
+              </div>
+              {station.funFact}
+            </div>
+
+            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-xs font-bold text-sky-950">
+              <div className="uppercase tracking-wider text-sky-700 font-black mb-0.5">
+                🧭 Hướng dẫn Đường đi:
+              </div>
+              {station.directions}
+            </div>
+
+            <p className="note text-center">
+              Tiến độ mở khóa bản đồ: <b>{unlockedCount}/{totalStations}</b> trạm ·{' '}
+              {allUnlocked
+                ? 'Bạn đã mở khóa 100% khuôn viên TDC!'
+                : nextStationName
+                  ? `Gợi ý tiếp theo: ${nextStationName}`
+                  : ''}
+            </p>
+
+            <button
+              type="button"
+              className={`btn big ${allUnlocked ? 'sun' : ''}`}
+              onClick={() => {
+                onClose();
+                if (allUnlocked) {
+                  setTimeout(onShowCertificate, 250);
+                }
+              }}
+            >
+              {allUnlocked ? '🎓 Xem Chứng nhận Nhà Thám Hiểm TDC' : 'Tiếp tục Hành trình'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // CASE C: Step 1 - Real-world O2O Verification (QR Scan or On-site Observation Riddle)
+  if (!verifiedMethod) {
+    return (
+      <div id="modal">
+        <div className="scrim" onClick={onClose} />
+        <div className="sheet card" role="dialog" aria-modal="true">
+          <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
+            <StationSticker col={station.col} type={station.type} size={56} />
+            <div>
+              <h2>{station.name}</h2>
+              <p>Bước 1/2: Xác thực Hiện trường (O2O Check-in)</p>
+            </div>
+            <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="sh-body">
+            <div className="know">
+              <b>Giới thiệu Trạm</b>
+              {station.info}
+            </div>
+
+            {verifyError && (
+              <div className="bg-rose-50 border-2 border-rose-300 text-rose-800 p-3 rounded-xl text-xs font-extrabold flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+                <span>{verifyError}</span>
+              </div>
+            )}
+
+            {/* Option 1: Observation Riddle */}
+            {station.riddle && (
+              <form
+                onSubmit={handleRiddleVerify}
+                className="bg-amber-50/80 border-2 border-amber-200 rounded-2xl p-3.5 flex flex-col gap-2.5"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
+                    <Eye className="w-4 h-4" /> Cách 1: Giải Mật thư Quan sát Thực địa (+10đ)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowRiddleHint(!showRiddleHint)}
+                    className="text-xs font-extrabold text-sky-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Lightbulb className="w-3.5 h-3.5" /> Gợi ý
+                  </button>
+                </div>
+                <p className="m-0 font-extrabold text-sm text-slate-800">
+                  {station.riddle.prompt}
+                </p>
+                {showRiddleHint && (
+                  <p className="m-0 text-xs font-bold text-amber-900 bg-amber-100/80 px-2.5 py-1.5 rounded-lg">
+                    💡 Gợi ý: {station.riddle.hint} (Đáp án mẫu: <b>{station.riddle.answer}</b>)
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={riddleInput}
+                    onChange={(e) => setRiddleInput(e.target.value)}
+                    placeholder="Nhập câu trả lời quan sát được..."
+                    className="flex-1 px-3 py-2 rounded-xl border-2 border-amber-300 bg-white font-extrabold text-sm"
+                  />
+                  <button type="submit" className="btn sun">
+                    Giải mã
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Option 2: QR Code Camera / Token */}
+            <div className="bg-sky-50 border-2 border-sky-200 rounded-2xl p-3.5 flex flex-col gap-2.5">
+              <span className="text-xs font-black uppercase tracking-wider text-sky-800 flex items-center gap-1.5">
+                <QrCode className="w-4 h-4" /> Cách 2: Quét Mã QR Cố định tại Trạm (+15đ)
+              </span>
+              <button
+                type="button"
+                className="btn blue w-full"
+                onClick={() => onOpenQrScanner(station)}
+              >
+                <QrCode className="w-5 h-5" /> Mở Camera Quét Mã QR Trạm
+              </button>
+              <form onSubmit={handleInlineQrTokenVerify} className="flex gap-2">
+                <input
+                  type="text"
+                  value={qrTokenInput}
+                  onChange={(e) => setQrTokenInput(e.target.value)}
+                  placeholder={`Hoặc nhập mã QR (${station.qrSecretToken})`}
+                  className="flex-1 px-3 py-1.5 rounded-xl border border-sky-300 bg-white font-bold text-xs"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 rounded-xl bg-sky-600 text-white font-extrabold text-xs cursor-pointer"
+                >
+                  Nhập mã
+                </button>
+              </form>
+            </div>
+
+            {/* Option 3: 3D Walk-in Demo Mode */}
+            <button
+              type="button"
+              className="btn ghost w-full"
+              onClick={handleDemoBypass}
+            >
+              <Sparkles className="w-4 h-4" /> Bỏ qua Xác thực Thực địa (Chế độ Trải nghiệm 3D)
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // CASE D: Step 2 - Station Challenge / Faculty Mini-game
+  return (
+    <div id="modal">
+      <div className="scrim" onClick={onClose} />
+      <div className="sheet card" role="dialog" aria-modal="true">
+        <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
+          <StationSticker col={station.col} type={station.type} size={56} />
+          <div>
+            <h2>{station.name}</h2>
+            <p>
+              {TYPE_LABEL[station.type]} · Tối đa +{station.pts} điểm
+            </p>
+          </div>
+          <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="sh-body">
+          <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl text-xs font-extrabold text-emerald-900">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              Đã xác thực hiện trường ({verifiedMethod.toUpperCase()})
+            </span>
+            {party?.isCrossFaculty && (
+              <span className="text-emerald-700">⚡ Liên khoa +20%</span>
+            )}
+          </div>
+
+          {station.type === 'checkin' && (
+            <>
+              <div className="know">
+                <b>Bạn có biết?</b>
+                {station.info}
+              </div>
+              <button
+                type="button"
+                className="btn big sun"
+                onClick={() => triggerComplete(station.pts, true)}
+              >
+                <Flag className="w-5 h-5" /> Xác nhận Check-in & Mở khóa Sương mù · +{station.pts}
+              </button>
+            </>
+          )}
+
+          {station.type === 'photo' && (
+            <>
+              <div className="know">
+                <b>Góc Sống Ảo 3D</b>
+                {station.info}
+              </div>
+              <button
+                type="button"
+                className="btn big sun"
+                onClick={() => onRequestPhotoMode(station, verifiedMethod)}
+              >
+                <Camera className="w-5 h-5" /> Mở Khung Máy Ảnh Polaroid 3D
+              </button>
+            </>
+          )}
+
+          {station.type === 'quiz' && pickedQuiz && (
+            <>
+              <div className="know">
+                <b>Khám phá Kiến thức TDC</b>
+                {station.info}
+              </div>
+              <p className="q">{pickedQuiz.q}</p>
+              <div className="opts">
+                {shuffledOptionIndices.map((origIdx, displayIdx) => {
+                  const letterLabel = String.fromCharCode(65 + displayIdx);
+                  const isCorrect = origIdx === pickedQuiz.ans;
+                  const isPicked = selectedQuizAns === origIdx;
+                  let cls = 'opt';
+                  if (selectedQuizAns !== null) {
+                    if (isCorrect) cls += ' ok';
+                    else if (isPicked) cls += ' no';
+                  }
+                  return (
+                    <button
+                      key={origIdx}
+                      type="button"
+                      disabled={selectedQuizAns !== null}
+                      onClick={() => handleQuizOptionClick(origIdx)}
+                      className={cls}
+                    >
+                      <i>{letterLabel}</i>
+                      <span>{pickedQuiz.opts[origIdx]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedQuizAns !== null && (
+                <div className="flex flex-col gap-2.5 mt-1">
+                  <p className="explain">
+                    {selectedQuizAns === pickedQuiz.ans
+                      ? '🎉 Chính xác! '
+                      : '💡 Chưa chính xác! '}
+                    {pickedQuiz.ex}
+                  </p>
+                  <button
+                    type="button"
+                    className={`btn big ${selectedQuizAns === pickedQuiz.ans ? 'sun' : ''}`}
+                    onClick={() =>
+                      triggerComplete(
+                        selectedQuizAns === pickedQuiz.ans ? station.pts : 40,
+                        selectedQuizAns === pickedQuiz.ans
+                      )
+                    }
+                  >
+                    <HelpCircle className="w-5 h-5" /> Nhận Huy hiệu & Xóa Sương mù · +
+                    {selectedQuizAns === pickedQuiz.ans ? station.pts : 40}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {station.type === 'kick' && (
+            <KickGame
+              maxPoints={station.pts}
+              onComplete={(pts, html) => triggerComplete(pts, true, html)}
+            />
+          )}
+
+          {station.type === 'it_debug' && (
+            <ItDebugGame
+              maxPoints={station.pts}
+              onComplete={(pts, html) => triggerComplete(pts, true, html)}
+            />
+          )}
+
+          {station.type === 'electric_circuit' && (
+            <ElectricCircuitGame
+              maxPoints={station.pts}
+              onComplete={(pts, html) => triggerComplete(pts, true, html)}
+            />
+          )}
+
+          {station.type === 'auto_engine' && (
+            <AutoEngineGame
+              maxPoints={station.pts}
+              onComplete={(pts, html) => triggerComplete(pts, true, html)}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+</file>
+
+<file path="src/components/StationSticker.tsx">
+import React from 'react';
+import {
+  Camera,
+  Check,
+  Code2,
+  Compass,
+  Cpu,
+  Flag,
+  HelpCircle,
+  Lock,
+  Sparkles,
+  Trophy,
+  Users,
+  Wrench,
+} from 'lucide-react';
+import { StationType } from '../types/game';
+
+interface StationStickerProps {
+  col: string;
+  type: StationType | 'star' | 'explorer' | 'party' | 'medal' | 'trophy' | 'list';
+  size?: number;
+  locked?: boolean;
+  done?: boolean;
+}
+
+export const StationSticker: React.FC<StationStickerProps> = ({
+  col,
+  type,
+  size = 52,
+  locked = false,
+  done = false,
+}) => {
+  const renderIcon = () => {
+    if (locked) return <Lock className="w-1/2 h-1/2" />;
+    if (done) return <Check className="w-3/5 h-3/5 stroke-[3]" />;
+    switch (type) {
+      case 'checkin':
+        return <Flag className="w-1/2 h-1/2" />;
+      case 'photo':
+        return <Camera className="w-1/2 h-1/2" />;
+      case 'quiz':
+        return <HelpCircle className="w-1/2 h-1/2" />;
+      case 'kick':
+        return <Trophy className="w-1/2 h-1/2" />;
+      case 'it_debug':
+        return <Code2 className="w-1/2 h-1/2" />;
+      case 'electric_circuit':
+        return <Cpu className="w-1/2 h-1/2" />;
+      case 'auto_engine':
+        return <Wrench className="w-1/2 h-1/2" />;
+      case 'party':
+        return <Users className="w-1/2 h-1/2" />;
+      case 'explorer':
+        return <Compass className="w-1/2 h-1/2" />;
+      default:
+        return <Sparkles className="w-1/2 h-1/2" />;
+    }
+  };
+
+  return (
+    <span
+      className={`sticker ${locked ? 'off' : ''}`}
+      style={
+        {
+          '--c': done ? '#3DAA5C' : col,
+          width: `${size}px`,
+          height: `${size}px`,
+        } as React.CSSProperties
+      }
+    >
+      {renderIcon()}
+    </span>
+  );
+};
+</file>
+
+<file path="src/data/campusBuildings.ts">
+import { CampusBuildingZone } from '../types/game';
+import { FH } from '../engine/threeHelpers';
+
+/**
+ * Hệ quy chiếu Địa không gian 3D (WGS84 GPS + Altitude <-> Local 3D Campus X, Y, Z)
+ * Trường Cao đẳng Công nghệ Thủ Đức (TDC)
+ * Địa chỉ: 53 Võ Văn Ngân, Phường Linh Chiểu, TP. Thủ Đức, TP. Hồ Chí Minh
+ */
+
+export const TDC_GEO_ANCHORS = {
+  // Tâm khuôn viên 3D tại (x = 0, y = 0, z = 0)
+  ORIGIN_LAT: 10.85142,
+  ORIGIN_LNG: 106.75818,
+  // Độ cao nền sân trường chuẩn so với mực nước biển (ASL - Above Sea Level) tại Linh Chiểu, Thủ Đức (~12.0m)
+  GROUND_ALTITUDE_ASL_M: 12.0,
+  // Chiều cao chuẩn mỗi tầng trong mô hình 3D (1 tầng = 4.2m)
+  FLOOR_HEIGHT_M: FH,
+  // Góc xoay hướng Bắc của bản đồ 3D so với Bắc địa lý (radian)
+  MAP_ROTATION_RAD: 0.0,
+  // Hệ số quy đổi mét kinh độ / vĩ độ tại vĩ độ 10.8514° Bắc
+  METERS_PER_DEG_LAT: 110609.0,
+  METERS_PER_DEG_LNG: 109345.0,
+};
+
+/**
+ * Danh sách chi tiết các Tòa nhà & Khu vực trong khuôn viên TDC kèm biên tọa độ (x0, z0, x1, z1) và cấu trúc phân tầng (Y/Floor)
+ */
+export const CAMPUS_BUILDINGS: CampusBuildingZone[] = [
+  {
+    id: 'bld_a1',
+    code: 'A1',
+    name: 'Tòa A1 · Khu Hành chính & Phòng Đào tạo',
+    bounds: [-141.5, 48.0, -76.5, 67.5],
+    minFloor: 1,
+    maxFloor: 3,
+    floorHeightMeters: FH,
+    color: '#E2574C',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Trệt)',
+        elevationMeters: 0,
+        departments: 'Phòng Đào tạo (A101–A104), Phòng Công tác Chính trị HSSV, Bộ phận Một cửa',
+        highlights: 'Nơi tiếp nhận hồ sơ, giải quyết thủ tục học vụ, cấp giấy xác nhận sinh viên',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2',
+        elevationMeters: FH,
+        departments: 'Ban Giám hiệu, Phòng Tổ chức Hành chính, Phòng Tài chính Kế toán (A201–A208)',
+        highlights: 'Khu vực điều hành trung tâm và hành lang cầu nối sang dãy A2',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3',
+        elevationMeters: 2 * FH,
+        departments: 'Phòng học Lý thuyết Đại cương & Khoa Kinh tế – Quản trị (A301–A310)',
+        highlights: 'Hệ thống giảng đường lý thuyết dưới mái ngói đỏ truyền thống',
+      },
+    ],
+  },
+  {
+    id: 'bld_a2',
+    code: 'A2',
+    name: 'Tòa A2 · Giảng đường Lý thuyết & Khoa Kinh tế',
+    bounds: [-76.5, 50.0, -21.0, 64.0],
+    minFloor: 1,
+    maxFloor: 3,
+    floorHeightMeters: FH,
+    color: '#FF8A4C',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Trệt)',
+        elevationMeters: 0,
+        departments: 'Văn phòng Khoa Tài chính – Kế toán, Phòng Tư vấn Tuyển sinh',
+        highlights: 'Kết nối trực tiếp trục đường chính từ Cổng 1 Võ Văn Ngân',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2',
+        elevationMeters: FH,
+        departments: 'Phòng Thực hành Nghiệp vụ Kế toán & Quản trị Doanh nghiệp (A209–A215)',
+        highlights: 'Trang bị hệ thống máy tính phần mềm kế toán MISA, ERP',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3',
+        elevationMeters: 2 * FH,
+        departments: 'Phòng học chuyên đề Logistics & Thương mại điện tử (A311–A318)',
+        highlights: 'Tầm nhìn hướng ra cụm sân thể thao trung tâm',
+      },
+    ],
+  },
+  {
+    id: 'bld_h',
+    code: 'H',
+    name: 'Tòa H · Hội trường Lớn & Trung tâm Sự kiện',
+    bounds: [-99.5, -0.5, -76.5, 49.0],
+    minFloor: 1,
+    maxFloor: 3,
+    floorHeightMeters: FH,
+    color: '#9B6BFF',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Sảnh Hội trường)',
+        elevationMeters: 0,
+        departments: 'Sảnh đón đại biểu, Văn phòng Đoàn Thanh niên – Hội Sinh viên TDC',
+        highlights: 'Bậc tam cấp lớn nhìn thẳng ra 3 sân bóng chuyền và cột cờ trường',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2 (Khán phòng Hội trường H)',
+        elevationMeters: FH,
+        departments: 'Hội trường Lớn sức chứa hơn 800 chỗ ngồi, Sân khấu chính',
+        highlights: 'Nơi tổ chức Lễ Khai giảng, Tốt nghiệp, Hội diễn Văn nghệ & Talkshow',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3 (Ban công & Phòng Kỹ thuật Âm thanh – Ánh sáng)',
+        elevationMeters: 2 * FH,
+        departments: 'Tầng lửng khán đài B, Trung tâm điều khiển âm thanh ánh sáng & Khoa Ngoại ngữ',
+        highlights: 'Phía trên mặt tiền gắn khẩu hiệu "Đạo đức – Tri thức – Kỹ năng"',
+      },
+    ],
+  },
+  {
+    id: 'bld_b_west',
+    code: 'B-Tây',
+    name: 'Tòa B (Cánh Tây) · Khoa Công nghệ Thông tin & Y tế',
+    bounds: [-123.5, -32.5, -93.1, -1.0],
+    minFloor: 1,
+    maxFloor: 4,
+    floorHeightMeters: FH,
+    color: '#2FA8F0',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Trệt)',
+        elevationMeters: 0,
+        departments: 'Phòng Y tế Trường (+ Y Tế), Văn phòng Khoa CNTT, Phòng Lab Mạng cơ bản',
+        highlights: 'Hỗ trợ sơ cấp cứu, chăm sóc sức khỏe HSSV ngay đầu hành lang Tây',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2',
+        elevationMeters: FH,
+        departments: 'Phòng Lab Lập trình Phần mềm, Phát triển Web & Mobile (B201–B206)',
+        highlights: 'Trang bị dàn PC cấu hình cao phục vụ thực hành Full-stack & CSDL',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3',
+        elevationMeters: 2 * FH,
+        departments: 'Phòng Lab Đồ họa Đa phương tiện, Thiết kế UI/UX & Xử lý ảnh (B301–B306)',
+        highlights: 'Trung tâm sáng tạo nội dung số và truyền thông đa phương tiện',
+      },
+      {
+        floor: 4,
+        label: 'Tầng 4',
+        elevationMeters: 3 * FH,
+        departments: 'Phòng Lab An toàn thông tin, Điện toán đám mây & AI/IoT (B401–B405)',
+        highlights: 'Nơi sinh hoạt CLB Học thuật CNTT và đội tuyển Hackathon TDC',
+      },
+    ],
+  },
+  {
+    id: 'bld_b_east',
+    code: 'B-Đông',
+    name: 'Tòa B (Cánh Đông) · Khoa Điện – Điện tử',
+    bounds: [-93.1, -30.5, -46.0, -1.0],
+    minFloor: 1,
+    maxFloor: 5,
+    floorHeightMeters: FH,
+    color: '#F07F55',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Trệt)',
+        elevationMeters: 0,
+        departments: 'Xưởng Thực hành Điện Công nghiệp, Máy điện & Khí cụ điện',
+        highlights: 'Hệ thống tủ điện công nghiệp, bàn thực hành đấu nối động cơ 3 pha',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2',
+        elevationMeters: FH,
+        departments: 'Văn phòng Khoa Điện – Điện tử, Phòng Thực hành Điện tử Cơ bản',
+        highlights: 'Trưng bày các mô hình nghiên cứu khoa học sinh viên ngành Điện',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3',
+        elevationMeters: 2 * FH,
+        departments: 'Phòng Lab Vi điều khiển, Hệ thống Nhúng & Điện tử Viễn thông',
+        highlights: 'Thực hành thiết kế mạch PCB, lập trình ARM, ESP32 và cảm biến',
+      },
+      {
+        floor: 4,
+        label: 'Tầng 4',
+        elevationMeters: 3 * FH,
+        departments: 'Phòng Lab Tự động hóa PLC, Khí nén – Thủy lực & Robot công nghiệp',
+        highlights: 'Trang bị trạm PLC Siemens/Mitsubishi và dây chuyền phân loại tự động',
+      },
+      {
+        floor: 5,
+        label: 'Tầng 5',
+        elevationMeters: 4 * FH,
+        departments: 'Phòng Thực hành Năng lượng Tái tạo, Điện Mặt trời & Nhà thông minh (Smart Home)',
+        highlights: 'Tầng cao nhất Khu B với hệ thống pin quang điện thực nghiệm',
+      },
+    ],
+  },
+  {
+    id: 'bld_workshop',
+    code: 'Xưởng CK',
+    name: 'Xưởng Thực hành Cơ khí – Công nghệ Ô tô',
+    bounds: [1.0, 39.0, 21.0, 53.0],
+    minFloor: 1,
+    maxFloor: 1,
+    floorHeightMeters: 6.5,
+    color: '#6F93B8',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Nhà xưởng Mái răng cưa)',
+        elevationMeters: 0,
+        departments: 'Xưởng Động cơ đốt trong, Khung gầm Ô tô, Máy cắt gọt kim loại & CNC',
+        highlights: 'Kiến trúc 3 nhịp mái răng cưa cao 6.5m thông gió và lấy sáng tự nhiên',
+      },
+    ],
+  },
+  {
+    id: 'bld_c',
+    code: 'C',
+    name: 'Tòa C · Giảng đường Khu Đông & Khoa Cơ khí – Ngoại ngữ',
+    bounds: [52.5, -23.0, 129.0, 1.0],
+    minFloor: 1,
+    maxFloor: 3,
+    floorHeightMeters: FH,
+    color: '#6F8CF0',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Trệt)',
+        elevationMeters: 0,
+        departments: 'Phòng Thực hành CAD/CAM – CNC, Văn phòng Khoa Cơ khí Chế tạo máy (C101–C108)',
+        highlights: 'Kết nối trực tiếp với Khu B qua hành lang mái che dài gần 100m',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2',
+        elevationMeters: FH,
+        departments: 'Phòng Lab Ngoại ngữ Đa phương tiện (Tiếng Anh, Tiếng Nhật, Tiếng Hàn) (C201–C210)',
+        highlights: 'Hệ thống cabin luyện âm tiêu chuẩn quốc tế',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3',
+        elevationMeters: 2 * FH,
+        departments: 'Khoa Du lịch, Thực hành Nghiệp vụ Nhà hàng – Khách sạn & Hướng dẫn (C301–C310)',
+        highlights: 'Phòng mô phỏng buồng phòng khách sạn và quầy Bar thực hành',
+      },
+    ],
+  },
+  {
+    id: 'bld_ktx',
+    code: 'KTX',
+    name: 'Ký túc xá Sinh viên TDC',
+    bounds: [57.5, -46.0, 101.5, -28.5],
+    minFloor: 1,
+    maxFloor: 3,
+    floorHeightMeters: FH,
+    color: '#E8608C',
+    floors: [
+      {
+        floor: 1,
+        label: 'Tầng 1 (Trệt)',
+        elevationMeters: 0,
+        departments: 'Ban Quản lý Ký túc xá, Phòng Sinh hoạt chung, Khu vực Căng-tin & Tự học',
+        highlights: 'Không gian xanh mát, an ninh 24/7 ngay trong khuôn viên trường',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2',
+        elevationMeters: FH,
+        departments: 'Khu Phòng ở Nội trú Sinh viên (P.201 – P.216)',
+        highlights: 'Phòng ở thoáng mát có ban công nhìn ra khu vực cây xanh phía Bắc',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3',
+        elevationMeters: 2 * FH,
+        departments: 'Khu Phòng ở Nội trú Sinh viên (P.301 – P.316)',
+        highlights: 'Tiện lợi di chuyển sang Tòa C và Tòa D chỉ trong 2 phút đi bộ',
+      },
+    ],
+  },
+  {
+    id: 'bld_d',
+    code: 'D',
+    name: 'Tòa D · Trung tâm Công nghệ Cao & Thư viện (11 Tầng nổi + 1 Tầng hầm)',
+    bounds: [23.0, 5.0, 86.5, 50.5],
+    minFloor: -1,
+    maxFloor: 11,
+    floorHeightMeters: FH,
+    color: '#00AEEF',
+    floors: [
+      {
+        floor: -1,
+        label: 'Tầng Hầm (B1)',
+        elevationMeters: -FH,
+        departments: 'Hầm giữ xe Cán bộ – Giảng viên, Trạm biến áp, Hệ thống kỹ thuật tòa nhà & PCCC',
+        highlights: 'Tầng hầm bê tông cốt thép hiện đại nằm dưới toàn bộ khối đế Tòa D',
+      },
+      {
+        floor: 1,
+        label: 'Tầng 1 (Sảnh chính Tòa D)',
+        elevationMeters: 0,
+        departments: 'Sảnh lễ tân trung tâm, Không gian Triển lãm Công nghệ TDC & Cụm 4 thang máy tốc độ cao',
+        highlights: 'Lối vào chính mở ra quảng trường Cổng 2 đường Chương Dương',
+      },
+      {
+        floor: 2,
+        label: 'Tầng 2 (Khối đế bo cong)',
+        elevationMeters: FH,
+        departments: 'Thư viện Số Thông minh (Smart Library) & Không gian Học tập Mở (Learning Commons)',
+        highlights: 'Thiết kế mặt dựng kính bo cong tầm nhìn 180 độ ra khuôn viên trường',
+      },
+      {
+        floor: 3,
+        label: 'Tầng 3 (Khối đế bo cong)',
+        elevationMeters: 2 * FH,
+        departments: 'Trung tâm Đổi mới Sáng tạo, Khởi nghiệp Sinh viên & Phòng Hội thảo Quốc tế',
+        highlights: 'Không gian Co-working space dành cho các dự án NCKH sinh viên',
+      },
+      {
+        floor: 4,
+        label: 'Tầng 4',
+        elevationMeters: 3 * FH,
+        departments: 'Cụm Phòng Máy tính Chuyên ngành Công nghệ Thông tin & Phần mềm (D04-01 – D04-12)',
+        highlights: 'Hệ thống phòng Lab máy trạm hiệu năng cao',
+      },
+      {
+        floor: 5,
+        label: 'Tầng 5',
+        elevationMeters: 4 * FH,
+        departments: 'Cụm Phòng Thực hành Thiết kế Đồ họa, Truyền thông & Thương mại Điện tử (D05-01 – D05-12)',
+        highlights: 'Studio thực hành quay dựng và xử lý đa phương tiện',
+      },
+      {
+        floor: 6,
+        label: 'Tầng 6',
+        elevationMeters: 5 * FH,
+        departments: 'Cụm Phòng Lab Điện tử – Viễn thông & Tự động hóa Công nghiệp 4.0 (D06-01 – D06-10)',
+        highlights: 'Kết nối giữa khối tháp chữ L và khối đế bo cong',
+      },
+      {
+        floor: 7,
+        label: 'Tầng 7 (Đỉnh khối đế bo cong)',
+        elevationMeters: 6 * FH,
+        departments: 'Phòng Học Thông minh (Smart Classrooms) & Sân vườn Thượng uyển Tầng 7',
+        highlights: 'Tầng kết thúc khối đế bo cong 7 tầng với tầm nhìn toàn cảnh sân trường',
+      },
+      {
+        floor: 8,
+        label: 'Tầng 8 (Khối tháp chữ L)',
+        elevationMeters: 7 * FH,
+        departments: 'Giảng đường Lý thuyết Chất lượng cao Khoa Kinh tế & Quản trị (D08-01 – D08-08)',
+        highlights: 'Hành lang thoáng đãng đón gió tự nhiên từ hướng Đông Nam',
+      },
+      {
+        floor: 9,
+        label: 'Tầng 9 (Khối tháp chữ L)',
+        elevationMeters: 8 * FH,
+        departments: 'Giảng đường Chuyên ngành Ngôn ngữ Anh, Nhật, Hàn & Du lịch (D09-01 – D09-08)',
+        highlights: 'Trang bị màn hình tương tác thông minh tại tất cả các phòng',
+      },
+      {
+        floor: 10,
+        label: 'Tầng 10 (Khối tháp chữ L)',
+        elevationMeters: 9 * FH,
+        departments: 'Trung tâm Nghiên cứu Ứng dụng Khoa học Công nghệ & Hợp tác Doanh nghiệp',
+        highlights: 'Nơi đặt các phòng Lab hợp tác cùng doanh nghiệp trong và ngoài nước',
+      },
+      {
+        floor: 11,
+        label: 'Tầng 11 (Tầng cao nhất Tòa D)',
+        elevationMeters: 10 * FH,
+        departments: 'Hội trường Đa năng Tầng 11, Đài quan sát Toàn cảnh TP. Thủ Đức & Tháp Logo TDC',
+        highlights: 'Độ cao hơn 42m so với sân trường, ngắm trọn vẹn tuyến Metro số 1 và trung tâm Thủ Đức',
+      },
+    ],
+  },
+];
+</file>
+
+<file path="src/data/faculties.ts">
+import { Faculty, FacultyId } from '../types/game';
+
+export const FACULTIES: Faculty[] = [
+  {
+    id: 'cntt',
+    name: 'Khoa Công nghệ thông tin',
+    shortName: 'CNTT',
+    color: '#2FA8F0',
+    badgeColor: '#E1F4FD',
+  },
+  {
+    id: 'dien_dt',
+    name: 'Khoa Điện – Điện tử',
+    shortName: 'Điện – ĐT',
+    color: '#FFAA1F',
+    badgeColor: '#FFF5DC',
+  },
+  {
+    id: 'co_khi_oto',
+    name: 'Khoa Cơ khí Ô tô',
+    shortName: 'CK Ô tô',
+    color: '#FF6F59',
+    badgeColor: '#FFECE8',
+  },
+  {
+    id: 'co_khi_ctm',
+    name: 'Khoa Cơ khí Chế tạo máy',
+    shortName: 'CK CTM',
+    color: '#6F8CF0',
+    badgeColor: '#EAF0FF',
+  },
+  {
+    id: 'kinh_te',
+    name: 'Khoa Kinh tế – Quản trị',
+    shortName: 'Kinh tế',
+    color: '#38B865',
+    badgeColor: '#E8F8E3',
+  },
+  {
+    id: 'ngoai_ngu',
+    name: 'Khoa Ngoại ngữ',
+    shortName: 'Ngoại ngữ',
+    color: '#9B6BFF',
+    badgeColor: '#F3ECFF',
+  },
+  {
+    id: 'du_lich',
+    name: 'Khoa Du lịch – Nhà hàng',
+    shortName: 'Du lịch',
+    color: '#FF6FA5',
+    badgeColor: '#FFEBF3',
+  },
+  {
+    id: 'khac',
+    name: 'Khoa / Bộ môn Khác',
+    shortName: 'TDC',
+    color: '#00AEEF',
+    badgeColor: '#E1F6FF',
+  },
+];
+
+export function getFacultyById(id?: FacultyId | string): Faculty {
+  return FACULTIES.find((f) => f.id === id) || FACULTIES[0];
+}
+</file>
+
+<file path="src/engine/audioSfx.ts">
+type SoundEffectKey = 'coin' | 'ok' | 'bad' | 'tap' | 'badge' | 'kick' | 'unlock';
+
+class AudioSfxManager {
+  private ctx: AudioContext | null = null;
+  private isMuted = false;
+
+  public init(): void {
+    if (!this.ctx && typeof window !== 'undefined') {
+      try {
+        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (AudioCtx) {
+          this.ctx = new AudioCtx();
+        }
+      } catch {
+        // Ignore audio context restriction
+      }
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
+  }
+
+  public setMuted(m: boolean): void {
+    this.isMuted = m;
+  }
+
+  public getMuted(): boolean {
+    return this.isMuted;
+  }
+
+  public toggleMute(): boolean {
+    this.isMuted = !this.isMuted;
+    return this.isMuted;
+  }
+
+  public tone(
+    frequencies: number[],
+    dur: number,
+    type: OscillatorType,
+    vol: number,
+    gap?: number
+  ): void {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const t0 = this.ctx.currentTime;
+    frequencies.forEach((f, i) => {
+      if (!this.ctx) return;
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      const st = t0 + i * (gap || dur * 0.8);
+      o.type = type;
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0, st);
+      g.gain.linearRampToValueAtTime(vol, st + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0008, st + dur);
+      o.connect(g);
+      g.connect(this.ctx.destination);
+      o.start(st);
+      o.stop(st + dur + 0.02);
+    });
+  }
+
+  public play(key: SoundEffectKey): void {
+    switch (key) {
+      case 'coin':
+        this.tone([988, 1319], 0.1, 'square', 0.04, 0.07);
+        break;
+      case 'ok':
+        this.tone([523, 659, 784, 1047], 0.16, 'triangle', 0.11, 0.1);
+        break;
+      case 'bad':
+        this.tone([240, 180], 0.22, 'sawtooth', 0.04, 0.15);
+        break;
+      case 'tap':
+        this.tone([700], 0.06, 'sine', 0.04);
+        break;
+      case 'badge':
+        this.tone([784, 988, 1175, 1568], 0.2, 'triangle', 0.11, 0.12);
+        break;
+      case 'kick':
+        this.tone([140, 90], 0.12, 'square', 0.07, 0.06);
+        break;
+      case 'unlock':
+        this.tone([440, 554, 659, 880, 1108], 0.18, 'triangle', 0.1, 0.09);
+        break;
+    }
+  }
+}
+
+export const audioSfx = new AudioSfxManager();
+</file>
+
+<file path="src/engine/chibiBuilder.ts">
+import * as THREE from 'three';
+import { AVATARS, ChibiAvatarSpec, PATHS } from '../data/campusLayout';
+import { lerpAngle, mesh } from './threeHelpers';
+
+export function makeChibi(
+  o: { shirt: string; hair: string; pants?: string; acc?: string },
+  withPack: boolean,
+  mat: (c: string | number, o?: THREE.MeshPhongMaterialParameters) => THREE.MeshPhongMaterial
+): THREE.Group {
+  const g = new THREE.Group();
+  const skin = mat('#FFD7B5');
+  const shirt = mat(o.shirt);
+  const pants = mat(o.pants || '#3B4A6B');
+  const hair = mat(o.hair);
+  const dark = mat('#2A1E1A');
+
+  const box = (w: number, h: number, d: number, c: string, x: number, y: number, z: number) =>
+    mesh(new THREE.BoxGeometry(w, h, d), mat(c), x, y, z);
+
+  const body = new THREE.Group();
+  g.add(body);
+  body.add(mesh(new THREE.CylinderGeometry(0.48, 0.62, 1, 10), shirt, 0, 1.08, 0));
+
+  const leg = (x: number) => {
+    const L = new THREE.Group();
+    L.position.set(x, 0.62, 0);
+    L.add(mesh(new THREE.CylinderGeometry(0.17, 0.15, 0.55, 8), pants, 0, -0.27, 0));
+    L.add(mesh(new THREE.SphereGeometry(0.21, 8, 6), dark, 0, -0.56, 0.06));
+    body.add(L);
+    return L;
+  };
+
+  const arm = (x: number) => {
+    const A = new THREE.Group();
+    A.position.set(x, 1.45, 0);
+    A.add(mesh(new THREE.CylinderGeometry(0.13, 0.12, 0.6, 8), shirt, 0, -0.3, 0));
+    A.add(mesh(new THREE.SphereGeometry(0.15, 8, 6), skin, 0, -0.62, 0));
+    A.rotation.z = x < 0 ? -0.28 : 0.28;
+    body.add(A);
+    return A;
+  };
+
+  const legL = leg(-0.24);
+  const legR = leg(0.24);
+  const armL = arm(-0.6);
+  const armR = arm(0.6);
+
+  const head = new THREE.Group();
+  head.position.y = 2.28;
+  body.add(head);
+  head.add(mesh(new THREE.SphereGeometry(0.8, 18, 14), skin));
+  const hc = mesh(
+    new THREE.SphereGeometry(0.85, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.5),
+    hair,
+    0,
+    0.04,
+    -0.06
+  );
+  hc.rotation.x = -0.32;
+  head.add(hc);
+
+  [-0.27, 0.27].forEach((x) => {
+    const e = mesh(new THREE.SphereGeometry(0.11, 10, 8), dark, x, -0.02, 0.72);
+    e.scale.z = 0.6;
+    head.add(e);
+    head.add(
+      mesh(new THREE.SphereGeometry(0.035, 6, 4), mat('#FFFFFF'), x + 0.04, 0.03, 0.79, false)
+    );
+    const ck = mesh(
+      new THREE.SphereGeometry(0.13, 8, 6),
+      mat('#FF9AAE'),
+      x * 1.65,
+      -0.22,
+      0.62,
+      false
+    );
+    ck.scale.set(1, 0.55, 0.45);
+    head.add(ck);
+  });
+
+  const mo = mesh(
+    new THREE.TorusGeometry(0.09, 0.03, 6, 10, Math.PI),
+    dark,
+    0,
+    -0.24,
+    0.76,
+    false
+  );
+  mo.rotation.z = Math.PI;
+  head.add(mo);
+
+  if (o.acc === 'cap') {
+    const c = mesh(
+      new THREE.SphereGeometry(0.88, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.42),
+      mat('#FFC83A'),
+      0,
+      0.12,
+      -0.02
+    );
+    c.rotation.x = -0.2;
+    head.add(c);
+    const v = mesh(
+      new THREE.CylinderGeometry(0.55, 0.55, 0.07, 16, 1, false, -Math.PI / 2, Math.PI),
+      mat('#FFC83A'),
+      0,
+      0.36,
+      0.62
+    );
+    v.rotation.x = 0.12;
+    head.add(v);
+  }
+  if (o.acc === 'pony') {
+    head.add(mesh(new THREE.SphereGeometry(0.34, 10, 8), hair, 0, -0.05, -0.92));
+    head.add(mesh(new THREE.SphereGeometry(0.12, 8, 6), mat('#38B865'), 0, 0.15, -0.86));
+  }
+  if (o.acc === 'bun') {
+    head.add(mesh(new THREE.SphereGeometry(0.32, 10, 8), hair, 0, 0.86, -0.22));
+    head.add(
+      mesh(new THREE.TorusGeometry(0.2, 0.06, 6, 12), mat('#FFC83A'), 0, 0.68, -0.18).rotateX(
+        Math.PI / 2
+      )
+    );
+  }
+  if (withPack) {
+    body.add(box(0.8, 0.9, 0.42, '#00AEEF', 0, 1.2, -0.62));
+    body.add(box(0.6, 0.3, 0.1, '#FFC83A', 0, 1.0, -0.85));
+  }
+
+  g.userData = { body, legL, legR, armL, armR, head };
+  return g;
+}
+
+export function animChibi(g: THREE.Group, ph: number, amt: number, t: number): void {
+  const u = g.userData;
+  if (!u || !u.legL) return;
+  const s = Math.sin(ph);
+  u.legL.rotation.x = s * 0.8 * amt;
+  u.legR.rotation.x = -s * 0.8 * amt;
+  u.armL.rotation.x = -s * 0.7 * amt;
+  u.armR.rotation.x = s * 0.7 * amt;
+  u.body.position.y = Math.abs(s) * 0.16 * amt;
+  u.head.rotation.z = Math.sin(t * 2) * 0.04 * (1 - amt);
+}
+
+export interface NpcWalker {
+  g: THREE.Group;
+  from: number;
+  to: number;
+  ph: number;
+  sp: number;
+  wait: number;
+}
+
+export interface PathNode {
+  x: number;
+  z: number;
+  n: number[];
+}
+
+export function buildPathGraphAndNpcs(ctx: {
+  scene: THREE.Scene;
+  mat: (c: string | number, o?: THREE.MeshPhongMaterialParameters) => THREE.MeshPhongMaterial;
+  rng: () => number;
+}): {
+  npcs: NpcWalker[];
+  pn: PathNode[];
+  animateNpcs: (dt: number, t: number) => void;
+} {
+  const { scene, mat, rng } = ctx;
+  const pn: PathNode[] = [];
+
+  const pnode = (x: number, z: number): number => {
+    for (let i = 0; i < pn.length; i++) {
+      if (Math.hypot(pn[i].x - x, pn[i].z - z) < 1.5) return i;
+    }
+    pn.push({ x, z, n: [] });
+    return pn.length - 1;
+  };
+
+  PATHS.forEach(([ax, az, bx, bz]) => {
+    const a = pnode(ax, az);
+    const b = pnode(bx, bz);
+    pn[a].n.push(b);
+    pn[b].n.push(a);
+  });
+
+  const npcLook: { shirt: string; hair: string; pants: string; acc?: string }[] = [
+    { shirt: '#FFFFFF', hair: '#2A1E1A', pants: '#2D4A6B', acc: 'pony' },
+    { shirt: '#00AEEF', hair: '#3A2A22', pants: '#30343A' },
+    { shirt: '#FFC83A', hair: '#24202A', pants: '#2D4A6B', acc: 'cap' },
+    { shirt: '#38B865', hair: '#6B3E26', pants: '#3C3F58', acc: 'bun' },
+    { shirt: '#FFFFFF', hair: '#24202A', pants: '#1F2C44' },
+    { shirt: '#9B6BFF', hair: '#3A2A22', pants: '#2D4A6B', acc: 'pony' },
+    { shirt: '#FF6F59', hair: '#24202A', pants: '#30343A' },
+    { shirt: '#FFFFFF', hair: '#6B3E26', pants: '#2D4A6B', acc: 'cap' },
+    { shirt: '#2FA8F0', hair: '#24202A', pants: '#3C3F58', acc: 'bun' },
+  ];
+
+  const npcs: NpcWalker[] = [];
+  npcLook.forEach((lk) => {
+    const g = makeChibi(lk, rng() < 0.5, mat);
+    g.scale.setScalar(0.82);
+    g.traverse((m) => {
+      if ((m as THREE.Mesh).isMesh) m.castShadow = true;
+    });
+    scene.add(g);
+    const a = Math.floor(rng() * pn.length);
+    g.position.set(pn[a].x, 0, pn[a].z);
+    npcs.push({
+      g,
+      from: a,
+      to: pn[a].n[0] ?? a,
+      ph: rng() * 6,
+      sp: 2 + rng() * 1.2,
+      wait: rng() * 3,
+    });
+  });
+
+  const animateNpcs = (dt: number, t: number) => {
+    npcs.forEach((n) => {
+      if (n.wait > 0) {
+        n.wait -= dt;
+        animChibi(n.g, n.ph, 0, t);
+        return;
+      }
+      const T = pn[n.to];
+      if (!T) return;
+      const dx = T.x - n.g.position.x;
+      const dz = T.z - n.g.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 0.5) {
+        const nb = pn[n.to].n.filter((k) => k !== n.from);
+        const nx = nb.length ? nb[Math.floor(Math.random() * nb.length)] : n.from;
+        n.from = n.to;
+        n.to = nx;
+        if (Math.random() < 0.25) n.wait = 1 + Math.random() * 3;
+        return;
+      }
+      n.g.position.x += (dx / d) * n.sp * dt;
+      n.g.position.z += (dz / d) * n.sp * dt;
+      n.g.rotation.y = lerpAngle(n.g.rotation.y, Math.atan2(dx, dz), 1 - Math.exp(-dt * 8));
+      n.ph += dt * n.sp * 1.4;
+      animChibi(n.g, n.ph, 1, t);
+    });
+  };
+
+  return { npcs, pn, animateNpcs };
+}
+
+export function getAvatarSvg(index: number): string {
+  const a: ChibiAvatarSpec = AVATARS[index] || AVATARS[0];
+  const acc =
+    a.acc === 'cap'
+      ? `<path d="M14 25c0-9 7-15 16-15s16 6 16 15z" fill="#FFC83A"/><path d="M28 23h22a3 3 0 0 1-3 4H28z" fill="#F0B020"/>`
+      : a.acc === 'pony'
+        ? `<circle cx="49" cy="33" r="6" fill="${a.hair}"/><circle cx="46" cy="27" r="2.4" fill="#38B865"/>`
+        : `<circle cx="30" cy="9" r="6" fill="${a.hair}"/><rect x="25" y="12" width="10" height="3" rx="1.5" fill="#FFC83A"/>`;
+  return `<svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="30" fill="#E6F6DA"/><path d="M12 60c0-11 8-17 18-17s18 6 18 17z" fill="${a.shirt}"/>
+  <circle cx="30" cy="31" r="15" fill="#FFD7B5"/><path d="M15 30c0-10 7-16 15-16s15 6 15 16c-4-5-9-7-15-7s-11 2-15 7z" fill="${a.hair}"/>${acc}
+  <circle cx="25" cy="33" r="1.9" fill="#2A1E1A"/><circle cx="35" cy="33" r="1.9" fill="#2A1E1A"/><ellipse cx="21.5" cy="37" rx="2.4" ry="1.4" fill="#FF9AAE"/><ellipse cx="38.5" cy="37" rx="2.4" ry="1.4" fill="#FF9AAE"/>
+  <path d="M27.5 38.5q2.5 2 5 0" stroke="#2A1E1A" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>`;
+}
+</file>
+
+<file path="src/engine/threeHelpers.ts">
+import * as THREE from 'three';
+import { CAMP, LAKE, ROADS } from '../data/campusLayout';
+import { Station } from '../types/game';
+
+export const FH = 4.2;
+export const FONT = '"Baloo 2","Nunito",system-ui,sans-serif';
+
+export type AABB = [number, number, number, number];
+
+export const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(b, v));
+
+export const smooth = (a: number, b: number, x: number): number => {
+  const t = clamp((x - a) / (b - a), 0, 1);
+  return t * t * (3 - 2 * t);
+};
+
+export const lerpAngle = (a: number, b: number, t: number): number => {
+  const d = (((b - a + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+  return a + d * t;
+};
+
+export function createRng(seed: number): () => number {
+  let s = seed | 0;
+  return function () {
+    s |= 0;
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function segDist(
+  px: number,
+  pz: number,
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number
+): number {
+  const dx = bx - ax;
+  const dz = bz - az;
+  const L = dx * dx + dz * dz || 1;
+  const t = clamp(((px - ax) * dx + (pz - az) * dz) / L, 0, 1);
+  return Math.hypot(px - ax - dx * t, pz - az - dz * t);
+}
+
+export const ell = (x: number, z: number): number =>
+  Math.hypot((x - CAMP.cx) / CAMP.rx, (z - CAMP.cz) / CAMP.rz);
+
+export function heightAt(x: number, z: number): number {
+  const d = ell(x, z);
+  const n =
+    6 * Math.sin(x * 0.031 + 1) * Math.cos(z * 0.027) +
+    3 * Math.sin(x * 0.07 + z * 0.05) +
+    2.2 * Math.cos(z * 0.09 - x * 0.04);
+  let h = smooth(1.3, 1.7, d) * (9 + n) + Math.max(0, d - 1.65) * 55;
+  let r = 1e9;
+  ROADS.forEach((Q) => {
+    r = Math.min(r, segDist(x, z, Q[0], Q[1], Q[2], Q[3]));
+  });
+  h *= smooth(7, 24, r);
+  h = Math.max(h, -0.5);
+  const k = smooth(LAKE.r, LAKE.r + 22, Math.hypot(x - LAKE.x, z - LAKE.z));
+  return h * k - (1 - k) * 2.4;
+}
+
+export function rr(
+  g: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+): void {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+
+export function canvasTex(
+  w: number,
+  h: number,
+  draw: (g: CanvasRenderingContext2D, w: number, h: number) => void,
+  rep = true
+): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d');
+  if (ctx) {
+    draw(ctx, w, h);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 4;
+  if (rep !== false) {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  }
+  return t;
+}
+
+export function createMaterialCache() {
+  const MC: Record<string, THREE.MeshPhongMaterial> = {};
+  return function mat(
+    c: string | number,
+    o?: THREE.MeshPhongMaterialParameters
+  ): THREE.MeshPhongMaterial {
+    const key = String(c);
+    if (!o && MC[key]) return MC[key];
+    const m = new THREE.MeshPhongMaterial({
+      color: c,
+      flatShading: true,
+      shininess: 6,
+      ...(o || {}),
+    });
+    if (!o) MC[key] = m;
+    return m;
+  };
+}
+
+export function mesh(
+  geo: THREE.BufferGeometry,
+  m: THREE.Material | THREE.Material[],
+  x?: number,
+  y?: number,
+  z?: number,
+  cast?: boolean
+): THREE.Mesh {
+  const o = new THREE.Mesh(geo, m);
+  o.position.set(x || 0, y || 0, z || 0);
+  o.castShadow = cast !== false;
+  o.receiveShadow = true;
+  return o;
+}
+
+export function facade(
+  wall: string,
+  win: string,
+  frame: string,
+  trim?: string
+): THREE.CanvasTexture {
+  return canvasTex(128, 128, (g, W, H) => {
+    g.fillStyle = wall;
+    g.fillRect(0, 0, W, H);
+    g.fillStyle = frame;
+    rr(g, 24, 22, 80, 66, 14);
+    g.fill();
+    g.fillStyle = win;
+    rr(g, 31, 29, 66, 52, 9);
+    g.fill();
+    g.fillStyle = 'rgba(255,255,255,.62)';
+    rr(g, 38, 35, 9, 32, 4);
+    g.fill();
+    g.fillStyle = trim || frame;
+    rr(g, 18, 92, 92, 9, 4);
+    g.fill();
+    g.fillStyle = 'rgba(0,0,0,.07)';
+    g.fillRect(0, H - 5, W, 5);
+  });
+}
+
+export function signTex(
+  lines: [string, number][],
+  bg: string,
+  fg: string,
+  w?: number,
+  h?: number
+): THREE.CanvasTexture {
+  return canvasTex(
+    w || 1024,
+    h || 200,
+    (g, W, H) => {
+      g.fillStyle = bg;
+      rr(g, 0, 0, W, H, Math.min(H * 0.25, 40));
+      g.fill();
+      g.fillStyle = fg;
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      lines.forEach((l, i) => {
+        g.font = `800 ${l[1]}px ${FONT}`;
+        g.fillText(l[0], W / 2, (H * (i + 1)) / (lines.length + 1) + l[1] * 0.06);
+      });
+    },
+    false
+  );
+}
+
+export function pill(
+  text: string,
+  o?: {
+    fs?: number;
+    pad?: number;
+    dot?: string;
+    bg?: string;
+    fg?: string;
+    h?: number;
+    ro?: number;
+  }
+): THREE.Sprite {
+  const opts = o || {};
+  const fs = opts.fs || 44;
+  const pad = opts.pad || 22;
+  const c = document.createElement('canvas');
+  const g = c.getContext('2d')!;
+  const font = `800 ${fs}px ${FONT}`;
+  g.font = font;
+  const tw = g.measureText(text).width;
+  const dw = opts.dot ? fs * 0.9 : 0;
+  const W = Math.ceil(tw + pad * 2 + dw);
+  const H = Math.round(fs * 1.55);
+  c.width = W + 8;
+  c.height = H + 12;
+  g.fillStyle = 'rgba(28,64,42,.22)';
+  rr(g, 4, 10, W, H, H / 2);
+  g.fill();
+  g.fillStyle = opts.bg || '#fff';
+  rr(g, 4, 4, W, H, H / 2);
+  g.fill();
+  if (opts.dot) {
+    g.fillStyle = opts.dot;
+    g.beginPath();
+    g.arc(4 + pad + fs * 0.3, 4 + H / 2, fs * 0.27, 0, 7);
+    g.fill();
+  }
+  g.font = font;
+  g.fillStyle = opts.fg || '#1E3528';
+  g.textBaseline = 'middle';
+  g.fillText(text, 4 + pad + dw, 4 + H / 2 + fs * 0.07);
+  const t = new THREE.CanvasTexture(c);
+  t.minFilter = THREE.LinearFilter;
+  const sp = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true })
+  );
+  const hh = opts.h || 3;
+  sp.scale.set((hh * c.width) / c.height, hh, 1);
+  sp.renderOrder = opts.ro || 6;
+  return sp;
+}
+
+export function letter(ch: string, bg: string, size?: number): THREE.Sprite {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d')!;
+  g.fillStyle = 'rgba(28,64,42,.25)';
+  g.beginPath();
+  g.arc(128, 138, 112, 0, 7);
+  g.fill();
+  g.fillStyle = '#fff';
+  g.beginPath();
+  g.arc(128, 124, 116, 0, 7);
+  g.fill();
+  g.fillStyle = bg;
+  g.beginPath();
+  g.arc(128, 124, 100, 0, 7);
+  g.fill();
+  g.fillStyle = '#fff';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.font = `800 ${ch.length > 2 ? 84 : 150}px ${FONT}`;
+  g.fillText(ch, 128, 136);
+  const t = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true })
+  );
+  sp.scale.setScalar(size || 8);
+  sp.renderOrder = 7;
+  return sp;
+}
+
+export function coinTex(st: Station, done: boolean): THREE.CanvasTexture {
+  return canvasTex(
+    256,
+    256,
+    (g) => {
+      g.fillStyle = 'rgba(28,64,42,.25)';
+      g.beginPath();
+      g.arc(128, 138, 116, 0, 7);
+      g.fill();
+      g.fillStyle = '#fff';
+      g.beginPath();
+      g.arc(128, 126, 118, 0, 7);
+      g.fill();
+      g.fillStyle = done ? '#3DAA5C' : st.col;
+      g.beginPath();
+      g.arc(128, 126, 102, 0, 7);
+      g.fill();
+      g.strokeStyle = '#fff';
+      g.fillStyle = '#fff';
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      if (done) {
+        g.lineWidth = 26;
+        g.beginPath();
+        g.moveTo(80, 130);
+        g.lineTo(114, 164);
+        g.lineTo(178, 94);
+        g.stroke();
+        return;
+      }
+      if (st.type === 'quiz') {
+        g.font = `800 150px ${FONT}`;
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.fillText('?', 128, 136);
+      } else if (st.type === 'it_debug') {
+        g.font = `800 105px ${FONT}`;
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.fillText('</>', 128, 132);
+      } else if (st.type === 'electric_circuit') {
+        g.lineWidth = 18;
+        g.beginPath();
+        g.moveTo(142, 66);
+        g.lineTo(96, 130);
+        g.lineTo(136, 130);
+        g.lineTo(110, 190);
+        g.stroke();
+      } else if (st.type === 'auto_engine') {
+        g.lineWidth = 16;
+        g.beginPath();
+        g.arc(128, 126, 36, 0, Math.PI * 2);
+        g.stroke();
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          g.beginPath();
+          g.moveTo(128 + Math.cos(a) * 38, 126 + Math.sin(a) * 38);
+          g.lineTo(128 + Math.cos(a) * 58, 126 + Math.sin(a) * 58);
+          g.stroke();
+        }
+      } else if (st.type === 'checkin') {
+        g.lineWidth = 14;
+        g.beginPath();
+        g.moveTo(92, 72);
+        g.lineTo(92, 186);
+        g.stroke();
+        g.beginPath();
+        g.moveTo(92, 74);
+        g.lineTo(180, 98);
+        g.lineTo(92, 128);
+        g.closePath();
+        g.fill();
+      } else if (st.type === 'photo') {
+        rr(g, 62, 92, 132, 88, 18);
+        g.fill();
+        g.fillRect(100, 78, 56, 20);
+        g.fillStyle = st.col;
+        g.beginPath();
+        g.arc(128, 136, 28, 0, 7);
+        g.fill();
+        g.fillStyle = '#fff';
+        g.beginPath();
+        g.arc(128, 136, 14, 0, 7);
+        g.fill();
+      } else {
+        g.beginPath();
+        g.arc(128, 126, 62, 0, 7);
+        g.fill();
+        g.fillStyle = st.col;
+        g.beginPath();
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+          g.lineTo(128 + Math.cos(a) * 24, 126 + Math.sin(a) * 24);
+        }
+        g.closePath();
+        g.fill();
+        g.strokeStyle = st.col;
+        g.lineWidth = 6;
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+          g.beginPath();
+          g.moveTo(128 + Math.cos(a) * 24, 126 + Math.sin(a) * 24);
+          g.lineTo(128 + Math.cos(a) * 58, 126 + Math.sin(a) * 58);
+          g.stroke();
+        }
+      }
+    },
+    false
+  );
+}
+</file>
+
+<file path="src/services/authService.ts">
+import {
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { FacultyId, PublicLeaderboardUser, UserProfile } from '../types/game';
+import { auth, db, isFirebaseConfigured } from './firebase';
+
+const LOCAL_PROFILE_KEY = 'tdc_go_profile_v2';
+const LOCAL_PUBLIC_USERS_KEY = 'tdc_go_public_users_v2';
+
+const SAMPLE_LEADERBOARD_USERS: PublicLeaderboardUser[] = [
+  {
+    uid: 'sample_1',
+    name: 'Minh Anh',
+    mssv: '24211TT0124',
+    facultyId: 'cntt',
+    avatar: 0,
+    points: 1420,
+    unlockedCount: 10,
+    updatedAt: Date.now() - 3600000,
+  },
+  {
+    uid: 'sample_2',
+    name: 'Gia Huy',
+    mssv: '24211DD0089',
+    facultyId: 'dien_dt',
+    avatar: 1,
+    points: 1280,
+    unlockedCount: 9,
+    updatedAt: Date.now() - 7200000,
+  },
+  {
+    uid: 'sample_3',
+    name: 'Thảo Vy',
+    mssv: '24211KT0215',
+    facultyId: 'kinh_te',
+    avatar: 2,
+    points: 1150,
+    unlockedCount: 8,
+    updatedAt: Date.now() - 8400000,
+  },
+  {
+    uid: 'sample_4',
+    name: 'Quốc Bảo',
+    mssv: '24211OT0042',
+    facultyId: 'co_khi_oto',
+    avatar: 0,
+    points: 990,
+    unlockedCount: 7,
+    updatedAt: Date.now() - 9600000,
+  },
+  {
+    uid: 'sample_5',
+    name: 'Ngọc Hân',
+    mssv: '24211NN0118',
+    facultyId: 'ngoai_ngu',
+    avatar: 2,
+    points: 870,
+    unlockedCount: 6,
+    updatedAt: Date.now() - 12000000,
+  },
+  {
+    uid: 'sample_6',
+    name: 'Tuấn Kiệt',
+    mssv: '24211CK0071',
+    facultyId: 'co_khi_ctm',
+    avatar: 1,
+    points: 740,
+    unlockedCount: 5,
+    updatedAt: Date.now() - 15000000,
+  },
+  {
+    uid: 'sample_7',
+    name: 'Bảo Trâm',
+    mssv: '24211DL0033',
+    facultyId: 'du_lich',
+    avatar: 2,
+    points: 620,
+    unlockedCount: 4,
+    updatedAt: Date.now() - 18000000,
+  },
+];
+
+export function loadLocalProfile(): UserProfile | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_PROFILE_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as UserProfile;
+    if (p && typeof p === 'object' && p.uid) return p;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLocalProfile(profile: UserProfile): void {
+  try {
+    localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(profile));
+    syncLocalPublicUser(profile);
+  } catch {
+    // Ignore storage error
+  }
+}
+
+export function getLocalPublicUsers(): PublicLeaderboardUser[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_PUBLIC_USERS_KEY);
+    if (!raw) {
+      localStorage.setItem(
+        LOCAL_PUBLIC_USERS_KEY,
+        JSON.stringify(SAMPLE_LEADERBOARD_USERS)
+      );
+      return [...SAMPLE_LEADERBOARD_USERS];
+    }
+    const list = JSON.parse(raw) as PublicLeaderboardUser[];
+    return Array.isArray(list) ? list : [...SAMPLE_LEADERBOARD_USERS];
+  } catch {
+    return [...SAMPLE_LEADERBOARD_USERS];
+  }
+}
+
+export function syncLocalPublicUser(profile: UserProfile): void {
+  try {
+    const users = getLocalPublicUsers();
+    const pub: PublicLeaderboardUser = {
+      uid: profile.uid,
+      name: profile.name,
+      mssv: profile.mssv,
+      facultyId: profile.facultyId,
+      avatar: profile.avatar,
+      points: profile.points,
+      unlockedCount: Object.keys(profile.done || {}).length,
+      partyId: profile.partyId,
+      updatedAt: Date.now(),
+    };
+    const idx = users.findIndex((u) => u.uid === profile.uid);
+    if (idx >= 0) users[idx] = pub;
+    else users.push(pub);
+    localStorage.setItem(LOCAL_PUBLIC_USERS_KEY, JSON.stringify(users));
+  } catch {
+    // Ignore storage error
+  }
+}
+
+export async function syncProfileToCloud(profile: UserProfile): Promise<void> {
+  saveLocalProfile(profile);
+  if (!isFirebaseConfigured || !db) return;
+
+  try {
+    const privateData = {
+      uid: profile.uid,
+      name: profile.name,
+      mssv: profile.mssv,
+      email: profile.email || `${profile.mssv.toLowerCase()}@mail.tdc.edu.vn`,
+      facultyId: profile.facultyId,
+      role: profile.role,
+      avatar: profile.avatar,
+      points: profile.points,
+      stars: profile.stars,
+      quizOk: profile.quizOk,
+      photos: profile.photos,
+      done: profile.done,
+      bonus: profile.bonus,
+      ...(profile.partyId ? { partyId: profile.partyId } : {}),
+      updatedAt: Date.now(),
+    };
+    await setDoc(doc(db, 'users', profile.uid), privateData, { merge: true });
+
+    const publicData: PublicLeaderboardUser = {
+      uid: profile.uid,
+      name: profile.name,
+      mssv: profile.mssv,
+      facultyId: profile.facultyId,
+      avatar: profile.avatar,
+      points: profile.points,
+      unlockedCount: Object.keys(profile.done || {}).length,
+      ...(profile.partyId ? { partyId: profile.partyId } : {}),
+      updatedAt: Date.now(),
+    };
+    await setDoc(doc(db, 'users_public', profile.uid), publicData, { merge: true });
+  } catch (e) {
+    console.warn('Cloud profile sync skipped/fallback:', e);
+  }
+}
+
+export async function loginOrRegisterExplorer(params: {
+  name: string;
+  mssv: string;
+  email?: string;
+  password?: string;
+  facultyId: FacultyId;
+  avatar: number;
+  mode: 'demo' | 'email_login' | 'email_register' | 'google';
+}): Promise<UserProfile> {
+  const cleanName = params.name.trim().slice(0, 32) || 'Tân binh TDC';
+  const cleanMssv = params.mssv.trim().toUpperCase().slice(0, 16) || '26211TT0001';
+  const cleanEmail =
+    params.email?.trim() || `${cleanMssv.toLowerCase()}@mail.tdc.edu.vn`;
+
+  if (isFirebaseConfigured && auth && db && params.mode !== 'demo') {
+    let uid = '';
+    if (params.mode === 'google') {
+      const cred = await signInWithPopup(auth, new GoogleAuthProvider());
+      uid = cred.user.uid;
+    } else if (params.mode === 'email_register') {
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        cleanEmail,
+        params.password || 'TdcGo2026!'
+      );
+      uid = cred.user.uid;
+    } else if (params.mode === 'email_login') {
+      const cred = await signInWithEmailAndPassword(
+        auth,
+        cleanEmail,
+        params.password || 'TdcGo2026!'
+      );
+      uid = cred.user.uid;
+    }
+
+    if (uid) {
+      const snap = await getDoc(doc(db, 'users', uid));
+      if (snap.exists()) {
+        const existing = snap.data() as UserProfile;
+        const merged: UserProfile = {
+          ...existing,
+          name: cleanName || existing.name,
+          mssv: cleanMssv || existing.mssv,
+          facultyId: params.facultyId || existing.facultyId,
+          avatar: params.avatar,
+          updatedAt: Date.now(),
+        };
+        await syncProfileToCloud(merged);
+        return merged;
+      }
+      const fresh: UserProfile = {
+        uid,
+        name: cleanName,
+        mssv: cleanMssv,
+        email: cleanEmail,
+        facultyId: params.facultyId,
+        role: 'student',
+        avatar: params.avatar,
+        points: 0,
+        stars: 0,
+        quizOk: 0,
+        photos: 0,
+        done: {},
+        bonus: {},
+        pos: null,
+        updatedAt: Date.now(),
+      };
+      await syncProfileToCloud(fresh);
+      return fresh;
+    }
+  }
+
+  // Local / Demo fallback
+  const existingLocal = loadLocalProfile();
+  if (existingLocal) {
+    const updated: UserProfile = {
+      ...existingLocal,
+      name: cleanName,
+      mssv: cleanMssv,
+      email: cleanEmail,
+      facultyId: params.facultyId,
+      avatar: params.avatar,
+      updatedAt: Date.now(),
+    };
+    saveLocalProfile(updated);
+    return updated;
+  }
+
+  const demoProfile: UserProfile = {
+    uid: `local_${cleanMssv.toLowerCase()}`,
+    name: cleanName,
+    mssv: cleanMssv,
+    email: cleanEmail,
+    facultyId: params.facultyId,
+    role: 'student',
+    avatar: params.avatar,
+    points: 0,
+    stars: 0,
+    quizOk: 0,
+    photos: 0,
+    done: {},
+    bonus: {},
+    pos: null,
+    updatedAt: Date.now(),
+  };
+  saveLocalProfile(demoProfile);
+  return demoProfile;
+}
+
+export function resetExplorerProgress(profile: UserProfile): UserProfile {
+  const reset: UserProfile = {
+    ...profile,
+    points: 0,
+    stars: 0,
+    quizOk: 0,
+    photos: 0,
+    done: {},
+    bonus: {},
+    pos: null,
+    certClaimed: false,
+    updatedAt: Date.now(),
+  };
+  void syncProfileToCloud(reset);
+  return reset;
+}
+
+export async function logoutExplorer(): Promise<void> {
+  if (isFirebaseConfigured && auth) {
+    try {
+      await signOut(auth);
+    } catch {
+      // Ignore
+    }
+  }
+}
+</file>
+
+<file path="src/services/firebase.ts">
+import { FirebaseApp, getApps, initializeApp } from 'firebase/app';
+import { Auth, getAuth } from 'firebase/auth';
+import { Firestore, getFirestore } from 'firebase/firestore';
+
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+};
+
+export const isFirebaseConfigured = Boolean(
+  firebaseConfig.apiKey &&
+    firebaseConfig.projectId &&
+    firebaseConfig.apiKey.trim().length > 5
+);
+
+let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
+let db: Firestore | null = null;
+
+if (isFirebaseConfigured) {
+  try {
+    app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+  } catch (e) {
+    console.warn('Firebase initialization failed, falling back to Local Demo mode:', e);
+  }
+}
+
+export { app, auth, db };
+</file>
+
+<file path="src/services/gpsService.ts">
+import { CAMPUS_BUILDINGS, TDC_GEO_ANCHORS } from '../data/campusBuildings';
+import { CAMP } from '../data/campusLayout';
+import { ell } from '../engine/threeHelpers';
+import { CampusBuildingZone, GpsTelemetry3D } from '../types/game';
+
+/**
+ * Chuyển đổi tọa độ GPS thực tế (WGS84 Latitude, Longitude, Altitude ASL)
+ * sang hệ tọa độ không gian 3 chiều của khuôn viên TDC (X: Đông/Tây, Y: Cao độ phân tầng, Z: Nam/Bắc)
+ */
+export function gpsToCampus3D(params: {
+  lat: number;
+  lng: number;
+  altitudeAsl?: number | null;
+  groundAltitudeReferenceAsl?: number;
+}): {
+  x: number;
+  y: number;
+  z: number;
+  insideCampus: boolean;
+} {
+  const dLat = params.lat - TDC_GEO_ANCHORS.ORIGIN_LAT;
+  const dLng = params.lng - TDC_GEO_ANCHORS.ORIGIN_LNG;
+
+  const eastMeters = dLng * TDC_GEO_ANCHORS.METERS_PER_DEG_LNG;
+  const northMeters = dLat * TDC_GEO_ANCHORS.METERS_PER_DEG_LAT;
+
+  const cosR = Math.cos(TDC_GEO_ANCHORS.MAP_ROTATION_RAD);
+  const sinR = Math.sin(TDC_GEO_ANCHORS.MAP_ROTATION_RAD);
+
+  // Trong Three.js: +X là hướng Đông, -Z là hướng Bắc (+Z là hướng Nam về phía Võ Văn Ngân)
+  const x = +(eastMeters * cosR - northMeters * sinR).toFixed(2);
+  const z = +(-northMeters * cosR - eastMeters * sinR).toFixed(2);
+
+  const groundRef =
+    params.groundAltitudeReferenceAsl ?? TDC_GEO_ANCHORS.GROUND_ALTITUDE_ASL_M;
+  const rawY =
+    params.altitudeAsl != null && Number.isFinite(params.altitudeAsl)
+      ? params.altitudeAsl - groundRef
+      : 0;
+  // Giới hạn độ cao hợp lệ trong khuôn viên từ tầng hầm (-4.2m) tới đỉnh tháp Tòa D (+50m)
+  const y = +Math.max(-TDC_GEO_ANCHORS.FLOOR_HEIGHT_M, Math.min(52, rawY)).toFixed(2);
+
+  const insideCampus = ell(x, z) <= 1.05;
+
+  return { x, y, z, insideCampus };
+}
+
+/**
+ * Chuyển đổi ngược từ tọa độ 3D khuôn viên TDC (X, Y, Z) sang tọa độ GPS (Lat, Lng, Altitude ASL)
+ */
+export function campus3DToGps(params: {
+  x: number;
+  y?: number;
+  z: number;
+  groundAltitudeReferenceAsl?: number;
+}): {
+  lat: number;
+  lng: number;
+  altitudeAsl: number;
+} {
+  const cosR = Math.cos(-TDC_GEO_ANCHORS.MAP_ROTATION_RAD);
+  const sinR = Math.sin(-TDC_GEO_ANCHORS.MAP_ROTATION_RAD);
+
+  const eastMeters = params.x * cosR + params.z * sinR;
+  const northMeters = -params.z * cosR + params.x * sinR;
+
+  const lat = +(
+    TDC_GEO_ANCHORS.ORIGIN_LAT +
+    northMeters / TDC_GEO_ANCHORS.METERS_PER_DEG_LAT
+  ).toFixed(6);
+  const lng = +(
+    TDC_GEO_ANCHORS.ORIGIN_LNG +
+    eastMeters / TDC_GEO_ANCHORS.METERS_PER_DEG_LNG
+  ).toFixed(6);
+
+  const groundRef =
+    params.groundAltitudeReferenceAsl ?? TDC_GEO_ANCHORS.GROUND_ALTITUDE_ASL_M;
+  const altitudeAsl = +(groundRef + (params.y || 0)).toFixed(2);
+
+  return { lat, lng, altitudeAsl };
+}
+
+/**
+ * Nhận diện tòa nhà sinh viên đang đứng (dựa theo mặt phẳng X, Z với dung sai biên GPS)
+ */
+export function detectBuildingAtPosition(
+  x: number,
+  z: number,
+  marginMeters = 2.5
+): CampusBuildingZone | null {
+  let bestMatch: CampusBuildingZone | null = null;
+  let bestDist = Infinity;
+
+  for (const b of CAMPUS_BUILDINGS) {
+    const [x0, z0, x1, z1] = b.bounds;
+    if (
+      x >= x0 - marginMeters &&
+      x <= x1 + marginMeters &&
+      z >= z0 - marginMeters &&
+      z <= z1 + marginMeters
+    ) {
+      // Khoảng cách vào tâm tòa nhà để ưu tiên tòa gần nhất nếu đứng ở ranh giới nối
+      const cx = (x0 + x1) / 2;
+      const cz = (z0 + z1) / 2;
+      const d = Math.hypot(x - cx, z - cz);
+      if (d < bestDist) {
+        bestDist = d;
+        bestMatch = b;
+      }
+    }
+  }
+  return bestMatch;
+}
+
+/**
+ * Tính toán Tầng hiện tại (Floor) từ cao độ tương đối Y (mét so với mặt sân trường)
+ * và giới hạn theo số tầng thực tế của tòa nhà đang đứng.
+ * - Tầng hầm B1: floor = -1 (y <= -1.8m, chỉ có tại Tòa D)
+ * - Tầng trệt (Tầng 1): floor = 1 (0m <= y < 4.2m)
+ * - Tầng N (N >= 1): floor = 1 + Math.floor((y + 1.2) / 4.2)
+ */
+export function resolveFloorFromElevation(
+  yMeters: number,
+  building: CampusBuildingZone | null
+): {
+  floor: number;
+  clampedY: number;
+} {
+  const fh = building?.floorHeightMeters || TDC_GEO_ANCHORS.FLOOR_HEIGHT_M;
+
+  let floor: number;
+  if (yMeters <= -1.8) {
+    floor = -1;
+  } else {
+    floor = Math.max(1, 1 + Math.floor((yMeters + 1.1) / fh));
+  }
+
+  if (building) {
+    if (floor < building.minFloor) floor = building.minFloor;
+    if (floor > building.maxFloor) floor = building.maxFloor;
+  } else {
+    // Ngoài sân trường không thuộc tòa nhà nào thì mặc định ở mặt đất (Tầng 1 / y = 0)
+    if (floor < 1) floor = 1;
+    if (floor > 11) floor = 11;
+  }
+
+  const clampedY = floor === -1 ? -fh : (floor - 1) * fh;
+  return { floor, clampedY: +clampedY.toFixed(2) };
+}
+
+/**
+ * Chuyển số tầng (floor) sang độ cao Y (mét) trong không gian 3D
+ */
+export function floorToElevationMeters(
+  floor: number,
+  building?: CampusBuildingZone | null
+): number {
+  const fh = building?.floorHeightMeters || TDC_GEO_ANCHORS.FLOOR_HEIGHT_M;
+  if (floor === -1) return -fh;
+  return Math.max(0, (floor - 1) * fh);
+}
+
+/**
+ * Tính khoảng cách không gian 3 chiều thực tế (Euclidean 3D distance) giữa 2 điểm (X, Y, Z)
+ */
+export function distance3D(
+  a: { x: number; y?: number; z: number },
+  b: { x: number; y?: number; z: number }
+): number {
+  const dx = a.x - b.x;
+  const dy = (a.y || 0) - (b.y || 0);
+  const dz = a.z - b.z;
+  return Math.hypot(dx, dy, dz);
+}
+
+/**
+ * Bộ lọc Kalman 1 chiều đơn giản giúp làm mượt nhiễu GPS thực tế trên thiết bị di động
+ * đặc biệt là trục cao độ (Altitude) và tọa độ ngang khi đứng gần các tòa nhà cao tầng như Tòa D.
+ */
+export class GpsKalmanFilter3D {
+  private xEst: number | null = null;
+  private yEst: number | null = null;
+  private zEst: number | null = null;
+  private pX = 1;
+  private pY = 1;
+  private pZ = 1;
+
+  // Nhiễu quá trình (Process noise Q)
+  private readonly qHoriz = 0.35;
+  private readonly qVert = 0.2;
+
+  public reset(x?: number, y?: number, z?: number): void {
+    this.xEst = x ?? null;
+    this.yEst = y ?? null;
+    this.zEst = z ?? null;
+    this.pX = 1;
+    this.pY = 1;
+    this.pZ = 1;
+  }
+
+  public filter(
+    rawX: number,
+    rawY: number,
+    rawZ: number,
+    horizAccuracyMeters = 8,
+    vertAccuracyMeters = 10
+  ): { x: number; y: number; z: number } {
+    const rH = Math.max(0.5, Math.min(50, horizAccuracyMeters * 0.25));
+    const rV = Math.max(0.5, Math.min(50, vertAccuracyMeters * 0.35));
+
+    if (this.xEst === null || this.yEst === null || this.zEst === null) {
+      this.xEst = rawX;
+      this.yEst = rawY;
+      this.zEst = rawZ;
+      return { x: rawX, y: rawY, z: rawZ };
+    }
+
+    // Cập nhật trục X
+    this.pX += this.qHoriz;
+    const kX = this.pX / (this.pX + rH);
+    this.xEst = this.xEst + kX * (rawX - this.xEst);
+    this.pX = (1 - kX) * this.pX;
+
+    // Cập nhật trục Z
+    this.pZ += this.qHoriz;
+    const kZ = this.pZ / (this.pZ + rH);
+    this.zEst = this.zEst + kZ * (rawZ - this.zEst);
+    this.pZ = (1 - kZ) * this.pZ;
+
+    // Cập nhật trục Y (Cao độ)
+    this.pY += this.qVert;
+    const kY = this.pY / (this.pY + rV);
+    this.yEst = this.yEst + kY * (rawY - this.yEst);
+    this.pY = (1 - kY) * this.pY;
+
+    return {
+      x: +this.xEst.toFixed(2),
+      y: +this.yEst.toFixed(2),
+      z: +this.zEst.toFixed(2),
+    };
+  }
+}
+
+/**
+ * Kẹp tọa độ (X, Z) vào biên elip của khuôn viên TDC nếu bật chế độ giữ trong khuôn viên
+ */
+export function clampToCampusBoundary(x: number, z: number): { x: number; z: number } {
+  const d = ell(x, z);
+  if (d <= 0.985) return { x, z };
+  const k = 0.985 / d;
+  return {
+    x: +(CAMP.cx + (x - CAMP.cx) * k).toFixed(2),
+    z: +(CAMP.cz + (z - CAMP.cz) * k).toFixed(2),
+  };
+}
+
+/**
+ * Tạo gói dữ liệu Telemetry 3D đầy đủ từ tọa độ 3D hoặc tín hiệu Geolocation
+ */
+export function buildTelemetryFromCampus3D(params: {
+  x: number;
+  y: number;
+  z: number;
+  accuracyMeters?: number;
+  altitudeAccuracyMeters?: number | null;
+  headingDeg?: number | null;
+  speedMps?: number | null;
+  source: GpsTelemetry3D['source'];
+  lockedFloor?: number | null;
+  groundAltitudeReferenceAsl?: number;
+}): GpsTelemetry3D {
+  const building = detectBuildingAtPosition(params.x, params.z);
+  const clampedLockedFloor =
+    params.lockedFloor != null
+      ? building
+        ? Math.max(building.minFloor, Math.min(building.maxFloor, params.lockedFloor))
+        : Math.max(-1, Math.min(11, params.lockedFloor))
+      : null;
+
+  const resolved =
+    clampedLockedFloor != null
+      ? {
+          floor: clampedLockedFloor,
+          clampedY: floorToElevationMeters(clampedLockedFloor, building),
+        }
+      : resolveFloorFromElevation(params.y, building);
+
+  const effectiveY = clampedLockedFloor != null ? resolved.clampedY : params.y;
+  const gps = campus3DToGps({
+    x: params.x,
+    y: effectiveY,
+    z: params.z,
+    groundAltitudeReferenceAsl: params.groundAltitudeReferenceAsl,
+  });
+
+  return {
+    lat: gps.lat,
+    lng: gps.lng,
+    altitudeAsl: gps.altitudeAsl,
+    accuracyMeters: params.accuracyMeters ?? 2.5,
+    altitudeAccuracyMeters: params.altitudeAccuracyMeters ?? 3.0,
+    headingDeg: params.headingDeg ?? null,
+    speedMps: params.speedMps ?? null,
+    x: +params.x.toFixed(2),
+    y: +effectiveY.toFixed(2),
+    z: +params.z.toFixed(2),
+    detectedFloor: resolved.floor,
+    detectedBuilding: building,
+    insideCampus: ell(params.x, params.z) <= 1.05,
+    source: params.source,
+    timestamp: Date.now(),
+  };
+}
+</file>
+
+<file path="src/index.css">
+@import "tailwindcss";
+
+/* Bố cục: thế giới 3D kiểu đồ chơi phủ kín màn hình; HUD bo tròn nổi ở 4 góc; thẻ thử thách trồi lên như tấm thẻ bài */
+:root {
+  --grass: #3DAA5C;
+  --grass-d: #23733D;
+  --leaf-l: #E6F6DA;
+  --sun: #FFC83A;
+  --sun-d: #D98E00;
+  --coral: #FF6F59;
+  --coral-d: #D9452F;
+  --tdc: #00AEEF;
+  --tdc-d: #0A7FC2;
+  --cream: #FFFBEF;
+  --card: #FFFFFF;
+  --ink: #1E3528;
+  --muted: #5B7266;
+  --line: #E2EBDA;
+  --drop: rgba(28, 64, 42, .20);
+  --f-display: "Baloo 2", "Nunito", system-ui, sans-serif;
+  --f-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  background: #CFEFDF;
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-tap-highlight-color: transparent;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+button:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 3px solid var(--tdc);
+  outline-offset: 2px;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#stage {
+  position: absolute;
+  inset: 0;
+}
+
+#stage canvas {
+  display: block;
+  touch-action: none;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 20px;
+  box-shadow: 0 4px 0 var(--drop), 0 10px 28px rgba(28, 64, 42, .14);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--grass);
+  color: #fff;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: .01em;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--grass-d);
+  transition: transform .08s, box-shadow .08s;
+  touch-action: manipulation;
+}
+
+.btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--grass-d);
+}
+
+.btn.sun {
+  background: var(--sun);
+  color: #4A3200;
+  box-shadow: 0 4px 0 var(--sun-d);
+}
+
+.btn.sun:active {
+  box-shadow: 0 1px 0 var(--sun-d);
+}
+
+.btn.blue {
+  background: var(--tdc);
+  color: #fff;
+  box-shadow: 0 4px 0 var(--tdc-d);
+}
+
+.btn.ghost {
+  background: var(--leaf-l);
+  color: var(--grass-d);
+  box-shadow: 0 4px 0 #C7E3B5;
+}
+
+.btn.big {
+  min-height: 52px;
+  font-size: 18px;
+  width: 100%;
+}
+
+/* ---------- màn hình mở đầu ---------- */
+#start {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(90deg, rgba(255, 251, 239, .90) 0, rgba(255, 251, 239, .62) 38%, rgba(255, 251, 239, 0) 65%);
+  overflow: auto;
+  z-index: 10;
+}
+
+.st-wrap {
+  width: min(460px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-left: clamp(0px, 3vw, 48px);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo .seal {
+  flex: none;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 0 var(--drop);
+}
+
+.logo .seal svg {
+  width: 48px;
+  height: 48px;
+}
+
+.logo h1 {
+  margin: 0;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 42px;
+  line-height: .9;
+  letter-spacing: -.01em;
+  color: var(--ink);
+}
+
+.logo h1 span {
+  display: inline-block;
+  background: var(--sun);
+  color: #3D2A00;
+  border-radius: 16px;
+  padding: 2px 12px 0;
+  margin-left: 4px;
+  transform: rotate(-3deg);
+  box-shadow: 0 5px 0 var(--sun-d);
+}
+
+.tag {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--ink);
+  max-width: 42ch;
+  text-wrap: balance;
+}
+
+.st-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.st-card label, .st-card .lbl {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 900;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+
+.st-card input {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  background: var(--cream);
+  color: var(--ink);
+  width: 100%;
+}
+
+.avas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.avas button {
+  border: 3px solid var(--line);
+  background: var(--cream);
+  border-radius: 16px;
+  padding: 6px 4px 5px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-weight: 800;
+  font-size: 12.5px;
+}
+
+.avas button.on {
+  border-color: var(--grass);
+  background: var(--leaf-l);
+}
+
+.fine {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.st-row {
+  display: flex;
+  gap: 10px;
+}
+
+.st-row .btn {
+  flex: 1;
+}
+
+/* ---------- HUD ---------- */
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  padding-bottom: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  z-index: 5;
+}
+
+#hud.dim > *:not(#fx) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hud-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.me {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px 6px 6px;
+  border-radius: 999px;
+  min-width: 0;
+  max-width: min(320px, 55vw);
+}
+
+.me .ava {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--leaf-l);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.me .ava svg {
+  width: 46px;
+  height: 46px;
+}
+
+.me-txt {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.me-txt b {
+  font-family: var(--f-display);
+  font-size: 16.5px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.me-txt span {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--grass-d);
+}
+
+.xp {
+  height: 7px;
+  border-radius: 5px;
+  background: var(--leaf-l);
+  overflow: hidden;
+  margin-top: 3px;
+  min-width: 90px;
+}
+
+.xp i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--grass), #8BD346);
+  border-radius: 5px;
+  transition: width .4s;
+}
+
+.hud-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.pills {
+  display: flex;
+  gap: 8px;
+}
+
+.pill {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 14px 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--drop);
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pill .ic {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.pill.pts .ic {
+  background: var(--sun);
+  color: #7A4D00;
+}
+
+.pill.bdg .ic {
+  background: var(--coral);
+  color: #fff;
+}
+
+.pill.bump {
+  animation: bump .45s;
+}
+
+@keyframes bump {
+  40% { transform: scale(1.16); }
+}
+
+#mini {
+  pointer-events: auto;
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  background: #BFE5B0;
+  border: 4px solid #fff;
+  box-shadow: 0 4px 0 var(--drop);
+  cursor: pointer;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rb {
+  pointer-events: auto;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 0;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 0 var(--drop);
+  color: var(--ink);
+  position: relative;
+}
+
+.rb:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 var(--drop);
+}
+
+.rb .dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--coral);
+  border: 2px solid #fff;
+}
+
+.hud-bot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+.guide {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 16px 0 6px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-weight: 800;
+  font-size: 13.5px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .25);
+  max-width: 100%;
+  cursor: pointer;
+  border: 0;
+}
+
+.guide .arr {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--sun);
+  color: #3D2A00;
+  display: grid;
+  place-items: center;
+  transition: transform .15s linear;
+}
+
+.guide span:last-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.act {
+  pointer-events: auto;
+  width: min(400px, 100%);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: pop .28s cubic-bezier(.2, 1.4, .4, 1);
+}
+
+.act-txt {
+  flex: 1;
+  min-width: 0;
+}
+
+.act-txt b {
+  display: block;
+  font-family: var(--f-display);
+  font-size: 18px;
+  line-height: 1.1;
+}
+
+.act-txt span {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.act .btn {
+  min-height: 42px;
+  padding: 0 16px;
+  font-size: 15px;
+}
+
+@keyframes pop {
+  from { transform: translateY(18px) scale(.9); opacity: 0; }
+}
+
+.keys {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  margin: 0;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink);
+  background: rgba(255, 255, 255, .82);
+  padding: 6px 10px;
+  border-radius: 10px;
+  max-width: 260px;
+  line-height: 1.4;
+}
+
+.keys b {
+  font-family: var(--f-display);
+}
+
+@media (pointer: coarse) {
+  .keys { display: none; }
+}
+
+@media (max-width: 520px) {
+  .logo h1 { font-size: 32px; }
+  #mini { width: 96px; height: 96px; }
+  .pill { height: 36px; font-size: 16px; padding: 0 11px 0 6px; }
+  .pill .ic { width: 24px; height: 24px; }
+  .rb { width: 40px; height: 40px; }
+  .me .ava, .me .ava svg { width: 40px; height: 40px; }
+  #start {
+    align-items: flex-end;
+    background: linear-gradient(0deg, rgba(255, 251, 239, .94) 0, rgba(255, 251, 239, .75) 55%, rgba(255, 251, 239, 0) 90%);
+  }
+  .st-wrap { margin-left: 0; }
+  .tag { font-size: 14px; }
+}
+
+/* ---------- bảng (modal) ---------- */
+#modal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px;
+  z-index: 30;
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 48, 32, .42);
+}
+
+.sheet {
+  position: relative;
+  width: min(460px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 0;
+  animation: pop .3s cubic-bezier(.2, 1.3, .4, 1);
+}
+
+@media (max-width: 520px) {
+  #modal {
+    align-items: flex-end;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+.sh-head {
+  position: relative;
+  padding: 16px 18px 14px;
+  color: #fff;
+  background: var(--c, var(--grass));
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border-radius: 20px 20px 0 0;
+  overflow: hidden;
+}
+
+.sh-head::after {
+  content: "";
+  position: absolute;
+  right: -30px;
+  top: -40px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .14);
+}
+
+.sh-head h2 {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 22px;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.sh-head p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 800;
+  opacity: .92;
+}
+
+.sh-x {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, .22);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.sh-body {
+  padding: 15px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.know {
+  background: var(--cream);
+  border-radius: 14px;
+  padding: 11px 14px;
+  font-size: 13.5px;
+}
+
+.know b {
+  display: block;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--sun-d);
+  margin-bottom: 2px;
+}
+
+.q {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 18px;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.opts {
+  display: grid;
+  gap: 8px;
+}
+
+.opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 2px solid var(--line);
+  background: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--line);
+}
+
+.opt i {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--leaf-l);
+  color: var(--grass-d);
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-family: var(--f-display);
+}
+
+.opt:hover:not(:disabled) {
+  border-color: var(--grass);
+}
+
+.opt.ok {
+  border-color: var(--grass);
+  background: #E8F8E3;
+}
+
+.opt.ok i {
+  background: var(--grass);
+  color: #fff;
+}
+
+.opt.no {
+  border-color: var(--coral);
+  background: #FFECE8;
+  animation: shake .35s;
+}
+
+.opt.no i {
+  background: var(--coral);
+  color: #fff;
+}
+
+.opt:disabled {
+  cursor: default;
+}
+
+@keyframes shake {
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.explain {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.reveal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 4px 0;
+}
+
+.reveal .sticker {
+  animation: spinIn .7s cubic-bezier(.2, 1.4, .4, 1);
+}
+
+.reveal h3 {
+  margin: 4px 0 0;
+  font-family: var(--f-display);
+  font-size: 21px;
+  line-height: 1.1;
+}
+
+.reveal .plus {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 26px;
+  color: var(--sun-d);
+}
+
+@keyframes spinIn {
+  from { transform: rotate(-200deg) scale(.2); }
+}
+
+.sticker {
+  flex: none;
+  border-radius: 50%;
+  background: var(--c);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  border: 4px solid #fff;
+  box-shadow: 0 4px 0 var(--drop);
+}
+
+.sticker.off {
+  background: #DDE5D6;
+  color: #A5B49C;
+}
+
+/* đá bóng */
+.pitch {
+  position: relative;
+  height: 150px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: repeating-linear-gradient(90deg, #4FAE5E 0 28px, #5DBE6A 28px 56px);
+}
+
+.pitch .goal {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  width: 150px;
+  height: 46px;
+  margin-left: -75px;
+  border: 5px solid #fff;
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .35) 0 2px, transparent 2px 9px),
+              repeating-linear-gradient(-45deg, rgba(255, 255, 255, .35) 0 2px, transparent 2px 9px);
+}
+
+.pitch .keeper {
+  position: absolute;
+  left: 50%;
+  top: 26px;
+  width: 26px;
+  height: 30px;
+  margin-left: -13px;
+  border-radius: 10px 10px 6px 6px;
+  background: var(--coral);
+  transition: transform .25s;
+}
+
+.ball {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  width: 30px;
+  height: 30px;
+  margin-left: -15px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, #1E3528 0 22%, #fff 24%);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, .2);
+  transition: transform .45s cubic-bezier(.3, .8, .4, 1);
+}
+
+.ball.goal {
+  transform: translate(var(--bx, 0px), -96px) scale(.6);
+}
+
+.ball.miss {
+  transform: translate(var(--bx, 90px), -120px) scale(.55);
+}
+
+.pbar {
+  position: relative;
+  height: 30px;
+  border-radius: 15px;
+  background: #F1D9CF;
+  overflow: hidden;
+  border: 3px solid #fff;
+  box-shadow: 0 3px 0 var(--line);
+}
+
+.pbar .zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--grass);
+}
+
+.pbar .needle {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 6px;
+  margin-left: -3px;
+  border-radius: 3px;
+  background: var(--ink);
+}
+
+.kdots {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.kdots i {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--line);
+}
+
+.kdots i.h {
+  background: var(--grass);
+}
+
+.kdots i.m {
+  background: var(--coral);
+}
+
+.kmsg {
+  margin: 0;
+  text-align: center;
+  font-weight: 800;
+}
+
+/* ảnh polaroid */
+.polar {
+  background: #fff;
+  padding: 10px 10px 14px;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
+  transform: rotate(-2.5deg);
+  align-self: center;
+  width: min(300px, 100%);
+}
+
+.polar img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 3px;
+}
+
+.polar p {
+  margin: 8px 0 0;
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 15px;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.polar small {
+  display: block;
+  font-family: var(--f-body);
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* danh sách */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qitem {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--cream);
+}
+
+.qitem b {
+  font-size: 14.5px;
+}
+
+.qbar {
+  height: 7px;
+  border-radius: 5px;
+  background: var(--line);
+  overflow: hidden;
+  margin-top: 5px;
+}
+
+.qbar i {
+  display: block;
+  height: 100%;
+  background: var(--grass);
+}
+
+.qrew {
+  font-family: var(--f-display);
+  font-weight: 800;
+  color: var(--sun-d);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.qitem.done {
+  background: #E8F8E3;
+}
+
+.qitem.done .qrew {
+  color: var(--grass-d);
+}
+
+.album {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px 6px;
+}
+
+@media (max-width: 480px) {
+  .album {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.album div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.album small {
+  display: block;
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.rank {
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--cream);
+  font-weight: 800;
+}
+
+.rank .n {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  font-family: var(--f-display);
+}
+
+.rank:nth-child(1) .n { background: var(--sun); }
+.rank:nth-child(2) .n { background: #DDE3E8; }
+.rank:nth-child(3) .n { background: #F2C7A1; }
+
+.rank.you {
+  background: #E1F4FD;
+  outline: 2px solid var(--tdc);
+}
+
+.rank > span:last-child {
+  font-family: var(--f-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.help h3 {
+  margin: 0 0 4px;
+  font-family: var(--f-display);
+  font-size: 16.5px;
+}
+
+.help p, .help ul {
+  margin: 0;
+  font-size: 13.5px;
+}
+
+.help ul {
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.help kbd {
+  font-family: var(--f-display);
+  font-weight: 800;
+  background: var(--cream);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 6px;
+}
+
+/* chứng nhận */
+.cert {
+  border: 3px dashed var(--sun);
+  border-radius: 18px;
+  padding: 16px 14px;
+  text-align: center;
+  background: var(--cream);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.cert small {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--sun-d);
+}
+
+.cert h3 {
+  margin: 0;
+  font-family: var(--f-display);
+  font-size: 28px;
+  line-height: 1.05;
+}
+
+.cert .row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.btns {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.btns > * {
+  flex: 1 1 130px;
+}
+
+a.btn {
+  text-decoration: none;
+}
+
+/* ---------- khung chụp ảnh ---------- */
+#viewfinder {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 25;
+}
+
+#viewfinder .fr {
+  position: absolute;
+  inset: 12% 8% 22%;
+  border-radius: 20px;
+  box-shadow: 0 0 0 2000px rgba(20, 48, 32, .28);
+}
+
+#viewfinder .fr::before, #viewfinder .fr::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 5px solid #fff;
+  border-radius: 22px;
+  -webkit-mask: linear-gradient(#000 0 0) top left/34px 34px no-repeat,
+                linear-gradient(#000 0 0) top right/34px 34px no-repeat,
+                linear-gradient(#000 0 0) bottom left/34px 34px no-repeat,
+                linear-gradient(#000 0 0) bottom right/34px 34px no-repeat;
+  mask: linear-gradient(#000 0 0) top left/34px 34px no-repeat,
+        linear-gradient(#000 0 0) top right/34px 34px no-repeat,
+        linear-gradient(#000 0 0) bottom left/34px 34px no-repeat,
+        linear-gradient(#000 0 0) bottom right/34px 34px no-repeat;
+}
+
+#viewfinder .cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(12% - 44px);
+  text-align: center;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 20px;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .25);
+}
+
+#viewfinder .vf-btns {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(6% + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  pointer-events: auto;
+}
+
+.shutter {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  border: 6px solid #fff;
+  background: var(--coral);
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .2);
+}
+
+.shutter:active {
+  transform: scale(.94);
+}
+
+.vf-small {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 0;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+#flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  pointer-events: none;
+  animation: flash .5s forwards;
+  z-index: 40;
+}
+
+@keyframes flash {
+  to { opacity: 0; }
+}
+
+/* ---------- chữ nổi, thông báo ---------- */
+#fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fxt {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--sun);
+  -webkit-text-stroke: 5px #fff;
+  paint-order: stroke fill;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+#toasts {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(76px + env(safe-area-inset-top, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  z-index: 45;
+}
+
+.toast {
+  background: var(--ink);
+  color: #fff;
+  font-weight: 800;
+  font-size: 14px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, .2);
+  animation: pop .3s cubic-bezier(.2, 1.4, .4, 1);
+  max-width: 100%;
+  text-align: center;
+}
+
+.toast.gold {
+  background: var(--sun);
+  color: #3D2A00;
+}
+</file>
+
+<file path="src/main.tsx">
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { App } from './App';
+import './index.css';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+</file>
+
+<file path="src/vite-env.d.ts">
+/// <reference types="vite/client" />
+</file>
+
+<file path=".env.example">
+# Cấu hình Firebase cho dự án TDC GO
+# Sao chép file này thành .env và điền thông số từ Firebase Console -> Project Settings.
+# Nếu để trống, ứng dụng tự động chạy ở chế độ Local Demo (LocalStorage + Simulated Realtime).
+
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+</file>
+
+<file path=".firebaserc">
+{
+  "projects": {
+    "default": "tdc-go-2026"
+  }
+}
+</file>
+
+<file path=".gitignore">
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.firebase
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+</file>
+
+<file path="firestore.indexes.json">
+{
+  "indexes": [
+    {
+      "collectionGroup": "users_public",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "facultyId", "order": "ASCENDING" },
+        { "fieldPath": "points", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "checkins",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "stationId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
+</file>
+
+<file path="firestore.rules">
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes the following data structures:
+//
+// Collection: users
+// Document ID: {userId} (matches request.auth.uid)
+// Fields:
+//   - uid: string (required, immutable, matches userId) - User ID
+//   - name: string (required, 1..50 chars) - Display name
+//   - mssv: string (required, 1..20 chars) - Student ID
+//   - email: string (required, valid email, max 100 chars) - Private student email
+//   - facultyId: string (required, enum of faculties) - Faculty ID
+//   - role: string (required, 'student' | 'admin') - RBAC role (cannot self-escalate)
+//   - avatar: number (required, 0..5) - Avatar index
+//   - points: number (required, >= 0, <= 1000000) - Total points
+//   - stars: number (required, >= 0, <= 100000) - Collected stars
+//   - quizOk: number (required, >= 0, <= 10000) - Correct quizzes
+//   - photos: number (required, >= 0, <= 10000) - Photos taken
+//   - done: map (required, max 50 keys) - Unlocked stations map
+//   - bonus: map (required, max 50 keys) - Completed quests map
+//   - partyId: string (optional, max 12 chars) - Active party room code
+//   - updatedAt: number (required, >= 0) - Epoch timestamp ms
+//
+// Collection: users_public
+// Document ID: {userId} (matches request.auth.uid)
+// Fields:
+//   - uid: string (required, immutable, matches userId) - User ID
+//   - name: string (required, 1..50 chars) - Display name (non-PII)
+//   - mssv: string (required, 1..20 chars) - Student ID
+//   - facultyId: string (required, enum of faculties) - Faculty ID
+//   - avatar: number (required, 0..5) - Avatar index
+//   - points: number (required, >= 0, <= 1000000) - Total points
+//   - unlockedCount: number (required, >= 0, <= 50) - Number of unlocked stations
+//   - partyId: string (optional, max 12 chars) - Active party code
+//   - updatedAt: number (required, >= 0) - Epoch timestamp ms
+//
+// Collection: stations
+// Document ID: {stationId}
+// Fields:
+//   - id: string (required, 1..30 chars)
+//   - name: string (required, 1..80 chars)
+//   - sub: string (required, 1..120 chars)
+//   - facultyId: string (required, 1..30 chars)
+//   - x: number (required, -500..500)
+//   - z: number (required, -500..500)
+//   - fogRadius: number (required, 5..120)
+//   - col: string (required, 4..16 chars)
+//   - type: string (required, enum)
+//   - pts: number (required, 10..2000)
+//   - badge: string (required, 1..60 chars)
+//   - info: string (required, 1..600 chars)
+//   - funFact: string (required, 1..600 chars)
+//   - directions: string (required, 1..400 chars)
+//   - qrSecretToken: string (required, 4..64 chars)
+//   - riddle: map (optional)
+//   - questions: list (optional, max 20 items)
+//   - active: bool (required)
+//
+// Collection: parties
+// Document ID: {partyCode}
+// Fields:
+//   - code: string (required, immutable, 6 chars)
+//   - hostUid: string (required, immutable, 1..64 chars)
+//   - name: string (required, 1..60 chars)
+//   - memberUids: list (required, 1..4 items)
+//   - members: list (required, 1..4 items)
+//   - isCrossFaculty: bool (required)
+//   - bonusMultiplier: number (required, 1..3)
+//   - totalPoints: number (required, >= 0, <= 4000000)
+//   - createdAt: number (required, immutable)
+//
+// Collection: events
+// Document ID: {eventId}
+// Fields:
+//   - id: string (required, 1..40 chars)
+//   - title: string (required, 1..100 chars)
+//   - description: string (required, 1..500 chars)
+//   - startDate: string (required, 1..30 chars)
+//   - endDate: string (required, 1..30 chars)
+//   - active: bool (required)
+//   - bonusMultiplier: number (required, 1..5)
+//
+// Collection: checkins
+// Document ID: {checkinId}
+// Fields:
+//   - uid: string (required, immutable, matches request.auth.uid)
+//   - userName: string (required, 1..50 chars)
+//   - stationId: string (required, 1..30 chars)
+//   - facultyId: string (required, 1..30 chars)
+//   - method: string (required, 'qr' | 'riddle' | 'demo')
+//   - pts: number (required, 0..5000)
+//   - timestamp: number (required, > 0)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) ||
+        request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) ||
+        request.resource.data.uid == resource.data.uid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+        (request.resource.data[field] is string &&
+         request.resource.data[field].size() >= minLen &&
+         request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.size() <= 100 &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidFaculty(facultyId) {
+      return facultyId in ['cntt', 'dien_dt', 'co_khi_oto', 'co_khi_ctm', 'kinh_te', 'ngoai_ngu', 'du_lich', 'khac'];
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUserPrivate(data) {
+      return hasRequiredFields(['uid', 'name', 'mssv', 'email', 'facultyId', 'role', 'avatar', 'points', 'stars', 'quizOk', 'photos', 'done', 'bonus', 'updatedAt']) &&
+        hasOnlyAllowedFields(['uid', 'name', 'mssv', 'email', 'facultyId', 'role', 'avatar', 'points', 'stars', 'quizOk', 'photos', 'done', 'bonus', 'partyId', 'updatedAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 64 &&
+        validStringLength('name', 1, 50) &&
+        validStringLength('mssv', 1, 20) &&
+        isValidEmail(data.email) &&
+        isValidFaculty(data.facultyId) &&
+        data.role in ['student', 'admin'] &&
+        data.avatar is number && data.avatar >= 0 && data.avatar <= 5 &&
+        data.points is number && data.points >= 0 && data.points <= 1000000 &&
+        data.stars is number && data.stars >= 0 && data.stars <= 100000 &&
+        data.quizOk is number && data.quizOk >= 0 && data.quizOk <= 10000 &&
+        data.photos is number && data.photos >= 0 && data.photos <= 10000 &&
+        data.done is map && data.done.size() <= 50 &&
+        data.bonus is map && data.bonus.size() <= 50 &&
+        isValidOptionalString('partyId', 0, 12) &&
+        data.updatedAt is number && data.updatedAt >= 0;
+    }
+
+    function isValidUserPublic(data) {
+      return hasRequiredFields(['uid', 'name', 'mssv', 'facultyId', 'avatar', 'points', 'unlockedCount', 'updatedAt']) &&
+        hasOnlyAllowedFields(['uid', 'name', 'mssv', 'facultyId', 'avatar', 'points', 'unlockedCount', 'partyId', 'updatedAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 64 &&
+        validStringLength('name', 1, 50) &&
+        validStringLength('mssv', 1, 20) &&
+        isValidFaculty(data.facultyId) &&
+        data.avatar is number && data.avatar >= 0 && data.avatar <= 5 &&
+        data.points is number && data.points >= 0 && data.points <= 1000000 &&
+        data.unlockedCount is number && data.unlockedCount >= 0 && data.unlockedCount <= 50 &&
+        isValidOptionalString('partyId', 0, 12) &&
+        data.updatedAt is number && data.updatedAt >= 0;
+    }
+
+    function isValidStation(data) {
+      return hasRequiredFields(['id', 'name', 'sub', 'facultyId', 'x', 'z', 'fogRadius', 'col', 'type', 'pts', 'badge', 'info', 'funFact', 'directions', 'qrSecretToken', 'active']) &&
+        hasOnlyAllowedFields(['id', 'name', 'sub', 'facultyId', 'x', 'z', 'fogRadius', 'col', 'type', 'pts', 'badge', 'info', 'funFact', 'directions', 'qrSecretToken', 'riddle', 'questions', 'active']) &&
+        validStringLength('id', 1, 30) &&
+        validStringLength('name', 1, 80) &&
+        validStringLength('sub', 1, 120) &&
+        validStringLength('facultyId', 1, 30) &&
+        data.x is number && data.x >= -500 && data.x <= 500 &&
+        data.z is number && data.z >= -500 && data.z <= 500 &&
+        data.fogRadius is number && data.fogRadius >= 5 && data.fogRadius <= 120 &&
+        validStringLength('col', 4, 16) &&
+        data.type in ['checkin', 'photo', 'quiz', 'kick', 'it_debug', 'electric_circuit', 'auto_engine'] &&
+        data.pts is number && data.pts >= 10 && data.pts <= 2000 &&
+        validStringLength('badge', 1, 60) &&
+        validStringLength('info', 1, 600) &&
+        validStringLength('funFact', 1, 600) &&
+        validStringLength('directions', 1, 400) &&
+        validStringLength('qrSecretToken', 4, 64) &&
+        (!('riddle' in data) || (data.riddle is map && data.riddle.keys().hasOnly(['prompt', 'answer', 'hint']))) &&
+        (!('questions' in data) || (data.questions is list && data.questions.size() <= 20)) &&
+        data.active is bool;
+    }
+
+    function isValidParty(data) {
+      return hasRequiredFields(['code', 'hostUid', 'name', 'memberUids', 'members', 'isCrossFaculty', 'bonusMultiplier', 'totalPoints', 'createdAt']) &&
+        hasOnlyAllowedFields(['code', 'hostUid', 'name', 'memberUids', 'members', 'isCrossFaculty', 'bonusMultiplier', 'totalPoints', 'createdAt']) &&
+        validStringLength('code', 6, 6) &&
+        validStringLength('hostUid', 1, 64) &&
+        validStringLength('name', 1, 60) &&
+        data.memberUids is list && data.memberUids.size() >= 1 && data.memberUids.size() <= 4 &&
+        data.members is list && data.members.size() >= 1 && data.members.size() <= 4 &&
+        data.isCrossFaculty is bool &&
+        data.bonusMultiplier is number && data.bonusMultiplier >= 1 && data.bonusMultiplier <= 3 &&
+        data.totalPoints is number && data.totalPoints >= 0 && data.totalPoints <= 4000000 &&
+        data.createdAt is number && data.createdAt >= 0;
+    }
+
+    function isValidEvent(data) {
+      return hasRequiredFields(['id', 'title', 'description', 'startDate', 'endDate', 'active', 'bonusMultiplier']) &&
+        hasOnlyAllowedFields(['id', 'title', 'description', 'startDate', 'endDate', 'active', 'bonusMultiplier']) &&
+        validStringLength('id', 1, 40) &&
+        validStringLength('title', 1, 100) &&
+        validStringLength('description', 1, 500) &&
+        validStringLength('startDate', 1, 30) &&
+        validStringLength('endDate', 1, 30) &&
+        data.active is bool &&
+        data.bonusMultiplier is number && data.bonusMultiplier >= 1 && data.bonusMultiplier <= 5;
+    }
+
+    function isValidCheckin(data) {
+      return hasRequiredFields(['uid', 'userName', 'stationId', 'facultyId', 'method', 'pts', 'timestamp']) &&
+        hasOnlyAllowedFields(['uid', 'userName', 'stationId', 'facultyId', 'method', 'pts', 'timestamp']) &&
+        data.uid == request.auth.uid &&
+        validStringLength('userName', 1, 50) &&
+        validStringLength('stationId', 1, 30) &&
+        isValidFaculty(data.facultyId) &&
+        data.method in ['qr', 'riddle', 'demo'] &&
+        data.pts is number && data.pts >= 0 && data.pts <= 5000 &&
+        data.timestamp is number && data.timestamp > 0;
+    }
+
+    // ===============================================================
+    // Collection Rules
+    // ===============================================================
+
+    // Private User Profile (contains PII email) -> strictly owner or admin
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() &&
+        isValidUserPrivate(request.resource.data) &&
+        uidUnchanged() &&
+        ((isOwner(userId) && request.resource.data.role == 'student') || isAdmin());
+      allow update: if isAuthenticated() &&
+        isValidUserPrivate(request.resource.data) &&
+        uidNotModified() &&
+        ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Public Leaderboard Profile (No PII) -> readable by authenticated players
+    match /users_public/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) &&
+        uidUnchanged() &&
+        isValidUserPublic(request.resource.data);
+      allow update: if (isOwner(userId) || isAdmin()) &&
+        uidNotModified() &&
+        isValidUserPublic(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Campus 3D Stations -> readable by authenticated users, writable by admins only
+    match /stations/{stationId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidStation(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Co-op Party Rooms (2-4 students)
+    match /parties/{partyCode} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() &&
+        request.resource.data.hostUid == request.auth.uid &&
+        request.auth.uid in request.resource.data.memberUids &&
+        isValidParty(request.resource.data);
+      allow update: if isAuthenticated() &&
+        isValidParty(request.resource.data) &&
+        request.resource.data.code == resource.data.code &&
+        request.resource.data.hostUid == resource.data.hostUid &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        (request.auth.uid in resource.data.memberUids || request.auth.uid in request.resource.data.memberUids || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.hostUid == request.auth.uid || isAdmin());
+    }
+
+    // Campaign Events
+    match /events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidEvent(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // O2O Check-in Logs (Anti-cheat & Analytics)
+    match /checkins/{checkinId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidCheckin(request.resource.data);
+      allow update: if false; // Check-in logs are immutable
+      allow delete: if isAdmin();
+    }
+  }
+}
+</file>
+
+<file path="index.html">
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>TDC Travel · Khám phá Khuôn viên 3D Trường Cao đẳng Công nghệ Thủ Đức</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@500;700;800;900&display=swap"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+</file>
+
+<file path="package.json">
+{
+  "name": "tdc-travel",
+  "private": true,
+  "version": "1.0.0",
+  "description": "TDC Travel - Web Game 3D Khám phá Khuôn viên Trường Cao đẳng Công nghệ Thủ Đức",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "firebase": "^11.3.1",
+    "html5-qrcode": "^2.3.8",
+    "lucide-react": "^0.475.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "three": "^0.173.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.6",
+    "@types/node": "^22.13.4",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "@types/three": "^0.173.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.0.6",
+    "typescript": "~5.7.2",
+    "vite": "^6.1.0",
+    "vitest": "^3.0.5"
+  }
+}
+</file>
+
+<file path="README.md">
+# TDC GO · Web Game 3D Khám phá Khuôn viên Trường Cao đẳng Công nghệ Thủ Đức
+
+Dự án triển khai từ Đề tài Nghiên cứu Khoa học Cấp Cơ sở năm học 2026–2027: **"Phát triển web game “TDC GO” khám phá khuôn viên Trường Cao đẳng Công nghệ Thủ Đức"**, kế thừa và mở rộng mô hình bản đồ 3D khuôn viên TDC từ [hoanghnguyen9109/tdc-go](https://github.com/hoanghnguyen9109/tdc-go).
+
+## Kiến trúc Công nghệ
+- **Frontend**: React 19 + TypeScript + Vite + TailwindCSS v4
+- **3D WebGL Engine**: Three.js (Mô hình 3D Khu A, Khu B, Hội trường H, Tòa C, KTX, Xưởng Cơ khí, Tòa D 11 tầng, 6 sân bóng mini, sân tennis, sân bóng chuyền, Cổng 1 & 2, đoàn tàu TDC Express, nhân vật Chibi & NPC)
+- **O2O Camera & QR**: `html5-qrcode` (WebRTC Camera Scanner) + `qrcode` (In Standee QR chống gian lận)
+- **Backend & Cloud**: Firebase Authentication + Cloud Firestore Realtime + Firebase Hosting (tích hợp chế độ **Dual-Mode Local Fallback** giúp chạy thử ngay không cần khóa `.env`)
+
+## 06 Phân hệ Cốt lõi đã Triển khai
+1. **Đăng nhập & Hồ sơ Thám hiểm (Explorer Profile)**: Đăng nhập Email SV (`@mail.tdc.edu.vn`) / Google / Demo nhanh, lưu MSSV, Khoa, Avatar Chibi, % mở khóa bản đồ, Bộ sưu tập Huy hiệu (TDC Stamp Collection) & Chứng nhận điện tử.
+2. **Bản đồ 3D Tương tác & Cơ chế Mở khóa Sương mù (Fog of War)**: Các khu vực chưa khám phá được phủ sương mù 3D (Volumetric Mist Clusters) và lớp tối trên Minimap; hiệu ứng tan sương mù kèm pháo giấy khi giải xong trạm.
+3. **Câu đố Thực địa & Check-in Hiện trường (O2O Verification + Anti-cheat)**: Xác thực kép tại trạm bằng Quét mã QR qua Camera hoặc Giải mật thư quan sát thực tế tại chỗ, kèm cơ chế chống gian lận (Cooldown thời gian di chuyển giữa các trạm & ngân hàng câu hỏi ngẫu nhiên).
+4. **Kho Mini-game Đặc trưng từng Khoa**:
+   - **Khoa CNTT (Tòa B)**: *Debug Terminal* – Tìm và vá 3 lỗi logic code dưới áp lực thời gian.
+   - **Khoa Điện – Điện tử (Tòa B)**: *Circuit Connector* – Xoay linh kiện khép kín mạch điện tự động hóa PLC 24V.
+   - **Khoa Cơ khí – Ô tô (Xưởng cơ khí)**: *4-Stroke Engine Assembly* – Lắp ráp chu trình động cơ đốt trong 4 kỳ (Nạp – Nén – Nổ – Xả).
+   - **Khu Thể thao (6 sân bóng mini)**: *Mini-game Sút bóng 3 lượt*.
+   - **Bồn cây tròn**: *Chụp ảnh Polaroid 3D trực tiếp từ cảnh WebGL*.
+5. **Tổ đội (Co-op Party 2–4 SV) & Bảng xếp hạng (Leaderboard)**: Tạo/vào phòng bằng mã 6 ký tự, tự động kích hoạt **+20% điểm thưởng Liên khoa (Cross-Faculty Bonus)** khi tổ đội có từ 2 khoa trở lên; BXH theo Cá nhân, Tổ đội và Khoa.
+6. **Quản trị Hệ thống (Admin CMS)**: Thêm/sửa/xóa điểm trạm 3D & mật thư, xuất bảng Standee QR Code chuẩn in ấn, quản lý Chiến dịch Sự kiện, xem biểu đồ thống kê và xuất báo cáo `.CSV`.
+
+## Hướng dẫn Chạy Dự án
+```bash
+# 1. Cài đặt thư viện
+npm install
+
+# 2. Chạy môi trường phát triển (http://localhost:5173)
+npm run dev
+
+# 3. Kiểm thử Unit Tests (Vitest)
+npm test
+
+# 4. Build Production
+npm run build
+```
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}
+</file>
+
+<file path="vite.config.ts">
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+
+export default defineConfig({
+  plugins: [react(), tailwindcss()],
+  server: {
+    port: 5173,
+    host: true,
+  },
+});
+</file>
+
+<file path="src/components/modals/HelpModal.tsx">
+import React from 'react';
+import { HelpCircle, X } from 'lucide-react';
+
+interface HelpModalProps {
+  onClose: () => void;
+}
+
+export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
+  return (
+    <div id="modal">
+      <div className="scrim" onClick={onClose} />
+      <div className="sheet card" role="dialog" aria-modal="true">
+        <div className="sh-head" style={{ '--c': '#00AEEF' } as React.CSSProperties}>
+          <span
+            className="sticker"
+            style={{ '--c': '#fff', color: '#00AEEF', width: 56, height: 56 } as React.CSSProperties}
+          >
+            <HelpCircle className="w-7 h-7" />
+          </span>
+          <div>
+            <h2>Hướng Dẫn Khám Phá TDC Travel</h2>
+            <p>Web Game 3D Tương tác Thực tế (O2O Gamification)</p>
+          </div>
+          <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="sh-body help">
+          <div>
+            <h3>1. Bản đồ 3D Khuôn viên TDC & Định vị GPS 3 Trục (X · Y · Z)</h3>
+            <p>
+              Hệ thống sử dụng tín hiệu <b>GPS độ chính xác cao (High-Accuracy WGS84 + Altitude)</b> kết hợp bộ lọc <b>Kalman 3D</b> để định vị vị trí thực tế của bạn trong khuôn viên Trường Cao đẳng Công nghệ Thủ Đức (53 Võ Văn Ngân) theo cả 3 trục:
+            </p>
+            <ul>
+              <li>
+                <b>Trục X (Đông – Tây) & Trục Z (Nam – Bắc):</b> Xác định vị trí của bạn trên mặt bằng khuôn viên và tự động nhận diện tòa nhà bạn đang đứng (Khu A, Khu B, Hội trường H, Tòa C, Tòa D, KTX, Xưởng Cơ khí).
+              </li>
+              <li>
+                <b>Trục Cao độ Y / Phân tầng (Floor Level):</b> Tính toán độ cao so với mặt sân trường (1 tầng = 4.2m) để hiển thị chính xác tầng bạn đang khám phá từ <b>Tầng Hầm B1 (-4.2m)</b> lên tới <b>Tầng 11 (+42.0m tại Tòa D)</b>.
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h3>2. Khám phá Phân tầng 3D & Chế độ Cắt lớp (3D Floor Cutaway)</h3>
+            <ul>
+              <li>
+                <b>Thanh Chọn Tầng 3D (B1 → T11):</b> Sử dụng thanh thang máy phân tầng ở cạnh trái màn hình hoặc nút <b>Chọn Tòa/Tầng</b> trên bảng GPS để chuyển nhanh giữa các tầng và xem danh sách Phòng ban / Khoa / Phòng Lab tại tầng đó.
+              </li>
+              <li>
+                <b>Cắt lớp Tầng 3D (Cutaway View):</b> Bấm nút <b>Cắt lớp Tầng 3D</b> trên bảng điều khiển GPS để ẩn các tầng phía trên và quan sát trực diện mặt sàn bên trong tầng bạn đang đứng.
+              </li>
+              <li>
+                <b>Chuẩn 0m (Tare Ground Altitude):</b> Khi đứng ở sân trường, bấm <b>Chuẩn 0m</b> để hiệu chuẩn áp kế / độ cao GPS của điện thoại về mốc chuẩn Tầng 1 (0.0m).
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h3>3. Check-in Thực địa (QR + Mật thư) & Tổ đội Liên khoa</h3>
+            <p>
+              Tại mỗi trạm, bạn có thể <b>Quét mã QR</b> qua Camera trình duyệt hoặc <b>Giải mật thư quan sát</b> để xóa tan sương mù (Fog of War) và nhận thêm điểm thưởng O2O. Hãy lập <b>Tổ đội 2–4 sinh viên khác Khoa</b> để kích hoạt <b>+20% điểm thưởng Liên khoa</b>!
+            </p>
+          </div>
+          <button type="button" className="btn big" onClick={onClose}>
+            Đã sẵn sàng Định vị & Khám phá!
+          </button>
         </div>
       </div>
     </div>
@@ -3084,1162 +7298,6 @@ export const MiniMap: React.FC<MiniMapProps> = ({
 };
 </file>
 
-<file path="src/components/QrScannerModal.tsx">
-import React, { useEffect, useRef, useState } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
-import { Camera, KeyRound, QrCode, ShieldCheck, Sparkles, X } from 'lucide-react';
-import { Station } from '../types/game';
-
-interface QrScannerModalProps {
-  stations: Station[];
-  targetStation?: Station | null;
-  onClose: () => void;
-  onQrDetected: (rawCode: string) => void;
-}
-
-export const QrScannerModal: React.FC<QrScannerModalProps> = ({
-  stations,
-  targetStation,
-  onClose,
-  onQrDetected,
-}) => {
-  const [manualToken, setManualToken] = useState('');
-  const [cameraActive, setCameraActive] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-
-  const stopCamera = async () => {
-    if (scannerRef.current) {
-      try {
-        if (scannerRef.current.isScanning) {
-          await scannerRef.current.stop();
-        }
-        scannerRef.current.clear();
-      } catch {
-        // Ignore cleanup errors
-      }
-      scannerRef.current = null;
-    }
-    setCameraActive(false);
-  };
-
-  const startCamera = async () => {
-    setCameraError(null);
-    try {
-      const qr = new Html5Qrcode('tdc-qr-reader');
-      scannerRef.current = qr;
-      setCameraActive(true);
-      await qr.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 220, height: 220 } },
-        (decodedText) => {
-          void stopCamera();
-          onQrDetected(decodedText);
-        },
-        () => {
-          // frame scan ignore
-        }
-      );
-    } catch {
-      setCameraActive(false);
-      setCameraError(
-        'Thiết bị chưa cấp quyền Camera hoặc đang chạy trên máy tính không có Webcam. Bạn có thể nhập mã Token trạm hoặc bấm "Mô phỏng Quét QR" bên dưới!'
-      );
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      void stopCamera();
-    };
-  }, []);
-
-  const handleManualSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!manualToken.trim()) return;
-    onQrDetected(manualToken.trim());
-  };
-
-  return (
-    <div id="modal">
-      <div className="scrim" onClick={onClose} />
-      <div className="sheet card" role="dialog" aria-modal="true">
-        <div className="sh-head" style={{ '--c': '#00AEEF' } as React.CSSProperties}>
-          <span
-            className="sticker"
-            style={{ '--c': '#fff', color: '#00AEEF', width: 54, height: 54 } as React.CSSProperties}
-          >
-            <QrCode className="w-7 h-7" />
-          </span>
-          <div>
-            <h2>Quét Mã QR Thực Địa</h2>
-            <p>
-              {targetStation
-                ? `Xác thực O2O tại: ${targetStation.name}`
-                : 'Hệ thống Check-in WebRTC Camera TDC GO'}
-            </p>
-          </div>
-          <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="sh-body">
-          <div className="know">
-            <b>Cơ chế Xác thực Kép (O2O Verification)</b>
-            Hướng camera điện thoại vào bảng mã QR đặt tại trạm thực tế trong khuôn viên TDC để mở khóa sương mù và nhận thêm <b>+15 điểm thưởng thực địa</b>.
-          </div>
-
-          <div className="rounded-2xl overflow-hidden bg-slate-900 border-2 border-sky-400 min-h-[210px] flex flex-col items-center justify-center relative p-3">
-            <div id="tdc-qr-reader" className="w-full max-w-[280px]" />
-            {!cameraActive && (
-              <div className="flex flex-col items-center text-center gap-2.5 py-4 text-white">
-                <Camera className="w-10 h-10 text-sky-400" />
-                <p className="text-xs text-slate-300 max-w-xs m-0">
-                  Sử dụng Camera trình duyệt (WebRTC) để quét trực tiếp không cần cài App
-                </p>
-                <button type="button" className="btn blue" onClick={startCamera}>
-                  <Camera className="w-4 h-4" /> Bật Camera Quét QR
-                </button>
-              </div>
-            )}
-          </div>
-
-          {cameraError && (
-            <div className="bg-amber-50 border border-amber-300 text-amber-900 p-3 rounded-xl text-xs font-bold">
-              ℹ️ {cameraError}
-            </div>
-          )}
-
-          <form onSubmit={handleManualSubmit} className="flex flex-col gap-2">
-            <label className="text-xs font-extrabold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-              <KeyRound className="w-3.5 h-3.5" /> Hoặc nhập Mã định danh in dưới bảng QR:
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={manualToken}
-                onChange={(e) => setManualToken(e.target.value)}
-                placeholder={
-                  targetStation
-                    ? `Ví dụ: ${targetStation.qrSecretToken}`
-                    : 'Nhập mã TDC-QR-...'
-                }
-                className="flex-1 px-3.5 py-2.5 rounded-xl border-2 border-slate-200 bg-[#FFFBEF] font-extrabold text-sm"
-              />
-              <button type="submit" className="btn">
-                Xác nhận
-              </button>
-            </div>
-          </form>
-
-          <div className="border-t border-slate-200 pt-3 flex flex-col gap-2">
-            <span className="text-xs font-extrabold text-slate-500 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Chế độ Giả lập Quét QR (Dành cho Demo trên PC):
-            </span>
-            {targetStation ? (
-              <button
-                type="button"
-                className="btn sun w-full"
-                onClick={() => onQrDetected(targetStation.qrSecretToken)}
-              >
-                <ShieldCheck className="w-5 h-5" /> Mô phỏng Quét QR Trạm {targetStation.name}
-              </button>
-            ) : (
-              <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
-                {stations
-                  .filter((s) => s.active !== false)
-                  .map((st) => (
-                    <button
-                      key={st.id}
-                      type="button"
-                      onClick={() => onQrDetected(st.qrSecretToken)}
-                      className="text-left px-2.5 py-2 rounded-xl border border-slate-200 hover:border-sky-400 bg-slate-50 text-xs font-extrabold truncate cursor-pointer"
-                    >
-                      📲 {st.name}
-                    </button>
-                  ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-</file>
-
-<file path="src/components/StartScreen.tsx">
-import React, { useState } from 'react';
-import { Compass, RotateCcw, Shield, Sparkles } from 'lucide-react';
-import { AVATARS, TDC_LOGO } from '../data/campusLayout';
-import { FACULTIES } from '../data/faculties';
-import { getAvatarSvg } from '../engine/chibiBuilder';
-import { isFirebaseConfigured } from '../services/firebase';
-import { FacultyId, UserProfile } from '../types/game';
-
-interface StartScreenProps {
-  existingProfile: UserProfile | null;
-  totalStations: number;
-  onStartGame: (params: {
-    name: string;
-    mssv: string;
-    email?: string;
-    password?: string;
-    facultyId: FacultyId;
-    avatar: number;
-    mode: 'demo' | 'email_login' | 'email_register' | 'google';
-  }) => Promise<void>;
-  onResetProgress: () => void;
-  onOpenAdmin: () => void;
-}
-
-export const StartScreen: React.FC<StartScreenProps> = ({
-  existingProfile,
-  totalStations,
-  onStartGame,
-  onResetProgress,
-  onOpenAdmin,
-}) => {
-  const [name, setName] = useState(existingProfile?.name || '');
-  const [mssv, setMssv] = useState(existingProfile?.mssv || '26211TT0102');
-  const [facultyId, setFacultyId] = useState<FacultyId>(
-    existingProfile?.facultyId || 'cntt'
-  );
-  const [avatar, setAvatar] = useState<number>(existingProfile?.avatar || 0);
-  const [authTab, setAuthTab] = useState<'quick' | 'cloud'>('quick');
-  const [email, setEmail] = useState(existingProfile?.email || '');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const unlockedCount = Object.keys(existingProfile?.done || {}).length;
-
-  const handleSubmit = async (
-    mode: 'demo' | 'email_login' | 'email_register' | 'google'
-  ) => {
-    setError(null);
-    setLoading(true);
-    try {
-      await onStartGame({
-        name: name.trim() || 'Minh Anh',
-        mssv: mssv.trim() || '26211TT0102',
-        email: email.trim() || undefined,
-        password: password || undefined,
-        facultyId,
-        avatar,
-        mode,
-      });
-    } catch (err) {
-      setError((err as Error).message || 'Đăng nhập thất bại.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div id="start">
-      <div className="st-wrap">
-        <div className="flex items-center justify-between">
-          <div className="logo">
-            <div className="seal">
-              <svg
-                viewBox="118 118 332 332"
-                role="img"
-                aria-label="Logo Trường Cao đẳng Công nghệ Thủ Đức"
-              >
-                <path fill="#00AEEF" d={TDC_LOGO} />
-              </svg>
-            </div>
-            <h1>
-              TDC<span>GO</span>
-            </h1>
-          </div>
-
-          <button
-            type="button"
-            onClick={onOpenAdmin}
-            className="px-3.5 py-2 rounded-2xl bg-white/95 border-2 border-slate-200 shadow-sm text-xs font-extrabold text-slate-700 hover:border-sky-400 flex items-center gap-1.5 cursor-pointer"
-            title="Mở Cổng Quản trị Hệ thống (Admin CMS)"
-          >
-            <Shield className="w-4 h-4 text-sky-600" /> Admin CMS
-          </button>
-        </div>
-
-        <p className="tag">
-          Khám phá bản đồ 3D khuôn viên Trường Cao đẳng Công nghệ Thủ Đức, mở khóa sương mù tại {totalStations} trạm thực địa, kết nối tổ đội liên khoa và sưu tầm huy hiệu!
-        </p>
-
-        <div className="st-card card">
-          {/* Auth Mode Switcher */}
-          <div className="grid grid-cols-2 gap-1.5 bg-[#FFFBEF] p-1 rounded-xl border border-slate-200">
-            <button
-              type="button"
-              onClick={() => setAuthTab('quick')}
-              className={`py-1.5 rounded-lg text-xs font-extrabold cursor-pointer ${
-                authTab === 'quick'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-slate-600 hover:bg-white'
-              }`}
-            >
-              ⚡ Hồ sơ Sinh viên / Demo
-            </button>
-            <button
-              type="button"
-              onClick={() => setAuthTab('cloud')}
-              className={`py-1.5 rounded-lg text-xs font-extrabold cursor-pointer ${
-                authTab === 'cloud'
-                  ? 'bg-sky-600 text-white'
-                  : 'text-slate-600 hover:bg-white'
-              }`}
-            >
-              ☁️ Tài khoản Email TDC
-            </button>
-          </div>
-
-          {error && (
-            <div className="bg-rose-50 border border-rose-300 text-rose-800 px-3 py-2 rounded-xl text-xs font-extrabold">
-              ⚠️ {error}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <div>
-              <label htmlFor="inName">Họ tên Sinh viên</label>
-              <input
-                id="inName"
-                type="text"
-                maxLength={24}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Ví dụ: Minh Anh"
-              />
-            </div>
-            <div>
-              <label htmlFor="inMssv">Mã số SV (MSSV)</label>
-              <input
-                id="inMssv"
-                type="text"
-                maxLength={14}
-                value={mssv}
-                onChange={(e) => setMssv(e.target.value.toUpperCase())}
-                placeholder="26211TT0102"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="inFaculty">Khoa / Ngành đào tạo tại TDC</label>
-            <select
-              id="inFaculty"
-              value={facultyId}
-              onChange={(e) => setFacultyId(e.target.value as FacultyId)}
-              className="w-full px-3.5 py-2.5 rounded-xl border-2 border-[#E2EBDA] bg-[#FFFBEF] font-extrabold text-sm text-[#1E3528]"
-            >
-              {FACULTIES.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name} ({f.shortName})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {authTab === 'cloud' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-sky-50/70 p-2.5 rounded-xl border border-sky-200">
-              <div>
-                <label htmlFor="inEmail">Email Sinh viên (@mail.tdc.edu.vn)</label>
-                <input
-                  id="inEmail"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="26211tt0102@mail.tdc.edu.vn"
-                  className="!text-xs !py-2"
-                />
-              </div>
-              <div>
-                <label htmlFor="inPass">Mật khẩu</label>
-                <input
-                  id="inPass"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="!text-xs !py-2"
-                />
-              </div>
-            </div>
-          )}
-
-          <span className="lbl">Chọn Nhân vật Chibi 3D</span>
-          <div className="avas">
-            {AVATARS.map((a, i) => (
-              <button
-                key={a.name}
-                type="button"
-                className={i === avatar ? 'on' : ''}
-                onClick={() => setAvatar(i)}
-                aria-pressed={i === avatar}
-              >
-                <div
-                  className="w-14 h-14"
-                  dangerouslySetInnerHTML={{ __html: getAvatarSvg(i) }}
-                />
-                {a.name}
-              </button>
-            ))}
-          </div>
-
-          {authTab === 'quick' ? (
-            <button
-              type="button"
-              disabled={loading}
-              className="btn big sun"
-              onClick={() => handleSubmit('demo')}
-            >
-              <Compass className="w-5 h-5" />
-              {existingProfile && existingProfile.points > 0
-                ? `Tiếp tục Hành trình · ${existingProfile.points.toLocaleString('vi-VN')} điểm (${unlockedCount}/${totalStations} trạm)`
-                : 'Bắt đầu Khám phá Khuôn viên 3D'}
-            </button>
-          ) : (
-            <div className="flex flex-col gap-2">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  disabled={loading}
-                  className="btn blue text-sm"
-                  onClick={() => handleSubmit('email_login')}
-                >
-                  Đăng nhập Email
-                </button>
-                <button
-                  type="button"
-                  disabled={loading}
-                  className="btn sun text-sm"
-                  onClick={() => handleSubmit('email_register')}
-                >
-                  Đăng ký Mới
-                </button>
-              </div>
-              {isFirebaseConfigured && (
-                <button
-                  type="button"
-                  disabled={loading}
-                  className="btn ghost text-xs"
-                  onClick={() => handleSubmit('google')}
-                >
-                  Đăng nhập nhanh với Google (@mail.tdc.edu.vn)
-                </button>
-              )}
-            </div>
-          )}
-
-          {existingProfile && (existingProfile.points > 0 || unlockedCount > 0) && (
-            <div className="st-row">
-              <button
-                type="button"
-                className="btn ghost text-sm"
-                onClick={onResetProgress}
-              >
-                <RotateCcw className="w-4 h-4" /> Đặt lại tiến độ & Phủ lại sương mù từ đầu
-              </button>
-            </div>
-          )}
-
-          <p className="fine flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
-            <span>
-              Đề tài NCKH 2026–2027: Tích hợp Bản đồ 3D + Sương mù (Fog of War), Quét QR thực địa O2O, Mini-game chuyên ngành các Khoa, Tổ đội Liên khoa & Admin CMS.
-            </span>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
-</file>
-
-<file path="src/components/StationModal.tsx">
-import React, { useMemo, useState } from 'react';
-import {
-  Camera,
-  CheckCircle2,
-  Compass,
-  Eye,
-  Flag,
-  HelpCircle,
-  Lightbulb,
-  QrCode,
-  ShieldAlert,
-  Sparkles,
-  Users,
-  X,
-} from 'lucide-react';
-import { TYPE_LABEL } from '../data/campusLayout';
-import { audioSfx } from '../engine/audioSfx';
-import {
-  checkAntiCheatCooldown,
-  verifyStationQrPayload,
-  verifyStationRiddle,
-} from '../services/gameService';
-import {
-  PartyRoom,
-  QuizItem,
-  Station,
-  UnlockedStationRecord,
-  UserProfile,
-  VerificationMethod,
-} from '../types/game';
-import { AutoEngineGame } from './minigames/AutoEngineGame';
-import { ElectricCircuitGame } from './minigames/ElectricCircuitGame';
-import { ItDebugGame } from './minigames/ItDebugGame';
-import { KickGame } from './minigames/KickGame';
-import { StationSticker } from './StationSticker';
-
-interface StationModalProps {
-  station: Station;
-  profile: UserProfile;
-  party: PartyRoom | null;
-  totalStations: number;
-  nextStationName?: string;
-  preverifiedMethod?: VerificationMethod | null;
-  onClose: () => void;
-  onOpenQrScanner: (st: Station) => void;
-  onRequestPhotoMode: (st: Station, method: VerificationMethod) => void;
-  onCompleteStation: (params: {
-    station: Station;
-    basePoints: number;
-    method: VerificationMethod;
-    isQuizOrGameSuccess: boolean;
-    summaryHtml?: string;
-  }) => Promise<{
-    finalPoints: number;
-    crossFacultyBonus: number;
-    qrBonus: number;
-  }>;
-  onShowCertificate: () => void;
-}
-
-export const StationModal: React.FC<StationModalProps> = ({
-  station,
-  profile,
-  party,
-  totalStations,
-  nextStationName,
-  preverifiedMethod,
-  onClose,
-  onOpenQrScanner,
-  onRequestPhotoMode,
-  onCompleteStation,
-  onShowCertificate,
-}) => {
-  const existingRecord: UnlockedStationRecord | undefined = profile.done?.[station.id];
-
-  // Step 1: O2O Field Verification ('qr' | 'riddle' | 'demo')
-  const [verifiedMethod, setVerifiedMethod] = useState<VerificationMethod | null>(
-    preverifiedMethod || (station.id === 'g1' ? 'demo' : null)
-  );
-  const [riddleInput, setRiddleInput] = useState('');
-  const [showRiddleHint, setShowRiddleHint] = useState(false);
-  const [verifyError, setVerifyError] = useState<string | null>(null);
-  const [qrTokenInput, setQrTokenInput] = useState('');
-
-  // Step 2: Quiz state (if type === 'quiz')
-  const pickedQuiz: QuizItem | null = useMemo(() => {
-    if (!station.questions || station.questions.length === 0) return null;
-    const idx = Math.floor(Math.random() * station.questions.length);
-    return station.questions[idx];
-  }, [station]);
-
-  const shuffledOptionIndices = useMemo(() => {
-    if (!pickedQuiz) return [0, 1, 2, 3];
-    return pickedQuiz.opts.map((_, i) => i).sort(() => Math.random() - 0.5);
-  }, [pickedQuiz]);
-
-  const [selectedQuizAns, setSelectedQuizAns] = useState<number | null>(null);
-
-  // Step 3: Completion Reveal state
-  const [completionResult, setCompletionResult] = useState<{
-    finalPoints: number;
-    crossFacultyBonus: number;
-    qrBonus: number;
-    summaryHtml?: string;
-  } | null>(null);
-
-  const unlockedCount = Object.keys(profile.done || {}).length;
-
-  const handleRiddleVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cooldown = checkAntiCheatCooldown(profile, 'riddle');
-    if (!cooldown.allowed) {
-      setVerifyError(
-        `Chống gian lận (Anti-cheat): Bạn di chuyển giữa 2 trạm quá nhanh! Vui lòng đợi ${cooldown.waitSeconds} giây.`
-      );
-      audioSfx.play('bad');
-      return;
-    }
-
-    if (verifyStationRiddle(station, riddleInput)) {
-      audioSfx.play('ok');
-      setVerifyError(null);
-      setVerifiedMethod('riddle');
-    } else {
-      audioSfx.play('bad');
-      setVerifyError('Mật thư thực địa chưa chính xác. Hãy quan sát mô hình 3D hoặc bấm xem Gợi ý!');
-    }
-  };
-
-  const handleInlineQrTokenVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cooldown = checkAntiCheatCooldown(profile, 'qr');
-    if (!cooldown.allowed) {
-      setVerifyError(
-        `Chống gian lận: Vui lòng chờ ${cooldown.waitSeconds}s trước khi quét trạm tiếp theo.`
-      );
-      audioSfx.play('bad');
-      return;
-    }
-    const res = verifyStationQrPayload(station, qrTokenInput);
-    if (res.valid) {
-      audioSfx.play('ok');
-      setVerifyError(null);
-      setVerifiedMethod('qr');
-    } else {
-      audioSfx.play('bad');
-      setVerifyError(res.message);
-    }
-  };
-
-  const handleDemoBypass = () => {
-    audioSfx.play('tap');
-    setVerifyError(null);
-    setVerifiedMethod('demo');
-  };
-
-  const triggerComplete = async (
-    basePoints: number,
-    isQuizOrGameSuccess: boolean,
-    summaryHtml?: string
-  ) => {
-    const method = verifiedMethod || 'demo';
-    const res = await onCompleteStation({
-      station,
-      basePoints,
-      method,
-      isQuizOrGameSuccess,
-      summaryHtml,
-    });
-    setCompletionResult({
-      ...res,
-      summaryHtml,
-    });
-  };
-
-  const handleQuizOptionClick = (originalIdx: number) => {
-    if (selectedQuizAns !== null || !pickedQuiz) return;
-    setSelectedQuizAns(originalIdx);
-    const ok = originalIdx === pickedQuiz.ans;
-    audioSfx.play(ok ? 'ok' : 'bad');
-  };
-
-  // CASE A: Already unlocked previously (Review station info, fun facts & directions)
-  if (existingRecord && !completionResult) {
-    return (
-      <div id="modal">
-        <div className="scrim" onClick={onClose} />
-        <div className="sheet card" role="dialog" aria-modal="true">
-          <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
-            <StationSticker col={station.col} type={station.type} size={56} done />
-            <div>
-              <h2>{station.name}</h2>
-              <p>{station.sub}</p>
-            </div>
-            <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="sh-body">
-            <div className="know">
-              <b>Thông tin Khu vực</b>
-              {station.info}
-            </div>
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs font-bold text-emerald-950 flex flex-col gap-1">
-              <span className="uppercase tracking-wider text-emerald-700 font-black">
-                🌟 Fun Fact Đã Mở Khóa:
-              </span>
-              <span>{station.funFact}</span>
-            </div>
-            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-xs font-bold text-sky-950 flex items-start gap-2">
-              <Compass className="w-4 h-4 text-sky-600 shrink-0 mt-0.5" />
-              <div>
-                <div className="uppercase tracking-wider text-sky-700 font-black">
-                  Chỉ dẫn Lộ trình Tiếp theo:
-                </div>
-                <div>{station.directions}</div>
-              </div>
-            </div>
-
-            {existingRecord.photoDataUrl && (
-              <div className="polar">
-                <img
-                  src={existingRecord.photoDataUrl}
-                  alt={`Ảnh check-in tại ${station.name}`}
-                />
-                <p>
-                  {profile.name} @ {station.name}
-                  <small>
-                    TDC GO ·{' '}
-                    {new Date(existingRecord.unlockedAt).toLocaleDateString('vi-VN')}
-                  </small>
-                </p>
-              </div>
-            )}
-
-            <div className="reveal">
-              <StationSticker col={station.col} type={station.type} size={84} />
-              <h3>{station.badge}</h3>
-              <p className="note">
-                Đã mở khóa sương mù với <b>+{existingRecord.pts} điểm</b> (Phương thức:{' '}
-                {existingRecord.method.toUpperCase()}).
-              </p>
-            </div>
-            <button type="button" className="btn big" onClick={onClose}>
-              Tiếp tục Khám phá
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // CASE B: Just completed right now -> Celebration & Badge Reveal
-  if (completionResult) {
-    const allUnlocked = unlockedCount >= totalStations;
-    return (
-      <div id="modal">
-        <div className="scrim" onClick={onClose} />
-        <div className="sheet card" role="dialog" aria-modal="true">
-          <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
-            <StationSticker col={station.col} type={station.type} size={56} />
-            <div>
-              <h2>Sương mù Đã Tan!</h2>
-              <p>{station.name}</p>
-            </div>
-            <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="sh-body">
-            {completionResult.summaryHtml && (
-              <div
-                dangerouslySetInnerHTML={{ __html: completionResult.summaryHtml }}
-              />
-            )}
-
-            <div className="reveal">
-              <StationSticker col={station.col} type={station.type} size={104} />
-              <h3>{station.badge}</h3>
-              <span className="plus">+{completionResult.finalPoints} điểm</span>
-
-              <div className="flex flex-wrap gap-1.5 justify-center text-xs font-extrabold">
-                {completionResult.qrBonus > 0 && (
-                  <span className="bg-sky-100 text-sky-800 px-2.5 py-0.5 rounded-full">
-                    +{completionResult.qrBonus} Điểm Xác thực Thực địa ({verifiedMethod?.toUpperCase()})
-                  </span>
-                )}
-                {completionResult.crossFacultyBonus > 0 && (
-                  <span className="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5" /> +{completionResult.crossFacultyBonus} Thưởng Tổ đội Liên Khoa (+20%)
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs font-bold text-amber-950">
-              <div className="uppercase tracking-wider text-amber-700 font-black mb-0.5">
-                💡 Kiến thức Thú vị (Fun Fact):
-              </div>
-              {station.funFact}
-            </div>
-
-            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-xs font-bold text-sky-950">
-              <div className="uppercase tracking-wider text-sky-700 font-black mb-0.5">
-                🧭 Hướng dẫn Đường đi:
-              </div>
-              {station.directions}
-            </div>
-
-            <p className="note text-center">
-              Tiến độ mở khóa bản đồ: <b>{unlockedCount}/{totalStations}</b> trạm ·{' '}
-              {allUnlocked
-                ? 'Bạn đã mở khóa 100% khuôn viên TDC!'
-                : nextStationName
-                  ? `Gợi ý tiếp theo: ${nextStationName}`
-                  : ''}
-            </p>
-
-            <button
-              type="button"
-              className={`btn big ${allUnlocked ? 'sun' : ''}`}
-              onClick={() => {
-                onClose();
-                if (allUnlocked) {
-                  setTimeout(onShowCertificate, 250);
-                }
-              }}
-            >
-              {allUnlocked ? '🎓 Xem Chứng nhận Nhà Thám Hiểm TDC' : 'Tiếp tục Hành trình'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // CASE C: Step 1 - Real-world O2O Verification (QR Scan or On-site Observation Riddle)
-  if (!verifiedMethod) {
-    return (
-      <div id="modal">
-        <div className="scrim" onClick={onClose} />
-        <div className="sheet card" role="dialog" aria-modal="true">
-          <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
-            <StationSticker col={station.col} type={station.type} size={56} />
-            <div>
-              <h2>{station.name}</h2>
-              <p>Bước 1/2: Xác thực Hiện trường (O2O Check-in)</p>
-            </div>
-            <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="sh-body">
-            <div className="know">
-              <b>Giới thiệu Trạm</b>
-              {station.info}
-            </div>
-
-            {verifyError && (
-              <div className="bg-rose-50 border-2 border-rose-300 text-rose-800 p-3 rounded-xl text-xs font-extrabold flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 shrink-0" />
-                <span>{verifyError}</span>
-              </div>
-            )}
-
-            {/* Option 1: Observation Riddle */}
-            {station.riddle && (
-              <form
-                onSubmit={handleRiddleVerify}
-                className="bg-amber-50/80 border-2 border-amber-200 rounded-2xl p-3.5 flex flex-col gap-2.5"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
-                    <Eye className="w-4 h-4" /> Cách 1: Giải Mật thư Quan sát Thực địa (+10đ)
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowRiddleHint(!showRiddleHint)}
-                    className="text-xs font-extrabold text-sky-700 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Lightbulb className="w-3.5 h-3.5" /> Gợi ý
-                  </button>
-                </div>
-                <p className="m-0 font-extrabold text-sm text-slate-800">
-                  {station.riddle.prompt}
-                </p>
-                {showRiddleHint && (
-                  <p className="m-0 text-xs font-bold text-amber-900 bg-amber-100/80 px-2.5 py-1.5 rounded-lg">
-                    💡 Gợi ý: {station.riddle.hint} (Đáp án mẫu: <b>{station.riddle.answer}</b>)
-                  </p>
-                )}
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={riddleInput}
-                    onChange={(e) => setRiddleInput(e.target.value)}
-                    placeholder="Nhập câu trả lời quan sát được..."
-                    className="flex-1 px-3 py-2 rounded-xl border-2 border-amber-300 bg-white font-extrabold text-sm"
-                  />
-                  <button type="submit" className="btn sun">
-                    Giải mã
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* Option 2: QR Code Camera / Token */}
-            <div className="bg-sky-50 border-2 border-sky-200 rounded-2xl p-3.5 flex flex-col gap-2.5">
-              <span className="text-xs font-black uppercase tracking-wider text-sky-800 flex items-center gap-1.5">
-                <QrCode className="w-4 h-4" /> Cách 2: Quét Mã QR Cố định tại Trạm (+15đ)
-              </span>
-              <button
-                type="button"
-                className="btn blue w-full"
-                onClick={() => onOpenQrScanner(station)}
-              >
-                <QrCode className="w-5 h-5" /> Mở Camera Quét Mã QR Trạm
-              </button>
-              <form onSubmit={handleInlineQrTokenVerify} className="flex gap-2">
-                <input
-                  type="text"
-                  value={qrTokenInput}
-                  onChange={(e) => setQrTokenInput(e.target.value)}
-                  placeholder={`Hoặc nhập mã QR (${station.qrSecretToken})`}
-                  className="flex-1 px-3 py-1.5 rounded-xl border border-sky-300 bg-white font-bold text-xs"
-                />
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 rounded-xl bg-sky-600 text-white font-extrabold text-xs cursor-pointer"
-                >
-                  Nhập mã
-                </button>
-              </form>
-            </div>
-
-            {/* Option 3: 3D Walk-in Demo Mode */}
-            <button
-              type="button"
-              className="btn ghost w-full"
-              onClick={handleDemoBypass}
-            >
-              <Sparkles className="w-4 h-4" /> Bỏ qua Xác thực Thực địa (Chế độ Trải nghiệm 3D)
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // CASE D: Step 2 - Station Challenge / Faculty Mini-game
-  return (
-    <div id="modal">
-      <div className="scrim" onClick={onClose} />
-      <div className="sheet card" role="dialog" aria-modal="true">
-        <div className="sh-head" style={{ '--c': station.col } as React.CSSProperties}>
-          <StationSticker col={station.col} type={station.type} size={56} />
-          <div>
-            <h2>{station.name}</h2>
-            <p>
-              {TYPE_LABEL[station.type]} · Tối đa +{station.pts} điểm
-            </p>
-          </div>
-          <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="sh-body">
-          <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl text-xs font-extrabold text-emerald-900">
-            <span className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              Đã xác thực hiện trường ({verifiedMethod.toUpperCase()})
-            </span>
-            {party?.isCrossFaculty && (
-              <span className="text-emerald-700">⚡ Liên khoa +20%</span>
-            )}
-          </div>
-
-          {station.type === 'checkin' && (
-            <>
-              <div className="know">
-                <b>Bạn có biết?</b>
-                {station.info}
-              </div>
-              <button
-                type="button"
-                className="btn big sun"
-                onClick={() => triggerComplete(station.pts, true)}
-              >
-                <Flag className="w-5 h-5" /> Xác nhận Check-in & Mở khóa Sương mù · +{station.pts}
-              </button>
-            </>
-          )}
-
-          {station.type === 'photo' && (
-            <>
-              <div className="know">
-                <b>Góc Sống Ảo 3D</b>
-                {station.info}
-              </div>
-              <button
-                type="button"
-                className="btn big sun"
-                onClick={() => onRequestPhotoMode(station, verifiedMethod)}
-              >
-                <Camera className="w-5 h-5" /> Mở Khung Máy Ảnh Polaroid 3D
-              </button>
-            </>
-          )}
-
-          {station.type === 'quiz' && pickedQuiz && (
-            <>
-              <div className="know">
-                <b>Khám phá Kiến thức TDC</b>
-                {station.info}
-              </div>
-              <p className="q">{pickedQuiz.q}</p>
-              <div className="opts">
-                {shuffledOptionIndices.map((origIdx, displayIdx) => {
-                  const letterLabel = String.fromCharCode(65 + displayIdx);
-                  const isCorrect = origIdx === pickedQuiz.ans;
-                  const isPicked = selectedQuizAns === origIdx;
-                  let cls = 'opt';
-                  if (selectedQuizAns !== null) {
-                    if (isCorrect) cls += ' ok';
-                    else if (isPicked) cls += ' no';
-                  }
-                  return (
-                    <button
-                      key={origIdx}
-                      type="button"
-                      disabled={selectedQuizAns !== null}
-                      onClick={() => handleQuizOptionClick(origIdx)}
-                      className={cls}
-                    >
-                      <i>{letterLabel}</i>
-                      <span>{pickedQuiz.opts[origIdx]}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {selectedQuizAns !== null && (
-                <div className="flex flex-col gap-2.5 mt-1">
-                  <p className="explain">
-                    {selectedQuizAns === pickedQuiz.ans
-                      ? '🎉 Chính xác! '
-                      : '💡 Chưa chính xác! '}
-                    {pickedQuiz.ex}
-                  </p>
-                  <button
-                    type="button"
-                    className={`btn big ${selectedQuizAns === pickedQuiz.ans ? 'sun' : ''}`}
-                    onClick={() =>
-                      triggerComplete(
-                        selectedQuizAns === pickedQuiz.ans ? station.pts : 40,
-                        selectedQuizAns === pickedQuiz.ans
-                      )
-                    }
-                  >
-                    <HelpCircle className="w-5 h-5" /> Nhận Huy hiệu & Xóa Sương mù · +
-                    {selectedQuizAns === pickedQuiz.ans ? station.pts : 40}
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-
-          {station.type === 'kick' && (
-            <KickGame
-              maxPoints={station.pts}
-              onComplete={(pts, html) => triggerComplete(pts, true, html)}
-            />
-          )}
-
-          {station.type === 'it_debug' && (
-            <ItDebugGame
-              maxPoints={station.pts}
-              onComplete={(pts, html) => triggerComplete(pts, true, html)}
-            />
-          )}
-
-          {station.type === 'electric_circuit' && (
-            <ElectricCircuitGame
-              maxPoints={station.pts}
-              onComplete={(pts, html) => triggerComplete(pts, true, html)}
-            />
-          )}
-
-          {station.type === 'auto_engine' && (
-            <AutoEngineGame
-              maxPoints={station.pts}
-              onComplete={(pts, html) => triggerComplete(pts, true, html)}
-            />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-</file>
-
-<file path="src/components/StationSticker.tsx">
-import React from 'react';
-import {
-  Camera,
-  Check,
-  Code2,
-  Compass,
-  Cpu,
-  Flag,
-  HelpCircle,
-  Lock,
-  Sparkles,
-  Trophy,
-  Users,
-  Wrench,
-} from 'lucide-react';
-import { StationType } from '../types/game';
-
-interface StationStickerProps {
-  col: string;
-  type: StationType | 'star' | 'explorer' | 'party' | 'medal' | 'trophy' | 'list';
-  size?: number;
-  locked?: boolean;
-  done?: boolean;
-}
-
-export const StationSticker: React.FC<StationStickerProps> = ({
-  col,
-  type,
-  size = 52,
-  locked = false,
-  done = false,
-}) => {
-  const renderIcon = () => {
-    if (locked) return <Lock className="w-1/2 h-1/2" />;
-    if (done) return <Check className="w-3/5 h-3/5 stroke-[3]" />;
-    switch (type) {
-      case 'checkin':
-        return <Flag className="w-1/2 h-1/2" />;
-      case 'photo':
-        return <Camera className="w-1/2 h-1/2" />;
-      case 'quiz':
-        return <HelpCircle className="w-1/2 h-1/2" />;
-      case 'kick':
-        return <Trophy className="w-1/2 h-1/2" />;
-      case 'it_debug':
-        return <Code2 className="w-1/2 h-1/2" />;
-      case 'electric_circuit':
-        return <Cpu className="w-1/2 h-1/2" />;
-      case 'auto_engine':
-        return <Wrench className="w-1/2 h-1/2" />;
-      case 'party':
-        return <Users className="w-1/2 h-1/2" />;
-      case 'explorer':
-        return <Compass className="w-1/2 h-1/2" />;
-      default:
-        return <Sparkles className="w-1/2 h-1/2" />;
-    }
-  };
-
-  return (
-    <span
-      className={`sticker ${locked ? 'off' : ''}`}
-      style={
-        {
-          '--c': done ? '#3DAA5C' : col,
-          width: `${size}px`,
-          height: `${size}px`,
-        } as React.CSSProperties
-      }
-    >
-      {renderIcon()}
-    </span>
-  );
-};
-</file>
-
 <file path="src/data/campusLayout.ts">
 import { Quest } from '../types/game';
 
@@ -4378,73 +7436,6 @@ export const QUESTS: Quest[] = [
     getValue: (p) => Object.keys(p.done || {}).length,
   },
 ];
-</file>
-
-<file path="src/data/faculties.ts">
-import { Faculty, FacultyId } from '../types/game';
-
-export const FACULTIES: Faculty[] = [
-  {
-    id: 'cntt',
-    name: 'Khoa Công nghệ thông tin',
-    shortName: 'CNTT',
-    color: '#2FA8F0',
-    badgeColor: '#E1F4FD',
-  },
-  {
-    id: 'dien_dt',
-    name: 'Khoa Điện – Điện tử',
-    shortName: 'Điện – ĐT',
-    color: '#FFAA1F',
-    badgeColor: '#FFF5DC',
-  },
-  {
-    id: 'co_khi_oto',
-    name: 'Khoa Cơ khí Ô tô',
-    shortName: 'CK Ô tô',
-    color: '#FF6F59',
-    badgeColor: '#FFECE8',
-  },
-  {
-    id: 'co_khi_ctm',
-    name: 'Khoa Cơ khí Chế tạo máy',
-    shortName: 'CK CTM',
-    color: '#6F8CF0',
-    badgeColor: '#EAF0FF',
-  },
-  {
-    id: 'kinh_te',
-    name: 'Khoa Kinh tế – Quản trị',
-    shortName: 'Kinh tế',
-    color: '#38B865',
-    badgeColor: '#E8F8E3',
-  },
-  {
-    id: 'ngoai_ngu',
-    name: 'Khoa Ngoại ngữ',
-    shortName: 'Ngoại ngữ',
-    color: '#9B6BFF',
-    badgeColor: '#F3ECFF',
-  },
-  {
-    id: 'du_lich',
-    name: 'Khoa Du lịch – Nhà hàng',
-    shortName: 'Du lịch',
-    color: '#FF6FA5',
-    badgeColor: '#FFEBF3',
-  },
-  {
-    id: 'khac',
-    name: 'Khoa / Bộ môn Khác',
-    shortName: 'TDC',
-    color: '#00AEEF',
-    badgeColor: '#E1F6FF',
-  },
-];
-
-export function getFacultyById(id?: FacultyId | string): Faculty {
-  return FACULTIES.find((f) => f.id === id) || FACULTIES[0];
-}
 </file>
 
 <file path="src/data/stations.ts">
@@ -4821,101 +7812,6 @@ export const DEFAULT_EVENTS: CampaignEvent[] = [
     bonusMultiplier: 1.5,
   },
 ];
-</file>
-
-<file path="src/engine/audioSfx.ts">
-type SoundEffectKey = 'coin' | 'ok' | 'bad' | 'tap' | 'badge' | 'kick' | 'unlock';
-
-class AudioSfxManager {
-  private ctx: AudioContext | null = null;
-  private isMuted = false;
-
-  public init(): void {
-    if (!this.ctx && typeof window !== 'undefined') {
-      try {
-        const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        if (AudioCtx) {
-          this.ctx = new AudioCtx();
-        }
-      } catch {
-        // Ignore audio context restriction
-      }
-    }
-    if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch(() => {});
-    }
-  }
-
-  public setMuted(m: boolean): void {
-    this.isMuted = m;
-  }
-
-  public getMuted(): boolean {
-    return this.isMuted;
-  }
-
-  public toggleMute(): boolean {
-    this.isMuted = !this.isMuted;
-    return this.isMuted;
-  }
-
-  public tone(
-    frequencies: number[],
-    dur: number,
-    type: OscillatorType,
-    vol: number,
-    gap?: number
-  ): void {
-    if (this.isMuted) return;
-    this.init();
-    if (!this.ctx) return;
-
-    const t0 = this.ctx.currentTime;
-    frequencies.forEach((f, i) => {
-      if (!this.ctx) return;
-      const o = this.ctx.createOscillator();
-      const g = this.ctx.createGain();
-      const st = t0 + i * (gap || dur * 0.8);
-      o.type = type;
-      o.frequency.value = f;
-      g.gain.setValueAtTime(0, st);
-      g.gain.linearRampToValueAtTime(vol, st + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0008, st + dur);
-      o.connect(g);
-      g.connect(this.ctx.destination);
-      o.start(st);
-      o.stop(st + dur + 0.02);
-    });
-  }
-
-  public play(key: SoundEffectKey): void {
-    switch (key) {
-      case 'coin':
-        this.tone([988, 1319], 0.1, 'square', 0.04, 0.07);
-        break;
-      case 'ok':
-        this.tone([523, 659, 784, 1047], 0.16, 'triangle', 0.11, 0.1);
-        break;
-      case 'bad':
-        this.tone([240, 180], 0.22, 'sawtooth', 0.04, 0.15);
-        break;
-      case 'tap':
-        this.tone([700], 0.06, 'sine', 0.04);
-        break;
-      case 'badge':
-        this.tone([784, 988, 1175, 1568], 0.2, 'triangle', 0.11, 0.12);
-        break;
-      case 'kick':
-        this.tone([140, 90], 0.12, 'square', 0.07, 0.06);
-        break;
-      case 'unlock':
-        this.tone([440, 554, 659, 880, 1108], 0.18, 'triangle', 0.1, 0.09);
-        break;
-    }
-  }
-}
-
-export const audioSfx = new AudioSfxManager();
 </file>
 
 <file path="src/engine/campusBuilder.ts">
@@ -6185,271 +9081,6 @@ export function buildCampusEnvironment(ctx: CampusBuildContext): {
 }
 </file>
 
-<file path="src/engine/chibiBuilder.ts">
-import * as THREE from 'three';
-import { AVATARS, ChibiAvatarSpec, PATHS } from '../data/campusLayout';
-import { lerpAngle, mesh } from './threeHelpers';
-
-export function makeChibi(
-  o: { shirt: string; hair: string; pants?: string; acc?: string },
-  withPack: boolean,
-  mat: (c: string | number, o?: THREE.MeshPhongMaterialParameters) => THREE.MeshPhongMaterial
-): THREE.Group {
-  const g = new THREE.Group();
-  const skin = mat('#FFD7B5');
-  const shirt = mat(o.shirt);
-  const pants = mat(o.pants || '#3B4A6B');
-  const hair = mat(o.hair);
-  const dark = mat('#2A1E1A');
-
-  const box = (w: number, h: number, d: number, c: string, x: number, y: number, z: number) =>
-    mesh(new THREE.BoxGeometry(w, h, d), mat(c), x, y, z);
-
-  const body = new THREE.Group();
-  g.add(body);
-  body.add(mesh(new THREE.CylinderGeometry(0.48, 0.62, 1, 10), shirt, 0, 1.08, 0));
-
-  const leg = (x: number) => {
-    const L = new THREE.Group();
-    L.position.set(x, 0.62, 0);
-    L.add(mesh(new THREE.CylinderGeometry(0.17, 0.15, 0.55, 8), pants, 0, -0.27, 0));
-    L.add(mesh(new THREE.SphereGeometry(0.21, 8, 6), dark, 0, -0.56, 0.06));
-    body.add(L);
-    return L;
-  };
-
-  const arm = (x: number) => {
-    const A = new THREE.Group();
-    A.position.set(x, 1.45, 0);
-    A.add(mesh(new THREE.CylinderGeometry(0.13, 0.12, 0.6, 8), shirt, 0, -0.3, 0));
-    A.add(mesh(new THREE.SphereGeometry(0.15, 8, 6), skin, 0, -0.62, 0));
-    A.rotation.z = x < 0 ? -0.28 : 0.28;
-    body.add(A);
-    return A;
-  };
-
-  const legL = leg(-0.24);
-  const legR = leg(0.24);
-  const armL = arm(-0.6);
-  const armR = arm(0.6);
-
-  const head = new THREE.Group();
-  head.position.y = 2.28;
-  body.add(head);
-  head.add(mesh(new THREE.SphereGeometry(0.8, 18, 14), skin));
-  const hc = mesh(
-    new THREE.SphereGeometry(0.85, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.5),
-    hair,
-    0,
-    0.04,
-    -0.06
-  );
-  hc.rotation.x = -0.32;
-  head.add(hc);
-
-  [-0.27, 0.27].forEach((x) => {
-    const e = mesh(new THREE.SphereGeometry(0.11, 10, 8), dark, x, -0.02, 0.72);
-    e.scale.z = 0.6;
-    head.add(e);
-    head.add(
-      mesh(new THREE.SphereGeometry(0.035, 6, 4), mat('#FFFFFF'), x + 0.04, 0.03, 0.79, false)
-    );
-    const ck = mesh(
-      new THREE.SphereGeometry(0.13, 8, 6),
-      mat('#FF9AAE'),
-      x * 1.65,
-      -0.22,
-      0.62,
-      false
-    );
-    ck.scale.set(1, 0.55, 0.45);
-    head.add(ck);
-  });
-
-  const mo = mesh(
-    new THREE.TorusGeometry(0.09, 0.03, 6, 10, Math.PI),
-    dark,
-    0,
-    -0.24,
-    0.76,
-    false
-  );
-  mo.rotation.z = Math.PI;
-  head.add(mo);
-
-  if (o.acc === 'cap') {
-    const c = mesh(
-      new THREE.SphereGeometry(0.88, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.42),
-      mat('#FFC83A'),
-      0,
-      0.12,
-      -0.02
-    );
-    c.rotation.x = -0.2;
-    head.add(c);
-    const v = mesh(
-      new THREE.CylinderGeometry(0.55, 0.55, 0.07, 16, 1, false, -Math.PI / 2, Math.PI),
-      mat('#FFC83A'),
-      0,
-      0.36,
-      0.62
-    );
-    v.rotation.x = 0.12;
-    head.add(v);
-  }
-  if (o.acc === 'pony') {
-    head.add(mesh(new THREE.SphereGeometry(0.34, 10, 8), hair, 0, -0.05, -0.92));
-    head.add(mesh(new THREE.SphereGeometry(0.12, 8, 6), mat('#38B865'), 0, 0.15, -0.86));
-  }
-  if (o.acc === 'bun') {
-    head.add(mesh(new THREE.SphereGeometry(0.32, 10, 8), hair, 0, 0.86, -0.22));
-    head.add(
-      mesh(new THREE.TorusGeometry(0.2, 0.06, 6, 12), mat('#FFC83A'), 0, 0.68, -0.18).rotateX(
-        Math.PI / 2
-      )
-    );
-  }
-  if (withPack) {
-    body.add(box(0.8, 0.9, 0.42, '#00AEEF', 0, 1.2, -0.62));
-    body.add(box(0.6, 0.3, 0.1, '#FFC83A', 0, 1.0, -0.85));
-  }
-
-  g.userData = { body, legL, legR, armL, armR, head };
-  return g;
-}
-
-export function animChibi(g: THREE.Group, ph: number, amt: number, t: number): void {
-  const u = g.userData;
-  if (!u || !u.legL) return;
-  const s = Math.sin(ph);
-  u.legL.rotation.x = s * 0.8 * amt;
-  u.legR.rotation.x = -s * 0.8 * amt;
-  u.armL.rotation.x = -s * 0.7 * amt;
-  u.armR.rotation.x = s * 0.7 * amt;
-  u.body.position.y = Math.abs(s) * 0.16 * amt;
-  u.head.rotation.z = Math.sin(t * 2) * 0.04 * (1 - amt);
-}
-
-export interface NpcWalker {
-  g: THREE.Group;
-  from: number;
-  to: number;
-  ph: number;
-  sp: number;
-  wait: number;
-}
-
-export interface PathNode {
-  x: number;
-  z: number;
-  n: number[];
-}
-
-export function buildPathGraphAndNpcs(ctx: {
-  scene: THREE.Scene;
-  mat: (c: string | number, o?: THREE.MeshPhongMaterialParameters) => THREE.MeshPhongMaterial;
-  rng: () => number;
-}): {
-  npcs: NpcWalker[];
-  pn: PathNode[];
-  animateNpcs: (dt: number, t: number) => void;
-} {
-  const { scene, mat, rng } = ctx;
-  const pn: PathNode[] = [];
-
-  const pnode = (x: number, z: number): number => {
-    for (let i = 0; i < pn.length; i++) {
-      if (Math.hypot(pn[i].x - x, pn[i].z - z) < 1.5) return i;
-    }
-    pn.push({ x, z, n: [] });
-    return pn.length - 1;
-  };
-
-  PATHS.forEach(([ax, az, bx, bz]) => {
-    const a = pnode(ax, az);
-    const b = pnode(bx, bz);
-    pn[a].n.push(b);
-    pn[b].n.push(a);
-  });
-
-  const npcLook: { shirt: string; hair: string; pants: string; acc?: string }[] = [
-    { shirt: '#FFFFFF', hair: '#2A1E1A', pants: '#2D4A6B', acc: 'pony' },
-    { shirt: '#00AEEF', hair: '#3A2A22', pants: '#30343A' },
-    { shirt: '#FFC83A', hair: '#24202A', pants: '#2D4A6B', acc: 'cap' },
-    { shirt: '#38B865', hair: '#6B3E26', pants: '#3C3F58', acc: 'bun' },
-    { shirt: '#FFFFFF', hair: '#24202A', pants: '#1F2C44' },
-    { shirt: '#9B6BFF', hair: '#3A2A22', pants: '#2D4A6B', acc: 'pony' },
-    { shirt: '#FF6F59', hair: '#24202A', pants: '#30343A' },
-    { shirt: '#FFFFFF', hair: '#6B3E26', pants: '#2D4A6B', acc: 'cap' },
-    { shirt: '#2FA8F0', hair: '#24202A', pants: '#3C3F58', acc: 'bun' },
-  ];
-
-  const npcs: NpcWalker[] = [];
-  npcLook.forEach((lk) => {
-    const g = makeChibi(lk, rng() < 0.5, mat);
-    g.scale.setScalar(0.82);
-    g.traverse((m) => {
-      if ((m as THREE.Mesh).isMesh) m.castShadow = true;
-    });
-    scene.add(g);
-    const a = Math.floor(rng() * pn.length);
-    g.position.set(pn[a].x, 0, pn[a].z);
-    npcs.push({
-      g,
-      from: a,
-      to: pn[a].n[0] ?? a,
-      ph: rng() * 6,
-      sp: 2 + rng() * 1.2,
-      wait: rng() * 3,
-    });
-  });
-
-  const animateNpcs = (dt: number, t: number) => {
-    npcs.forEach((n) => {
-      if (n.wait > 0) {
-        n.wait -= dt;
-        animChibi(n.g, n.ph, 0, t);
-        return;
-      }
-      const T = pn[n.to];
-      if (!T) return;
-      const dx = T.x - n.g.position.x;
-      const dz = T.z - n.g.position.z;
-      const d = Math.hypot(dx, dz);
-      if (d < 0.5) {
-        const nb = pn[n.to].n.filter((k) => k !== n.from);
-        const nx = nb.length ? nb[Math.floor(Math.random() * nb.length)] : n.from;
-        n.from = n.to;
-        n.to = nx;
-        if (Math.random() < 0.25) n.wait = 1 + Math.random() * 3;
-        return;
-      }
-      n.g.position.x += (dx / d) * n.sp * dt;
-      n.g.position.z += (dz / d) * n.sp * dt;
-      n.g.rotation.y = lerpAngle(n.g.rotation.y, Math.atan2(dx, dz), 1 - Math.exp(-dt * 8));
-      n.ph += dt * n.sp * 1.4;
-      animChibi(n.g, n.ph, 1, t);
-    });
-  };
-
-  return { npcs, pn, animateNpcs };
-}
-
-export function getAvatarSvg(index: number): string {
-  const a: ChibiAvatarSpec = AVATARS[index] || AVATARS[0];
-  const acc =
-    a.acc === 'cap'
-      ? `<path d="M14 25c0-9 7-15 16-15s16 6 16 15z" fill="#FFC83A"/><path d="M28 23h22a3 3 0 0 1-3 4H28z" fill="#F0B020"/>`
-      : a.acc === 'pony'
-        ? `<circle cx="49" cy="33" r="6" fill="${a.hair}"/><circle cx="46" cy="27" r="2.4" fill="#38B865"/>`
-        : `<circle cx="30" cy="9" r="6" fill="${a.hair}"/><rect x="25" y="12" width="10" height="3" rx="1.5" fill="#FFC83A"/>`;
-  return `<svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="30" fill="#E6F6DA"/><path d="M12 60c0-11 8-17 18-17s18 6 18 17z" fill="${a.shirt}"/>
-  <circle cx="30" cy="31" r="15" fill="#FFD7B5"/><path d="M15 30c0-10 7-16 15-16s15 6 15 16c-4-5-9-7-15-7s-11 2-15 7z" fill="${a.hair}"/>${acc}
-  <circle cx="25" cy="33" r="1.9" fill="#2A1E1A"/><circle cx="35" cy="33" r="1.9" fill="#2A1E1A"/><ellipse cx="21.5" cy="37" rx="2.4" ry="1.4" fill="#FF9AAE"/><ellipse cx="38.5" cy="37" rx="2.4" ry="1.4" fill="#FF9AAE"/>
-  <path d="M27.5 38.5q2.5 2 5 0" stroke="#2A1E1A" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>`;
-}
-</file>
-
 <file path="src/engine/fogOfWar.ts">
 import * as THREE from 'three';
 import { Station } from '../types/game';
@@ -6818,392 +9449,6 @@ export function buildNatureAndTrain(ctx: {
 }
 </file>
 
-<file path="src/engine/threeHelpers.ts">
-import * as THREE from 'three';
-import { CAMP, LAKE, ROADS } from '../data/campusLayout';
-import { Station } from '../types/game';
-
-export const FH = 4.2;
-export const FONT = '"Baloo 2","Nunito",system-ui,sans-serif';
-
-export type AABB = [number, number, number, number];
-
-export const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(b, v));
-
-export const smooth = (a: number, b: number, x: number): number => {
-  const t = clamp((x - a) / (b - a), 0, 1);
-  return t * t * (3 - 2 * t);
-};
-
-export const lerpAngle = (a: number, b: number, t: number): number => {
-  const d = (((b - a + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
-  return a + d * t;
-};
-
-export function createRng(seed: number): () => number {
-  let s = seed | 0;
-  return function () {
-    s |= 0;
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-export function segDist(
-  px: number,
-  pz: number,
-  ax: number,
-  az: number,
-  bx: number,
-  bz: number
-): number {
-  const dx = bx - ax;
-  const dz = bz - az;
-  const L = dx * dx + dz * dz || 1;
-  const t = clamp(((px - ax) * dx + (pz - az) * dz) / L, 0, 1);
-  return Math.hypot(px - ax - dx * t, pz - az - dz * t);
-}
-
-export const ell = (x: number, z: number): number =>
-  Math.hypot((x - CAMP.cx) / CAMP.rx, (z - CAMP.cz) / CAMP.rz);
-
-export function heightAt(x: number, z: number): number {
-  const d = ell(x, z);
-  const n =
-    6 * Math.sin(x * 0.031 + 1) * Math.cos(z * 0.027) +
-    3 * Math.sin(x * 0.07 + z * 0.05) +
-    2.2 * Math.cos(z * 0.09 - x * 0.04);
-  let h = smooth(1.3, 1.7, d) * (9 + n) + Math.max(0, d - 1.65) * 55;
-  let r = 1e9;
-  ROADS.forEach((Q) => {
-    r = Math.min(r, segDist(x, z, Q[0], Q[1], Q[2], Q[3]));
-  });
-  h *= smooth(7, 24, r);
-  h = Math.max(h, -0.5);
-  const k = smooth(LAKE.r, LAKE.r + 22, Math.hypot(x - LAKE.x, z - LAKE.z));
-  return h * k - (1 - k) * 2.4;
-}
-
-export function rr(
-  g: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number
-): void {
-  g.beginPath();
-  g.moveTo(x + r, y);
-  g.arcTo(x + w, y, x + w, y + h, r);
-  g.arcTo(x + w, y + h, x, y + h, r);
-  g.arcTo(x, y + h, x, y, r);
-  g.arcTo(x, y, x + w, y, r);
-  g.closePath();
-}
-
-export function canvasTex(
-  w: number,
-  h: number,
-  draw: (g: CanvasRenderingContext2D, w: number, h: number) => void,
-  rep = true
-): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
-  const ctx = c.getContext('2d');
-  if (ctx) {
-    draw(ctx, w, h);
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.anisotropy = 4;
-  if (rep !== false) {
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  }
-  return t;
-}
-
-export function createMaterialCache() {
-  const MC: Record<string, THREE.MeshPhongMaterial> = {};
-  return function mat(
-    c: string | number,
-    o?: THREE.MeshPhongMaterialParameters
-  ): THREE.MeshPhongMaterial {
-    const key = String(c);
-    if (!o && MC[key]) return MC[key];
-    const m = new THREE.MeshPhongMaterial({
-      color: c,
-      flatShading: true,
-      shininess: 6,
-      ...(o || {}),
-    });
-    if (!o) MC[key] = m;
-    return m;
-  };
-}
-
-export function mesh(
-  geo: THREE.BufferGeometry,
-  m: THREE.Material | THREE.Material[],
-  x?: number,
-  y?: number,
-  z?: number,
-  cast?: boolean
-): THREE.Mesh {
-  const o = new THREE.Mesh(geo, m);
-  o.position.set(x || 0, y || 0, z || 0);
-  o.castShadow = cast !== false;
-  o.receiveShadow = true;
-  return o;
-}
-
-export function facade(
-  wall: string,
-  win: string,
-  frame: string,
-  trim?: string
-): THREE.CanvasTexture {
-  return canvasTex(128, 128, (g, W, H) => {
-    g.fillStyle = wall;
-    g.fillRect(0, 0, W, H);
-    g.fillStyle = frame;
-    rr(g, 24, 22, 80, 66, 14);
-    g.fill();
-    g.fillStyle = win;
-    rr(g, 31, 29, 66, 52, 9);
-    g.fill();
-    g.fillStyle = 'rgba(255,255,255,.62)';
-    rr(g, 38, 35, 9, 32, 4);
-    g.fill();
-    g.fillStyle = trim || frame;
-    rr(g, 18, 92, 92, 9, 4);
-    g.fill();
-    g.fillStyle = 'rgba(0,0,0,.07)';
-    g.fillRect(0, H - 5, W, 5);
-  });
-}
-
-export function signTex(
-  lines: [string, number][],
-  bg: string,
-  fg: string,
-  w?: number,
-  h?: number
-): THREE.CanvasTexture {
-  return canvasTex(
-    w || 1024,
-    h || 200,
-    (g, W, H) => {
-      g.fillStyle = bg;
-      rr(g, 0, 0, W, H, Math.min(H * 0.25, 40));
-      g.fill();
-      g.fillStyle = fg;
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      lines.forEach((l, i) => {
-        g.font = `800 ${l[1]}px ${FONT}`;
-        g.fillText(l[0], W / 2, (H * (i + 1)) / (lines.length + 1) + l[1] * 0.06);
-      });
-    },
-    false
-  );
-}
-
-export function pill(
-  text: string,
-  o?: {
-    fs?: number;
-    pad?: number;
-    dot?: string;
-    bg?: string;
-    fg?: string;
-    h?: number;
-    ro?: number;
-  }
-): THREE.Sprite {
-  const opts = o || {};
-  const fs = opts.fs || 44;
-  const pad = opts.pad || 22;
-  const c = document.createElement('canvas');
-  const g = c.getContext('2d')!;
-  const font = `800 ${fs}px ${FONT}`;
-  g.font = font;
-  const tw = g.measureText(text).width;
-  const dw = opts.dot ? fs * 0.9 : 0;
-  const W = Math.ceil(tw + pad * 2 + dw);
-  const H = Math.round(fs * 1.55);
-  c.width = W + 8;
-  c.height = H + 12;
-  g.fillStyle = 'rgba(28,64,42,.22)';
-  rr(g, 4, 10, W, H, H / 2);
-  g.fill();
-  g.fillStyle = opts.bg || '#fff';
-  rr(g, 4, 4, W, H, H / 2);
-  g.fill();
-  if (opts.dot) {
-    g.fillStyle = opts.dot;
-    g.beginPath();
-    g.arc(4 + pad + fs * 0.3, 4 + H / 2, fs * 0.27, 0, 7);
-    g.fill();
-  }
-  g.font = font;
-  g.fillStyle = opts.fg || '#1E3528';
-  g.textBaseline = 'middle';
-  g.fillText(text, 4 + pad + dw, 4 + H / 2 + fs * 0.07);
-  const t = new THREE.CanvasTexture(c);
-  t.minFilter = THREE.LinearFilter;
-  const sp = new THREE.Sprite(
-    new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true })
-  );
-  const hh = opts.h || 3;
-  sp.scale.set((hh * c.width) / c.height, hh, 1);
-  sp.renderOrder = opts.ro || 6;
-  return sp;
-}
-
-export function letter(ch: string, bg: string, size?: number): THREE.Sprite {
-  const c = document.createElement('canvas');
-  c.width = c.height = 256;
-  const g = c.getContext('2d')!;
-  g.fillStyle = 'rgba(28,64,42,.25)';
-  g.beginPath();
-  g.arc(128, 138, 112, 0, 7);
-  g.fill();
-  g.fillStyle = '#fff';
-  g.beginPath();
-  g.arc(128, 124, 116, 0, 7);
-  g.fill();
-  g.fillStyle = bg;
-  g.beginPath();
-  g.arc(128, 124, 100, 0, 7);
-  g.fill();
-  g.fillStyle = '#fff';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.font = `800 ${ch.length > 2 ? 84 : 150}px ${FONT}`;
-  g.fillText(ch, 128, 136);
-  const t = new THREE.CanvasTexture(c);
-  const sp = new THREE.Sprite(
-    new THREE.SpriteMaterial({ map: t, depthTest: false, transparent: true })
-  );
-  sp.scale.setScalar(size || 8);
-  sp.renderOrder = 7;
-  return sp;
-}
-
-export function coinTex(st: Station, done: boolean): THREE.CanvasTexture {
-  return canvasTex(
-    256,
-    256,
-    (g) => {
-      g.fillStyle = 'rgba(28,64,42,.25)';
-      g.beginPath();
-      g.arc(128, 138, 116, 0, 7);
-      g.fill();
-      g.fillStyle = '#fff';
-      g.beginPath();
-      g.arc(128, 126, 118, 0, 7);
-      g.fill();
-      g.fillStyle = done ? '#3DAA5C' : st.col;
-      g.beginPath();
-      g.arc(128, 126, 102, 0, 7);
-      g.fill();
-      g.strokeStyle = '#fff';
-      g.fillStyle = '#fff';
-      g.lineCap = 'round';
-      g.lineJoin = 'round';
-      if (done) {
-        g.lineWidth = 26;
-        g.beginPath();
-        g.moveTo(80, 130);
-        g.lineTo(114, 164);
-        g.lineTo(178, 94);
-        g.stroke();
-        return;
-      }
-      if (st.type === 'quiz') {
-        g.font = `800 150px ${FONT}`;
-        g.textAlign = 'center';
-        g.textBaseline = 'middle';
-        g.fillText('?', 128, 136);
-      } else if (st.type === 'it_debug') {
-        g.font = `800 105px ${FONT}`;
-        g.textAlign = 'center';
-        g.textBaseline = 'middle';
-        g.fillText('</>', 128, 132);
-      } else if (st.type === 'electric_circuit') {
-        g.lineWidth = 18;
-        g.beginPath();
-        g.moveTo(142, 66);
-        g.lineTo(96, 130);
-        g.lineTo(136, 130);
-        g.lineTo(110, 190);
-        g.stroke();
-      } else if (st.type === 'auto_engine') {
-        g.lineWidth = 16;
-        g.beginPath();
-        g.arc(128, 126, 36, 0, Math.PI * 2);
-        g.stroke();
-        for (let i = 0; i < 8; i++) {
-          const a = (i / 8) * Math.PI * 2;
-          g.beginPath();
-          g.moveTo(128 + Math.cos(a) * 38, 126 + Math.sin(a) * 38);
-          g.lineTo(128 + Math.cos(a) * 58, 126 + Math.sin(a) * 58);
-          g.stroke();
-        }
-      } else if (st.type === 'checkin') {
-        g.lineWidth = 14;
-        g.beginPath();
-        g.moveTo(92, 72);
-        g.lineTo(92, 186);
-        g.stroke();
-        g.beginPath();
-        g.moveTo(92, 74);
-        g.lineTo(180, 98);
-        g.lineTo(92, 128);
-        g.closePath();
-        g.fill();
-      } else if (st.type === 'photo') {
-        rr(g, 62, 92, 132, 88, 18);
-        g.fill();
-        g.fillRect(100, 78, 56, 20);
-        g.fillStyle = st.col;
-        g.beginPath();
-        g.arc(128, 136, 28, 0, 7);
-        g.fill();
-        g.fillStyle = '#fff';
-        g.beginPath();
-        g.arc(128, 136, 14, 0, 7);
-        g.fill();
-      } else {
-        g.beginPath();
-        g.arc(128, 126, 62, 0, 7);
-        g.fill();
-        g.fillStyle = st.col;
-        g.beginPath();
-        for (let i = 0; i < 5; i++) {
-          const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
-          g.lineTo(128 + Math.cos(a) * 24, 126 + Math.sin(a) * 24);
-        }
-        g.closePath();
-        g.fill();
-        g.strokeStyle = st.col;
-        g.lineWidth = 6;
-        for (let i = 0; i < 5; i++) {
-          const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
-          g.beginPath();
-          g.moveTo(128 + Math.cos(a) * 24, 126 + Math.sin(a) * 24);
-          g.lineTo(128 + Math.cos(a) * 58, 126 + Math.sin(a) * 58);
-          g.stroke();
-        }
-      }
-    },
-    false
-  );
-}
-</file>
-
 <file path="src/pages/AdminDashboard.tsx">
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
@@ -7351,7 +9596,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `bao-cao-thong-ke-tdc-go-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `bao-cao-thong-ke-tdc-travel-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     showNotice('Đã xuất file Báo cáo Thống kê CSV thành công!');
@@ -7369,7 +9614,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
           <div>
             <h1 className="m-0 font-black text-xl sm:text-2xl tracking-tight">
-              TDC GO · Hệ Thống Quản Trị (Admin CMS)
+              TDC Travel · Hệ Thống Quản Trị (Admin CMS)
             </h1>
             <p className="m-0 text-xs font-bold text-slate-500">
               Quản lý Trạm 3D, Mật thư O2O, In ấn Mã QR Thực địa & Thống kê Đoàn – Hội
@@ -7845,7 +10090,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <path fill="#00AEEF" d={TDC_LOGO} />
                     </svg>
                     <span className="font-black text-xs uppercase tracking-wider text-sky-700">
-                      TRƯỜNG CĐ CÔNG NGHỆ THỦ ĐỨC · TDC GO
+                      TRƯỜNG CĐ CÔNG NGHỆ THỦ ĐỨC · TDC TRAVEL
                     </span>
                   </div>
 
@@ -7878,7 +10123,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   <p className="m-0 text-[11px] font-bold text-slate-500">
-                    Quét mã bằng Camera Web Game <b>TDC GO</b> để xóa sương mù 3D và nhận huy hiệu <b>“{st.badge}” (+{st.pts}đ)</b>
+                    Quét mã bằng Camera Web Game <b>TDC Travel</b> để xóa sương mù 3D và nhận huy hiệu <b>“{st.badge}” (+{st.pts}đ)</b>
                   </p>
                 </div>
               ))}
@@ -8167,7 +10412,7 @@ export async function saveCampaignEvent(evt: CampaignEvent): Promise<CampaignEve
 
 export function buildStationQrPayload(station: Station): string {
   return JSON.stringify({
-    app: 'TDC_GO',
+    app: 'TDC_TRAVEL',
     stationId: station.id,
     token: station.qrSecretToken,
   });
@@ -8239,7 +10484,7 @@ export function getAdminAnalytics(stations: Station[]): AnalyticsSummary {
 
 export function generateAnalyticsCsv(summary: AnalyticsSummary): string {
   const lines: string[] = [];
-  lines.push('BAO CAO THONG KE HE THONG TDC GO - TRUONG CAO DANG CONG NGHE THU DUC');
+  lines.push('BAO CAO THONG KE HE THONG TDC TRAVEL - TRUONG CAO DANG CONG NGHE THU DUC');
   lines.push(`Ngay xuat bao cao,${new Date().toISOString()}`);
   lines.push(`Tong so Sinh vien tham gia,${summary.totalUsers}`);
   lines.push(`Tong luot Check-in & Mo khoa Tram,${summary.totalCheckins}`);
@@ -8259,368 +10504,755 @@ export function generateAnalyticsCsv(summary: AnalyticsSummary): string {
 }
 </file>
 
-<file path="src/services/authService.ts">
+<file path="src/services/gameService.ts">
+import { addDoc, collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { QUESTS } from '../data/campusLayout';
+import { DEFAULT_EVENTS } from '../data/stations';
 import {
-  createUserWithEmailAndPassword,
-  GoogleAuthProvider,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  signOut,
-} from 'firebase/auth';
+  CampaignEvent,
+  CheckinLog,
+  PartyRoom,
+  PublicLeaderboardUser,
+  Station,
+  UnlockedStationRecord,
+  UserProfile,
+  VerificationMethod,
+} from '../types/game';
+import { getLocalPublicUsers, syncProfileToCloud } from './authService';
+import { db, isFirebaseConfigured } from './firebase';
+import { loadLocalParties, syncMemberPointsInParty } from './partyService';
+
+const LOCAL_CHECKINS_KEY = 'tdc_go_checkins_v2';
+const LOCAL_EVENTS_KEY = 'tdc_go_events_v2';
+
+// Minimum cooldown in ms between real-world QR/Riddle check-ins to prevent automated replay
+export const ANTI_CHEAT_COOLDOWN_MS = 4000;
+
+export function normalizeVietnameseAnswer(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+export function verifyStationRiddle(station: Station, userInput: string): boolean {
+  if (!station.riddle) return true;
+  const expected = normalizeVietnameseAnswer(station.riddle.answer);
+  const actual = normalizeVietnameseAnswer(userInput);
+  if (!actual) return false;
+  return actual === expected || actual.includes(expected);
+}
+
+export function verifyStationQrPayload(
+  station: Station,
+  scannedCode: string
+): { valid: boolean; matchedStationId?: string; message: string } {
+  const clean = scannedCode.trim();
+  if (!clean) {
+    return { valid: false, message: 'Mã QR trống hoặc không hợp lệ.' };
+  }
+
+  // Support either JSON payload `{"app":"TDC_TRAVEL","stationId":"...","token":"..."}` or direct token string
+  try {
+    if (clean.startsWith('{')) {
+      const obj = JSON.parse(clean) as {
+        app?: string;
+        stationId?: string;
+        token?: string;
+      };
+      if (obj.token === station.qrSecretToken || obj.stationId === station.id) {
+        return {
+          valid: true,
+          matchedStationId: station.id,
+          message: `Xác thực QR thành công tại ${station.name}!`,
+        };
+      }
+      return {
+        valid: false,
+        matchedStationId: obj.stationId,
+        message: 'Mã QR này thuộc về một trạm khác trong khuôn viên.',
+      };
+    }
+  } catch {
+    // Plain string check below
+  }
+
+  if (
+    clean.toUpperCase() === station.qrSecretToken.toUpperCase() ||
+    clean.toLowerCase() === station.id.toLowerCase()
+  ) {
+    return {
+      valid: true,
+      matchedStationId: station.id,
+      message: `Xác thực mã định danh trạm ${station.name} thành công!`,
+    };
+  }
+
+  return {
+    valid: false,
+    message: 'Mã QR không khớp với trạm hiện tại. Hãy kiểm tra lại bảng QR tại trạm!',
+  };
+}
+
+export function checkAntiCheatCooldown(
+  profile: UserProfile,
+  method: VerificationMethod,
+  now = Date.now()
+): { allowed: boolean; waitSeconds: number } {
+  if (method === 'demo') return { allowed: true, waitSeconds: 0 };
+
+  const timestamps = Object.values(profile.done || {}).map((r) => r.unlockedAt || 0);
+  if (timestamps.length === 0) return { allowed: true, waitSeconds: 0 };
+
+  const lastUnlock = Math.max(...timestamps);
+  const elapsed = now - lastUnlock;
+  if (elapsed < ANTI_CHEAT_COOLDOWN_MS) {
+    return {
+      allowed: false,
+      waitSeconds: Math.ceil((ANTI_CHEAT_COOLDOWN_MS - elapsed) / 1000),
+    };
+  }
+  return { allowed: true, waitSeconds: 0 };
+}
+
+export function loadLocalEvents(): CampaignEvent[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_EVENTS_KEY);
+    if (!raw) {
+      localStorage.setItem(LOCAL_EVENTS_KEY, JSON.stringify(DEFAULT_EVENTS));
+      return [...DEFAULT_EVENTS];
+    }
+    const list = JSON.parse(raw) as CampaignEvent[];
+    return Array.isArray(list) ? list : [...DEFAULT_EVENTS];
+  } catch {
+    return [...DEFAULT_EVENTS];
+  }
+}
+
+export function getActiveEventMultiplier(): {
+  event: CampaignEvent | null;
+  multiplier: number;
+} {
+  const events = loadLocalEvents();
+  const active = events.find((e) => e.active);
+  return {
+    event: active || null,
+    multiplier: active ? active.bonusMultiplier : 1.0,
+  };
+}
+
+export function calculateStationRewardPoints(params: {
+  basePoints: number;
+  party: PartyRoom | null;
+  method: VerificationMethod;
+  eventMultiplier?: number;
+}): {
+  finalPoints: number;
+  crossFacultyBonus: number;
+  qrBonus: number;
+  eventBonus: number;
+  activeEventTitle?: string;
+} {
+  const qrBonus = params.method === 'qr' ? 15 : params.method === 'riddle' ? 10 : 0;
+  const crossMultiplier =
+    params.party && params.party.isCrossFaculty ? params.party.bonusMultiplier : 1.0;
+  const crossFacultyBonus =
+    crossMultiplier > 1 ? Math.round(params.basePoints * (crossMultiplier - 1)) : 0;
+
+  const activeEvt =
+    params.eventMultiplier !== undefined
+      ? { event: null, multiplier: params.eventMultiplier }
+      : getActiveEventMultiplier();
+  const evtMult = activeEvt.multiplier > 1 ? activeEvt.multiplier : 1.0;
+  const eventBonus =
+    evtMult > 1 ? Math.round(params.basePoints * (evtMult - 1)) : 0;
+
+  const finalPoints = params.basePoints + qrBonus + crossFacultyBonus + eventBonus;
+  return {
+    finalPoints,
+    crossFacultyBonus,
+    qrBonus,
+    eventBonus,
+    activeEventTitle: activeEvt.event?.title,
+  };
+}
+
+export function loadLocalCheckinLogs(): CheckinLog[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_CHECKINS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as CheckinLog[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function recordStationUnlock(params: {
+  profile: UserProfile;
+  station: Station;
+  baseEarnedPoints: number;
+  method: VerificationMethod;
+  party: PartyRoom | null;
+  photoDataUrl?: string;
+  isQuizOrGameSuccess?: boolean;
+  totalStationsCount: number;
+}): Promise<{
+  updatedProfile: UserProfile;
+  finalPoints: number;
+  crossFacultyBonus: number;
+  qrBonus: number;
+  newlyCompletedQuests: { name: string; reward: number }[];
+}> {
+  const { finalPoints, crossFacultyBonus, qrBonus } = calculateStationRewardPoints({
+    basePoints: params.baseEarnedPoints,
+    party: params.party,
+    method: params.method,
+  });
+
+  const record: UnlockedStationRecord = {
+    pts: finalPoints,
+    unlockedAt: Date.now(),
+    method: params.method,
+    ...(params.photoDataUrl ? { photoDataUrl: params.photoDataUrl } : {}),
+  };
+
+  const nextDone = {
+    ...(params.profile.done || {}),
+    [params.station.id]: record,
+  };
+
+  let nextProfile: UserProfile = {
+    ...params.profile,
+    points: params.profile.points + finalPoints,
+    quizOk:
+      params.profile.quizOk + (params.isQuizOrGameSuccess ? 1 : 0),
+    photos:
+      params.profile.photos + (params.station.type === 'photo' ? 1 : 0),
+    done: nextDone,
+    updatedAt: Date.now(),
+  };
+
+  const newlyCompletedQuests: { name: string; reward: number }[] = [];
+  QUESTS.forEach((q) => {
+    if (!nextProfile.bonus[q.id] && q.getValue(nextProfile, params.totalStationsCount) >= q.need) {
+      nextProfile = {
+        ...nextProfile,
+        points: nextProfile.points + q.reward,
+        bonus: { ...nextProfile.bonus, [q.id]: true },
+      };
+      newlyCompletedQuests.push({ name: q.name, reward: q.reward });
+    }
+  });
+
+  // Save checkin log
+  const logEntry: CheckinLog = {
+    id: `chk_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    uid: nextProfile.uid,
+    userName: nextProfile.name,
+    stationId: params.station.id,
+    facultyId: nextProfile.facultyId,
+    method: params.method,
+    pts: finalPoints,
+    timestamp: Date.now(),
+  };
+
+  try {
+    const logs = loadLocalCheckinLogs();
+    logs.unshift(logEntry);
+    localStorage.setItem(LOCAL_CHECKINS_KEY, JSON.stringify(logs.slice(0, 300)));
+  } catch {
+    // Ignore
+  }
+
+  if (isFirebaseConfigured && db) {
+    try {
+      await addDoc(collection(db, 'checkins'), {
+        uid: logEntry.uid,
+        userName: logEntry.userName,
+        stationId: logEntry.stationId,
+        facultyId: logEntry.facultyId,
+        method: logEntry.method,
+        pts: logEntry.pts,
+        timestamp: logEntry.timestamp,
+      });
+    } catch {
+      // Fallback local
+    }
+  }
+
+  await syncProfileToCloud(nextProfile);
+  await syncMemberPointsInParty(nextProfile);
+
+  return {
+    updatedProfile: nextProfile,
+    finalPoints,
+    crossFacultyBonus,
+    qrBonus,
+    newlyCompletedQuests,
+  };
+}
+
+export async function recordStarPickup(
+  profile: UserProfile,
+  totalStationsCount: number
+): Promise<{
+  updatedProfile: UserProfile;
+  newlyCompletedQuests: { name: string; reward: number }[];
+}> {
+  let nextProfile: UserProfile = {
+    ...profile,
+    stars: (profile.stars || 0) + 1,
+    points: profile.points + 10,
+    updatedAt: Date.now(),
+  };
+
+  const newlyCompletedQuests: { name: string; reward: number }[] = [];
+  QUESTS.forEach((q) => {
+    if (!nextProfile.bonus[q.id] && q.getValue(nextProfile, totalStationsCount) >= q.need) {
+      nextProfile = {
+        ...nextProfile,
+        points: nextProfile.points + q.reward,
+        bonus: { ...nextProfile.bonus, [q.id]: true },
+      };
+      newlyCompletedQuests.push({ name: q.name, reward: q.reward });
+    }
+  });
+
+  await syncProfileToCloud(nextProfile);
+  return { updatedProfile: nextProfile, newlyCompletedQuests };
+}
+
+export async function fetchLeaderboardData(
+  currentProfile: UserProfile
+): Promise<{
+  individuals: PublicLeaderboardUser[];
+  parties: PartyRoom[];
+}> {
+  let individuals = getLocalPublicUsers();
+
+  if (isFirebaseConfigured && db) {
+    try {
+      const q = query(
+        collection(db, 'users_public'),
+        orderBy('points', 'desc'),
+        limit(30)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        individuals = snap.docs.map((d) => d.data() as PublicLeaderboardUser);
+      }
+    } catch {
+      // Fallback local
+    }
+  }
+
+  // Ensure current player is always up-to-date in leaderboard list
+  const meEntry: PublicLeaderboardUser = {
+    uid: currentProfile.uid,
+    name: currentProfile.name,
+    mssv: currentProfile.mssv,
+    facultyId: currentProfile.facultyId,
+    avatar: currentProfile.avatar,
+    points: currentProfile.points,
+    unlockedCount: Object.keys(currentProfile.done || {}).length,
+    partyId: currentProfile.partyId,
+    updatedAt: Date.now(),
+  };
+  const filtered = individuals.filter((u) => u.uid !== currentProfile.uid);
+  const mergedIndividuals = [...filtered, meEntry].sort((a, b) => b.points - a.points);
+
+  const parties = loadLocalParties().sort((a, b) => b.totalPoints - a.totalPoints);
+  return { individuals: mergedIndividuals, parties };
+}
+</file>
+
+<file path="src/services/partyService.ts">
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { FacultyId, PublicLeaderboardUser, UserProfile } from '../types/game';
-import { auth, db, isFirebaseConfigured } from './firebase';
+import { FACULTIES } from '../data/faculties';
+import { FacultyId, PartyMember, PartyRoom, UserProfile } from '../types/game';
+import { syncProfileToCloud } from './authService';
+import { db, isFirebaseConfigured } from './firebase';
 
-const LOCAL_PROFILE_KEY = 'tdc_go_profile_v2';
-const LOCAL_PUBLIC_USERS_KEY = 'tdc_go_public_users_v2';
+const LOCAL_PARTIES_KEY = 'tdc_go_parties_v2';
 
-const SAMPLE_LEADERBOARD_USERS: PublicLeaderboardUser[] = [
+const SAMPLE_PARTIES: PartyRoom[] = [
   {
-    uid: 'sample_1',
-    name: 'Minh Anh',
-    mssv: '24211TT0124',
-    facultyId: 'cntt',
-    avatar: 0,
-    points: 1420,
-    unlockedCount: 10,
-    updatedAt: Date.now() - 3600000,
+    code: 'TDC26A',
+    hostUid: 'sample_1',
+    name: 'Biệt đội Liên Khoa TDC',
+    memberUids: ['sample_1', 'sample_2', 'sample_3'],
+    members: [
+      {
+        uid: 'sample_1',
+        name: 'Minh Anh',
+        mssv: '24211TT0124',
+        facultyId: 'cntt',
+        avatar: 0,
+        points: 1420,
+      },
+      {
+        uid: 'sample_2',
+        name: 'Gia Huy',
+        mssv: '24211DD0089',
+        facultyId: 'dien_dt',
+        avatar: 1,
+        points: 1280,
+      },
+      {
+        uid: 'sample_3',
+        name: 'Thảo Vy',
+        mssv: '24211KT0215',
+        facultyId: 'kinh_te',
+        avatar: 2,
+        points: 1150,
+      },
+    ],
+    isCrossFaculty: true,
+    bonusMultiplier: 1.2,
+    totalPoints: 3850,
+    createdAt: Date.now() - 7200000,
   },
   {
-    uid: 'sample_2',
-    name: 'Gia Huy',
-    mssv: '24211DD0089',
-    facultyId: 'dien_dt',
-    avatar: 1,
-    points: 1280,
-    unlockedCount: 9,
-    updatedAt: Date.now() - 7200000,
-  },
-  {
-    uid: 'sample_3',
-    name: 'Thảo Vy',
-    mssv: '24211KT0215',
-    facultyId: 'kinh_te',
-    avatar: 2,
-    points: 1150,
-    unlockedCount: 8,
-    updatedAt: Date.now() - 8400000,
-  },
-  {
-    uid: 'sample_4',
-    name: 'Quốc Bảo',
-    mssv: '24211OT0042',
-    facultyId: 'co_khi_oto',
-    avatar: 0,
-    points: 990,
-    unlockedCount: 7,
-    updatedAt: Date.now() - 9600000,
-  },
-  {
-    uid: 'sample_5',
-    name: 'Ngọc Hân',
-    mssv: '24211NN0118',
-    facultyId: 'ngoai_ngu',
-    avatar: 2,
-    points: 870,
-    unlockedCount: 6,
-    updatedAt: Date.now() - 12000000,
-  },
-  {
-    uid: 'sample_6',
-    name: 'Tuấn Kiệt',
-    mssv: '24211CK0071',
-    facultyId: 'co_khi_ctm',
-    avatar: 1,
-    points: 740,
-    unlockedCount: 5,
-    updatedAt: Date.now() - 15000000,
-  },
-  {
-    uid: 'sample_7',
-    name: 'Bảo Trâm',
-    mssv: '24211DL0033',
-    facultyId: 'du_lich',
-    avatar: 2,
-    points: 620,
-    unlockedCount: 4,
-    updatedAt: Date.now() - 18000000,
+    code: 'CNTT99',
+    hostUid: 'sample_4',
+    name: 'Chiến thần Code & Cơ khí',
+    memberUids: ['sample_4', 'sample_6'],
+    members: [
+      {
+        uid: 'sample_4',
+        name: 'Quốc Bảo',
+        mssv: '24211OT0042',
+        facultyId: 'co_khi_oto',
+        avatar: 0,
+        points: 990,
+      },
+      {
+        uid: 'sample_6',
+        name: 'Tuấn Kiệt',
+        mssv: '24211CK0071',
+        facultyId: 'co_khi_ctm',
+        avatar: 1,
+        points: 740,
+      },
+    ],
+    isCrossFaculty: true,
+    bonusMultiplier: 1.2,
+    totalPoints: 1730,
+    createdAt: Date.now() - 5400000,
   },
 ];
 
-export function loadLocalProfile(): UserProfile | null {
-  try {
-    const raw = localStorage.getItem(LOCAL_PROFILE_KEY);
-    if (!raw) return null;
-    const p = JSON.parse(raw) as UserProfile;
-    if (p && typeof p === 'object' && p.uid) return p;
-    return null;
-  } catch {
-    return null;
-  }
+export function evaluateCrossFacultyBonus(members: PartyMember[]): {
+  isCrossFaculty: boolean;
+  bonusMultiplier: number;
+} {
+  const uniqueFaculties = new Set(members.map((m) => m.facultyId));
+  const isCross = uniqueFaculties.size >= 2;
+  return {
+    isCrossFaculty: isCross,
+    bonusMultiplier: isCross ? 1.2 : 1.0,
+  };
 }
 
-export function saveLocalProfile(profile: UserProfile): void {
+export function loadLocalParties(): PartyRoom[] {
   try {
-    localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(profile));
-    syncLocalPublicUser(profile);
-  } catch {
-    // Ignore storage error
-  }
-}
-
-export function getLocalPublicUsers(): PublicLeaderboardUser[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_PUBLIC_USERS_KEY);
+    const raw = localStorage.getItem(LOCAL_PARTIES_KEY);
     if (!raw) {
-      localStorage.setItem(
-        LOCAL_PUBLIC_USERS_KEY,
-        JSON.stringify(SAMPLE_LEADERBOARD_USERS)
-      );
-      return [...SAMPLE_LEADERBOARD_USERS];
+      localStorage.setItem(LOCAL_PARTIES_KEY, JSON.stringify(SAMPLE_PARTIES));
+      return [...SAMPLE_PARTIES];
     }
-    const list = JSON.parse(raw) as PublicLeaderboardUser[];
-    return Array.isArray(list) ? list : [...SAMPLE_LEADERBOARD_USERS];
+    const parsed = JSON.parse(raw) as PartyRoom[];
+    return Array.isArray(parsed) ? parsed : [...SAMPLE_PARTIES];
   } catch {
-    return [...SAMPLE_LEADERBOARD_USERS];
+    return [...SAMPLE_PARTIES];
   }
 }
 
-export function syncLocalPublicUser(profile: UserProfile): void {
+export function saveLocalParties(parties: PartyRoom[]): void {
   try {
-    const users = getLocalPublicUsers();
-    const pub: PublicLeaderboardUser = {
-      uid: profile.uid,
-      name: profile.name,
-      mssv: profile.mssv,
-      facultyId: profile.facultyId,
-      avatar: profile.avatar,
-      points: profile.points,
-      unlockedCount: Object.keys(profile.done || {}).length,
-      partyId: profile.partyId,
-      updatedAt: Date.now(),
-    };
-    const idx = users.findIndex((u) => u.uid === profile.uid);
-    if (idx >= 0) users[idx] = pub;
-    else users.push(pub);
-    localStorage.setItem(LOCAL_PUBLIC_USERS_KEY, JSON.stringify(users));
+    localStorage.setItem(LOCAL_PARTIES_KEY, JSON.stringify(parties));
   } catch {
-    // Ignore storage error
+    // Ignore
   }
 }
 
-export async function syncProfileToCloud(profile: UserProfile): Promise<void> {
-  saveLocalProfile(profile);
-  if (!isFirebaseConfigured || !db) return;
-
-  try {
-    const privateData = {
-      uid: profile.uid,
-      name: profile.name,
-      mssv: profile.mssv,
-      email: profile.email || `${profile.mssv.toLowerCase()}@mail.tdc.edu.vn`,
-      facultyId: profile.facultyId,
-      role: profile.role,
-      avatar: profile.avatar,
-      points: profile.points,
-      stars: profile.stars,
-      quizOk: profile.quizOk,
-      photos: profile.photos,
-      done: profile.done,
-      bonus: profile.bonus,
-      ...(profile.partyId ? { partyId: profile.partyId } : {}),
-      updatedAt: Date.now(),
-    };
-    await setDoc(doc(db, 'users', profile.uid), privateData, { merge: true });
-
-    const publicData: PublicLeaderboardUser = {
-      uid: profile.uid,
-      name: profile.name,
-      mssv: profile.mssv,
-      facultyId: profile.facultyId,
-      avatar: profile.avatar,
-      points: profile.points,
-      unlockedCount: Object.keys(profile.done || {}).length,
-      ...(profile.partyId ? { partyId: profile.partyId } : {}),
-      updatedAt: Date.now(),
-    };
-    await setDoc(doc(db, 'users_public', profile.uid), publicData, { merge: true });
-  } catch (e) {
-    console.warn('Cloud profile sync skipped/fallback:', e);
+function generateRoomCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let out = '';
+  for (let i = 0; i < 6; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)];
   }
+  return out;
 }
 
-export async function loginOrRegisterExplorer(params: {
-  name: string;
-  mssv: string;
-  email?: string;
-  password?: string;
-  facultyId: FacultyId;
-  avatar: number;
-  mode: 'demo' | 'email_login' | 'email_register' | 'google';
-}): Promise<UserProfile> {
-  const cleanName = params.name.trim().slice(0, 32) || 'Tân binh TDC';
-  const cleanMssv = params.mssv.trim().toUpperCase().slice(0, 16) || '26211TT0001';
-  const cleanEmail =
-    params.email?.trim() || `${cleanMssv.toLowerCase()}@mail.tdc.edu.vn`;
+export async function getPartyByCode(code: string): Promise<PartyRoom | null> {
+  const cleanCode = code.trim().toUpperCase();
+  if (!cleanCode) return null;
 
-  if (isFirebaseConfigured && auth && db && params.mode !== 'demo') {
-    let uid = '';
-    if (params.mode === 'google') {
-      const cred = await signInWithPopup(auth, new GoogleAuthProvider());
-      uid = cred.user.uid;
-    } else if (params.mode === 'email_register') {
-      const cred = await createUserWithEmailAndPassword(
-        auth,
-        cleanEmail,
-        params.password || 'TdcGo2026!'
-      );
-      uid = cred.user.uid;
-    } else if (params.mode === 'email_login') {
-      const cred = await signInWithEmailAndPassword(
-        auth,
-        cleanEmail,
-        params.password || 'TdcGo2026!'
-      );
-      uid = cred.user.uid;
-    }
-
-    if (uid) {
-      const snap = await getDoc(doc(db, 'users', uid));
-      if (snap.exists()) {
-        const existing = snap.data() as UserProfile;
-        const merged: UserProfile = {
-          ...existing,
-          name: cleanName || existing.name,
-          mssv: cleanMssv || existing.mssv,
-          facultyId: params.facultyId || existing.facultyId,
-          avatar: params.avatar,
-          updatedAt: Date.now(),
-        };
-        await syncProfileToCloud(merged);
-        return merged;
-      }
-      const fresh: UserProfile = {
-        uid,
-        name: cleanName,
-        mssv: cleanMssv,
-        email: cleanEmail,
-        facultyId: params.facultyId,
-        role: 'student',
-        avatar: params.avatar,
-        points: 0,
-        stars: 0,
-        quizOk: 0,
-        photos: 0,
-        done: {},
-        bonus: {},
-        pos: null,
-        updatedAt: Date.now(),
-      };
-      await syncProfileToCloud(fresh);
-      return fresh;
-    }
-  }
-
-  // Local / Demo fallback
-  const existingLocal = loadLocalProfile();
-  if (existingLocal) {
-    const updated: UserProfile = {
-      ...existingLocal,
-      name: cleanName,
-      mssv: cleanMssv,
-      email: cleanEmail,
-      facultyId: params.facultyId,
-      avatar: params.avatar,
-      updatedAt: Date.now(),
-    };
-    saveLocalProfile(updated);
-    return updated;
-  }
-
-  const demoProfile: UserProfile = {
-    uid: `local_${cleanMssv.toLowerCase()}`,
-    name: cleanName,
-    mssv: cleanMssv,
-    email: cleanEmail,
-    facultyId: params.facultyId,
-    role: 'student',
-    avatar: params.avatar,
-    points: 0,
-    stars: 0,
-    quizOk: 0,
-    photos: 0,
-    done: {},
-    bonus: {},
-    pos: null,
-    updatedAt: Date.now(),
-  };
-  saveLocalProfile(demoProfile);
-  return demoProfile;
-}
-
-export function resetExplorerProgress(profile: UserProfile): UserProfile {
-  const reset: UserProfile = {
-    ...profile,
-    points: 0,
-    stars: 0,
-    quizOk: 0,
-    photos: 0,
-    done: {},
-    bonus: {},
-    pos: null,
-    certClaimed: false,
-    updatedAt: Date.now(),
-  };
-  void syncProfileToCloud(reset);
-  return reset;
-}
-
-export async function logoutExplorer(): Promise<void> {
-  if (isFirebaseConfigured && auth) {
+  if (isFirebaseConfigured && db) {
     try {
-      await signOut(auth);
+      const snap = await getDoc(doc(db, 'parties', cleanCode));
+      if (snap.exists()) return snap.data() as PartyRoom;
+    } catch {
+      // Fallback local
+    }
+  }
+  const parties = loadLocalParties();
+  return parties.find((p) => p.code === cleanCode) || null;
+}
+
+export async function createPartyRoom(
+  profile: UserProfile,
+  partyName: string
+): Promise<{ room: PartyRoom; updatedProfile: UserProfile }> {
+  const code = generateRoomCode();
+  const hostMember: PartyMember = {
+    uid: profile.uid,
+    name: profile.name,
+    mssv: profile.mssv,
+    facultyId: profile.facultyId,
+    avatar: profile.avatar,
+    points: profile.points,
+  };
+
+  const room: PartyRoom = {
+    code,
+    hostUid: profile.uid,
+    name: partyName.trim().slice(0, 45) || `Tổ đội của ${profile.name}`,
+    memberUids: [profile.uid],
+    members: [hostMember],
+    isCrossFaculty: false,
+    bonusMultiplier: 1.0,
+    totalPoints: profile.points,
+    createdAt: Date.now(),
+  };
+
+  if (isFirebaseConfigured && db) {
+    try {
+      await setDoc(doc(db, 'parties', code), room);
+    } catch {
+      // Fallback local
+    }
+  }
+
+  const parties = loadLocalParties().filter((p) => p.code !== code);
+  parties.unshift(room);
+  saveLocalParties(parties);
+
+  const updatedProfile: UserProfile = {
+    ...profile,
+    partyId: code,
+    updatedAt: Date.now(),
+  };
+  await syncProfileToCloud(updatedProfile);
+  return { room, updatedProfile };
+}
+
+export async function joinPartyRoom(
+  profile: UserProfile,
+  codeInput: string
+): Promise<{ room: PartyRoom; updatedProfile: UserProfile }> {
+  const code = codeInput.trim().toUpperCase();
+  const room = await getPartyByCode(code);
+  if (!room) {
+    throw new Error(`Không tìm thấy phòng Tổ đội với mã "${code}".`);
+  }
+  if (!room.memberUids.includes(profile.uid) && room.members.length >= 4) {
+    throw new Error('Phòng Tổ đội này đã đủ tối đa 4 thành viên.');
+  }
+
+  const me: PartyMember = {
+    uid: profile.uid,
+    name: profile.name,
+    mssv: profile.mssv,
+    facultyId: profile.facultyId,
+    avatar: profile.avatar,
+    points: profile.points,
+  };
+
+  const filteredMembers = room.members.filter((m) => m.uid !== profile.uid);
+  const nextMembers = [...filteredMembers, me];
+  const nextUids = nextMembers.map((m) => m.uid);
+  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
+  const totalPoints = nextMembers.reduce((sum, m) => sum + m.points, 0);
+
+  const updatedRoom: PartyRoom = {
+    ...room,
+    memberUids: nextUids,
+    members: nextMembers,
+    isCrossFaculty,
+    bonusMultiplier,
+    totalPoints,
+  };
+
+  if (isFirebaseConfigured && db) {
+    try {
+      await setDoc(doc(db, 'parties', code), updatedRoom);
+    } catch {
+      // Fallback local
+    }
+  }
+
+  const parties = loadLocalParties();
+  const idx = parties.findIndex((p) => p.code === code);
+  if (idx >= 0) parties[idx] = updatedRoom;
+  else parties.unshift(updatedRoom);
+  saveLocalParties(parties);
+
+  const updatedProfile: UserProfile = {
+    ...profile,
+    partyId: code,
+    updatedAt: Date.now(),
+  };
+  await syncProfileToCloud(updatedProfile);
+
+  return { room: updatedRoom, updatedProfile };
+}
+
+export async function simulateTeammateJoin(
+  roomCode: string,
+  currentFacultyId: FacultyId
+): Promise<PartyRoom> {
+  const room = await getPartyByCode(roomCode);
+  if (!room) throw new Error('Không tìm thấy phòng tổ đội.');
+  if (room.members.length >= 4) {
+    throw new Error('Tổ đội đã đủ 4 thành viên.');
+  }
+
+  const otherFaculties = FACULTIES.filter((f) => f.id !== currentFacultyId);
+  const pickedFaculty =
+    otherFaculties[room.members.length % otherFaculties.length] || FACULTIES[1];
+  const sampleNames = ['Hoàng Nam', 'Khánh Linh', 'Đức Trọng', 'Phương Thảo'];
+  const idx = room.members.length;
+  const teammate: PartyMember = {
+    uid: `coop_ally_${Date.now()}`,
+    name: sampleNames[idx % sampleNames.length],
+    mssv: `25211${pickedFaculty.id.slice(0, 2).toUpperCase()}0${10 + idx}`,
+    facultyId: pickedFaculty.id,
+    avatar: idx % 3,
+    points: 240 + idx * 80,
+  };
+
+  const nextMembers = [...room.members, teammate];
+  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
+  const updatedRoom: PartyRoom = {
+    ...room,
+    memberUids: nextMembers.map((m) => m.uid),
+    members: nextMembers,
+    isCrossFaculty,
+    bonusMultiplier,
+    totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
+  };
+
+  if (isFirebaseConfigured && db) {
+    try {
+      await setDoc(doc(db, 'parties', room.code), updatedRoom);
     } catch {
       // Ignore
     }
   }
+
+  const parties = loadLocalParties();
+  const pIdx = parties.findIndex((p) => p.code === room.code);
+  if (pIdx >= 0) parties[pIdx] = updatedRoom;
+  else parties.unshift(updatedRoom);
+  saveLocalParties(parties);
+
+  return updatedRoom;
 }
-</file>
 
-<file path="src/services/firebase.ts">
-import { FirebaseApp, getApps, initializeApp } from 'firebase/app';
-import { Auth, getAuth } from 'firebase/auth';
-import { Firestore, getFirestore } from 'firebase/firestore';
+export async function syncMemberPointsInParty(profile: UserProfile): Promise<PartyRoom | null> {
+  if (!profile.partyId) return null;
+  const room = await getPartyByCode(profile.partyId);
+  if (!room) return null;
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
-};
+  const nextMembers = room.members.map((m) =>
+    m.uid === profile.uid
+      ? {
+          ...m,
+          name: profile.name,
+          facultyId: profile.facultyId,
+          avatar: profile.avatar,
+          points: profile.points,
+        }
+      : m
+  );
+  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
+  const updatedRoom: PartyRoom = {
+    ...room,
+    members: nextMembers,
+    isCrossFaculty,
+    bonusMultiplier,
+    totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
+  };
 
-export const isFirebaseConfigured = Boolean(
-  firebaseConfig.apiKey &&
-    firebaseConfig.projectId &&
-    firebaseConfig.apiKey.trim().length > 5
-);
-
-let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
-let db: Firestore | null = null;
-
-if (isFirebaseConfigured) {
-  try {
-    app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-  } catch (e) {
-    console.warn('Firebase initialization failed, falling back to Local Demo mode:', e);
+  if (isFirebaseConfigured && db) {
+    try {
+      await setDoc(doc(db, 'parties', room.code), updatedRoom);
+    } catch {
+      // Ignore
+    }
   }
+
+  const parties = loadLocalParties();
+  const idx = parties.findIndex((p) => p.code === room.code);
+  if (idx >= 0) parties[idx] = updatedRoom;
+  saveLocalParties(parties);
+  return updatedRoom;
 }
 
-export { app, auth, db };
+export async function leavePartyRoom(profile: UserProfile): Promise<UserProfile> {
+  if (profile.partyId) {
+    const code = profile.partyId.trim().toUpperCase();
+    const room = await getPartyByCode(code);
+    if (room) {
+      const nextMembers = room.members.filter((m) => m.uid !== profile.uid);
+      const nextUids = nextMembers.map((m) => m.uid);
+      const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
+      const updatedRoom: PartyRoom = {
+        ...room,
+        hostUid: nextMembers[0]?.uid || room.hostUid,
+        memberUids: nextUids,
+        members: nextMembers,
+        isCrossFaculty,
+        bonusMultiplier,
+        totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
+      };
+
+      if (isFirebaseConfigured && db && nextMembers.length > 0) {
+        try {
+          await setDoc(doc(db, 'parties', room.code), updatedRoom);
+        } catch {
+          // Ignore
+        }
+      }
+
+      const parties = loadLocalParties();
+      const idx = parties.findIndex((p) => p.code === room.code);
+      if (idx >= 0) {
+        if (nextMembers.length > 0) {
+          parties[idx] = updatedRoom;
+        } else {
+          parties.splice(idx, 1);
+        }
+        saveLocalParties(parties);
+      }
+    }
+  }
+
+  const updated: UserProfile = {
+    ...profile,
+    partyId: undefined,
+    updatedAt: Date.now(),
+  };
+  await syncProfileToCloud(updated);
+  return updated;
+}
 </file>
 
 <file path="src/types/game.ts">
@@ -8821,1919 +11453,43 @@ export interface CheckinLog {
 }
 </file>
 
-<file path="src/index.css">
-@import "tailwindcss";
-
-/* Bố cục: thế giới 3D kiểu đồ chơi phủ kín màn hình; HUD bo tròn nổi ở 4 góc; thẻ thử thách trồi lên như tấm thẻ bài */
-:root {
-  --grass: #3DAA5C;
-  --grass-d: #23733D;
-  --leaf-l: #E6F6DA;
-  --sun: #FFC83A;
-  --sun-d: #D98E00;
-  --coral: #FF6F59;
-  --coral-d: #D9452F;
-  --tdc: #00AEEF;
-  --tdc-d: #0A7FC2;
-  --cream: #FFFBEF;
-  --card: #FFFFFF;
-  --ink: #1E3528;
-  --muted: #5B7266;
-  --line: #E2EBDA;
-  --drop: rgba(28, 64, 42, .20);
-  --f-display: "Baloo 2", "Nunito", system-ui, sans-serif;
-  --f-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
-  color-scheme: light;
-}
-
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-}
-
-body {
-  background: #CFEFDF;
-  color: var(--ink);
-  font-family: var(--f-body);
-  font-size: 15px;
-  line-height: 1.45;
-  -webkit-tap-highlight-color: transparent;
-}
-
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-button {
-  font: inherit;
-  color: inherit;
-}
-
-button:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 3px solid var(--tdc);
-  outline-offset: 2px;
-}
-
-#app {
-  position: fixed;
-  inset: 0;
-}
-
-#stage {
-  position: absolute;
-  inset: 0;
-}
-
-#stage canvas {
-  display: block;
-  touch-action: none;
-}
-
-.card {
-  background: var(--card);
-  border-radius: 20px;
-  box-shadow: 0 4px 0 var(--drop), 0 10px 28px rgba(28, 64, 42, .14);
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 44px;
-  padding: 0 18px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--grass);
-  color: #fff;
-  font-family: var(--f-display);
-  font-weight: 800;
-  font-size: 16px;
-  letter-spacing: .01em;
-  cursor: pointer;
-  box-shadow: 0 4px 0 var(--grass-d);
-  transition: transform .08s, box-shadow .08s;
-  touch-action: manipulation;
-}
-
-.btn:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--grass-d);
-}
-
-.btn.sun {
-  background: var(--sun);
-  color: #4A3200;
-  box-shadow: 0 4px 0 var(--sun-d);
-}
-
-.btn.sun:active {
-  box-shadow: 0 1px 0 var(--sun-d);
-}
-
-.btn.blue {
-  background: var(--tdc);
-  color: #fff;
-  box-shadow: 0 4px 0 var(--tdc-d);
-}
-
-.btn.ghost {
-  background: var(--leaf-l);
-  color: var(--grass-d);
-  box-shadow: 0 4px 0 #C7E3B5;
-}
-
-.btn.big {
-  min-height: 52px;
-  font-size: 18px;
-  width: 100%;
-}
-
-/* ---------- màn hình mở đầu ---------- */
-#start {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-top: calc(16px + env(safe-area-inset-top, 0px));
-  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(90deg, rgba(255, 251, 239, .90) 0, rgba(255, 251, 239, .62) 38%, rgba(255, 251, 239, 0) 65%);
-  overflow: auto;
-  z-index: 10;
-}
-
-.st-wrap {
-  width: min(460px, 100%);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-left: clamp(0px, 3vw, 48px);
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.logo .seal {
-  flex: none;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: #fff;
-  display: grid;
-  place-items: center;
-  box-shadow: 0 4px 0 var(--drop);
-}
-
-.logo .seal svg {
-  width: 48px;
-  height: 48px;
-}
-
-.logo h1 {
-  margin: 0;
-  font-family: var(--f-display);
-  font-weight: 800;
-  font-size: 56px;
-  line-height: .9;
-  letter-spacing: -.01em;
-  color: var(--ink);
-}
-
-.logo h1 span {
-  display: inline-block;
-  background: var(--sun);
-  color: #3D2A00;
-  border-radius: 18px;
-  padding: 2px 14px 0;
-  margin-left: 4px;
-  transform: rotate(-4deg);
-  box-shadow: 0 5px 0 var(--sun-d);
-}
-
-.tag {
-  margin: 0;
-  font-size: 15.5px;
-  font-weight: 700;
-  color: var(--ink);
-  max-width: 42ch;
-  text-wrap: balance;
-}
-
-.st-card {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.st-card label, .st-card .lbl {
-  display: block;
-  font-size: 11.5px;
-  font-weight: 900;
-  letter-spacing: .07em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 3px;
-}
-
-.st-card input {
-  font: inherit;
-  font-size: 15px;
-  font-weight: 800;
-  padding: 9px 12px;
-  border-radius: 12px;
-  border: 2px solid var(--line);
-  background: var(--cream);
-  color: var(--ink);
-  width: 100%;
-}
-
-.avas {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-
-.avas button {
-  border: 3px solid var(--line);
-  background: var(--cream);
-  border-radius: 16px;
-  padding: 6px 4px 5px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  font-weight: 800;
-  font-size: 12.5px;
-}
-
-.avas button.on {
-  border-color: var(--grass);
-  background: var(--leaf-l);
-}
-
-.fine {
-  margin: 0;
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.4;
-}
-
-.st-row {
-  display: flex;
-  gap: 10px;
-}
-
-.st-row .btn {
-  flex: 1;
-}
-
-/* ---------- HUD ---------- */
-#hud {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  padding-top: calc(12px + env(safe-area-inset-top, 0px));
-  padding-bottom: 16px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  z-index: 5;
-}
-
-#hud.dim > *:not(#fx) {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.hud-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.me {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 14px 6px 6px;
-  border-radius: 999px;
-  min-width: 0;
-  max-width: min(320px, 55vw);
-}
-
-.me .ava {
-  flex: none;
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background: var(--leaf-l);
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-}
-
-.me .ava svg {
-  width: 46px;
-  height: 46px;
-}
-
-.me-txt {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.me-txt b {
-  font-family: var(--f-display);
-  font-size: 16.5px;
-  line-height: 1.1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.me-txt span {
-  font-size: 11.5px;
-  font-weight: 800;
-  color: var(--grass-d);
-}
-
-.xp {
-  height: 7px;
-  border-radius: 5px;
-  background: var(--leaf-l);
-  overflow: hidden;
-  margin-top: 3px;
-  min-width: 90px;
-}
-
-.xp i {
-  display: block;
-  height: 100%;
-  width: 0;
-  background: linear-gradient(90deg, var(--grass), #8BD346);
-  border-radius: 5px;
-  transition: width .4s;
-}
-
-.hud-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.pills {
-  display: flex;
-  gap: 8px;
-}
-
-.pill {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 40px;
-  padding: 0 14px 0 8px;
-  border: 0;
-  border-radius: 999px;
-  background: #fff;
-  cursor: pointer;
-  box-shadow: 0 4px 0 var(--drop);
-  font-family: var(--f-display);
-  font-weight: 800;
-  font-size: 18px;
-  font-variant-numeric: tabular-nums;
-}
-
-.pill .ic {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-}
-
-.pill.pts .ic {
-  background: var(--sun);
-  color: #7A4D00;
-}
-
-.pill.bdg .ic {
-  background: var(--coral);
-  color: #fff;
-}
-
-.pill.bump {
-  animation: bump .45s;
-}
-
-@keyframes bump {
-  40% { transform: scale(1.16); }
-}
-
-#mini {
-  pointer-events: auto;
-  width: 118px;
-  height: 118px;
-  border-radius: 50%;
-  background: #BFE5B0;
-  border: 4px solid #fff;
-  box-shadow: 0 4px 0 var(--drop);
-  cursor: pointer;
-}
-
-.side {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.rb {
-  pointer-events: auto;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 0;
-  background: #fff;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  box-shadow: 0 4px 0 var(--drop);
-  color: var(--ink);
-  position: relative;
-}
-
-.rb:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 var(--drop);
-}
-
-.rb .dot {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--coral);
-  border: 2px solid #fff;
-}
-
-.hud-bot {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-}
-
-.guide {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  height: 44px;
-  padding: 0 16px 0 6px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: #fff;
-  font-weight: 800;
-  font-size: 13.5px;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, .25);
-  max-width: 100%;
-  cursor: pointer;
-  border: 0;
-}
-
-.guide .arr {
-  flex: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--sun);
-  color: #3D2A00;
-  display: grid;
-  place-items: center;
-  transition: transform .15s linear;
-}
-
-.guide span:last-child {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.act {
-  pointer-events: auto;
-  width: min(400px, 100%);
-  padding: 12px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  animation: pop .28s cubic-bezier(.2, 1.4, .4, 1);
-}
-
-.act-txt {
-  flex: 1;
-  min-width: 0;
-}
-
-.act-txt b {
-  display: block;
-  font-family: var(--f-display);
-  font-size: 18px;
-  line-height: 1.1;
-}
-
-.act-txt span {
-  font-size: 12.5px;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.act .btn {
-  min-height: 42px;
-  padding: 0 16px;
-  font-size: 15px;
-}
-
-@keyframes pop {
-  from { transform: translateY(18px) scale(.9); opacity: 0; }
-}
-
-.keys {
-  position: absolute;
-  left: max(16px, env(safe-area-inset-left, 0px));
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  margin: 0;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: var(--ink);
-  background: rgba(255, 255, 255, .82);
-  padding: 6px 10px;
-  border-radius: 10px;
-  max-width: 260px;
-  line-height: 1.4;
-}
-
-.keys b {
-  font-family: var(--f-display);
-}
-
-#joy {
-  display: none;
-  pointer-events: auto;
-  position: absolute;
-  left: max(20px, env(safe-area-inset-left, 0px));
-  bottom: calc(22px + env(safe-area-inset-bottom, 0px));
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, .55);
-  border: 3px solid rgba(255, 255, 255, .9);
-  touch-action: none;
-}
-
-#joy i {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 54px;
-  height: 54px;
-  margin: -27px 0 0 -27px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 4px 0 var(--drop);
-}
-
-@media (pointer: coarse) {
-  #joy { display: block; }
-  .keys { display: none; }
-  .hud-bot { align-items: flex-end; }
-  .act { margin-bottom: 96px; align-self: center; }
-  .guide { margin-left: 140px; max-width: calc(100% - 140px); }
-}
-
-@media (max-width: 520px) {
-  .logo h1 { font-size: 46px; }
-  #mini { width: 96px; height: 96px; }
-  .pill { height: 36px; font-size: 16px; padding: 0 11px 0 6px; }
-  .pill .ic { width: 24px; height: 24px; }
-  .rb { width: 40px; height: 40px; }
-  .me .ava, .me .ava svg { width: 40px; height: 40px; }
-  #start {
-    align-items: flex-end;
-    background: linear-gradient(0deg, rgba(255, 251, 239, .94) 0, rgba(255, 251, 239, .75) 55%, rgba(255, 251, 239, 0) 90%);
-  }
-  .st-wrap { margin-left: 0; }
-  .tag { font-size: 14px; }
-}
-
-/* ---------- bảng (modal) ---------- */
-#modal {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 16px;
-  z-index: 30;
-}
-
-.scrim {
-  position: absolute;
-  inset: 0;
-  background: rgba(20, 48, 32, .42);
-}
-
-.sheet {
-  position: relative;
-  width: min(460px, 100%);
-  max-height: 100%;
-  overflow: auto;
-  padding: 0;
-  animation: pop .3s cubic-bezier(.2, 1.3, .4, 1);
-}
-
-@media (max-width: 520px) {
-  #modal {
-    align-items: flex-end;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  }
-}
-
-.sh-head {
-  position: relative;
-  padding: 16px 18px 14px;
-  color: #fff;
-  background: var(--c, var(--grass));
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  border-radius: 20px 20px 0 0;
-  overflow: hidden;
-}
-
-.sh-head::after {
-  content: "";
-  position: absolute;
-  right: -30px;
-  top: -40px;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, .14);
-}
-
-.sh-head h2 {
-  margin: 0;
-  font-family: var(--f-display);
-  font-size: 22px;
-  line-height: 1.08;
-  text-wrap: balance;
-}
-
-.sh-head p {
-  margin: 2px 0 0;
-  font-size: 13px;
-  font-weight: 800;
-  opacity: .92;
-}
-
-.sh-x {
-  position: absolute;
-  right: 10px;
-  top: 10px;
-  z-index: 1;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 0;
-  background: rgba(255, 255, 255, .22);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
-
-.sh-body {
-  padding: 15px 18px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.know {
-  background: var(--cream);
-  border-radius: 14px;
-  padding: 11px 14px;
-  font-size: 13.5px;
-}
-
-.know b {
-  display: block;
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--sun-d);
-  margin-bottom: 2px;
-}
-
-.q {
-  margin: 0;
-  font-family: var(--f-display);
-  font-size: 18px;
-  line-height: 1.2;
-  text-wrap: balance;
-}
-
-.opts {
-  display: grid;
-  gap: 8px;
-}
-
-.opt {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  text-align: left;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 2px solid var(--line);
-  background: #fff;
-  font-weight: 800;
-  font-size: 14px;
-  cursor: pointer;
-  box-shadow: 0 3px 0 var(--line);
-}
-
-.opt i {
-  flex: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  background: var(--leaf-l);
-  color: var(--grass-d);
-  display: grid;
-  place-items: center;
-  font-style: normal;
-  font-family: var(--f-display);
-}
-
-.opt:hover:not(:disabled) {
-  border-color: var(--grass);
-}
-
-.opt.ok {
-  border-color: var(--grass);
-  background: #E8F8E3;
-}
-
-.opt.ok i {
-  background: var(--grass);
-  color: #fff;
-}
-
-.opt.no {
-  border-color: var(--coral);
-  background: #FFECE8;
-  animation: shake .35s;
-}
-
-.opt.no i {
-  background: var(--coral);
-  color: #fff;
-}
-
-.opt:disabled {
-  cursor: default;
-}
-
-@keyframes shake {
-  25% { transform: translateX(-5px); }
-  75% { transform: translateX(5px); }
-}
-
-.explain {
-  margin: 0;
-  font-size: 13.5px;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.reveal {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 6px;
-  padding: 4px 0;
-}
-
-.reveal .sticker {
-  animation: spinIn .7s cubic-bezier(.2, 1.4, .4, 1);
-}
-
-.reveal h3 {
-  margin: 4px 0 0;
-  font-family: var(--f-display);
-  font-size: 21px;
-  line-height: 1.1;
-}
-
-.reveal .plus {
-  font-family: var(--f-display);
-  font-weight: 800;
-  font-size: 26px;
-  color: var(--sun-d);
-}
-
-@keyframes spinIn {
-  from { transform: rotate(-200deg) scale(.2); }
-}
-
-.sticker {
-  flex: none;
-  border-radius: 50%;
-  background: var(--c);
-  color: #fff;
-  display: grid;
-  place-items: center;
-  border: 4px solid #fff;
-  box-shadow: 0 4px 0 var(--drop);
-}
-
-.sticker.off {
-  background: #DDE5D6;
-  color: #A5B49C;
-}
-
-/* đá bóng */
-.pitch {
-  position: relative;
-  height: 150px;
-  border-radius: 16px;
-  overflow: hidden;
-  background: repeating-linear-gradient(90deg, #4FAE5E 0 28px, #5DBE6A 28px 56px);
-}
-
-.pitch .goal {
-  position: absolute;
-  left: 50%;
-  top: 10px;
-  width: 150px;
-  height: 46px;
-  margin-left: -75px;
-  border: 5px solid #fff;
-  border-bottom: 0;
-  border-radius: 6px 6px 0 0;
-  background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .35) 0 2px, transparent 2px 9px),
-              repeating-linear-gradient(-45deg, rgba(255, 255, 255, .35) 0 2px, transparent 2px 9px);
-}
-
-.pitch .keeper {
-  position: absolute;
-  left: 50%;
-  top: 26px;
-  width: 26px;
-  height: 30px;
-  margin-left: -13px;
-  border-radius: 10px 10px 6px 6px;
-  background: var(--coral);
-  transition: transform .25s;
-}
-
-.ball {
-  position: absolute;
-  left: 50%;
-  bottom: 16px;
-  width: 30px;
-  height: 30px;
-  margin-left: -15px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%, #1E3528 0 22%, #fff 24%);
-  box-shadow: 0 3px 0 rgba(0, 0, 0, .2);
-  transition: transform .45s cubic-bezier(.3, .8, .4, 1);
-}
-
-.ball.goal {
-  transform: translate(var(--bx, 0px), -96px) scale(.6);
-}
-
-.ball.miss {
-  transform: translate(var(--bx, 90px), -120px) scale(.55);
-}
-
-.pbar {
-  position: relative;
-  height: 30px;
-  border-radius: 15px;
-  background: #F1D9CF;
-  overflow: hidden;
-  border: 3px solid #fff;
-  box-shadow: 0 3px 0 var(--line);
-}
-
-.pbar .zone {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  background: var(--grass);
-}
-
-.pbar .needle {
-  position: absolute;
-  top: -2px;
-  bottom: -2px;
-  width: 6px;
-  margin-left: -3px;
-  border-radius: 3px;
-  background: var(--ink);
-}
-
-.kdots {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-}
-
-.kdots i {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--line);
-}
-
-.kdots i.h {
-  background: var(--grass);
-}
-
-.kdots i.m {
-  background: var(--coral);
-}
-
-.kmsg {
-  margin: 0;
-  text-align: center;
-  font-weight: 800;
-}
-
-/* ảnh polaroid */
-.polar {
-  background: #fff;
-  padding: 10px 10px 14px;
-  border-radius: 6px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, .18);
-  transform: rotate(-2.5deg);
-  align-self: center;
-  width: min(300px, 100%);
-}
-
-.polar img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
-  border-radius: 3px;
-}
-
-.polar p {
-  margin: 8px 0 0;
-  font-family: var(--f-display);
-  font-weight: 700;
-  font-size: 15px;
-  text-align: center;
-  line-height: 1.2;
-}
-
-.polar small {
-  display: block;
-  font-family: var(--f-body);
-  font-size: 12px;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-/* danh sách */
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.qitem {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: var(--cream);
-}
-
-.qitem b {
-  font-size: 14.5px;
-}
-
-.qbar {
-  height: 7px;
-  border-radius: 5px;
-  background: var(--line);
-  overflow: hidden;
-  margin-top: 5px;
-}
-
-.qbar i {
-  display: block;
-  height: 100%;
-  background: var(--grass);
-}
-
-.qrew {
-  font-family: var(--f-display);
-  font-weight: 800;
-  color: var(--sun-d);
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.qitem.done {
-  background: #E8F8E3;
-}
-
-.qitem.done .qrew {
-  color: var(--grass-d);
-}
-
-.album {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 12px 6px;
-}
-
-@media (max-width: 480px) {
-  .album {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-.album div {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  text-align: center;
-  font-size: 11.5px;
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.album small {
-  display: block;
-  font-weight: 700;
-  color: var(--muted);
-  font-size: 10.5px;
-}
-
-.rank {
-  display: grid;
-  grid-template-columns: 34px 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border-radius: 12px;
-  background: var(--cream);
-  font-weight: 800;
-}
-
-.rank .n {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: #fff;
-  font-family: var(--f-display);
-}
-
-.rank:nth-child(1) .n { background: var(--sun); }
-.rank:nth-child(2) .n { background: #DDE3E8; }
-.rank:nth-child(3) .n { background: #F2C7A1; }
-
-.rank.you {
-  background: #E1F4FD;
-  outline: 2px solid var(--tdc);
-}
-
-.rank > span:last-child {
-  font-family: var(--f-display);
-  font-variant-numeric: tabular-nums;
-}
-
-.note {
-  margin: 0;
-  font-size: 12.5px;
-  color: var(--muted);
-  font-weight: 700;
-}
-
-.help h3 {
-  margin: 0 0 4px;
-  font-family: var(--f-display);
-  font-size: 16.5px;
-}
-
-.help p, .help ul {
-  margin: 0;
-  font-size: 13.5px;
-}
-
-.help ul {
-  padding-left: 18px;
-  display: grid;
-  gap: 4px;
-}
-
-.help kbd {
-  font-family: var(--f-display);
-  font-weight: 800;
-  background: var(--cream);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 0 6px;
-}
-
-/* chứng nhận */
-.cert {
-  border: 3px dashed var(--sun);
-  border-radius: 18px;
-  padding: 16px 14px;
-  text-align: center;
-  background: var(--cream);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: center;
-}
-
-.cert small {
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: var(--sun-d);
-}
-
-.cert h3 {
-  margin: 0;
-  font-family: var(--f-display);
-  font-size: 28px;
-  line-height: 1.05;
-}
-
-.cert .row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px;
-  margin-top: 4px;
-}
-
-.btns {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.btns > * {
-  flex: 1 1 130px;
-}
-
-a.btn {
-  text-decoration: none;
-}
-
-/* ---------- khung chụp ảnh ---------- */
-#viewfinder {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 25;
-}
-
-#viewfinder .fr {
-  position: absolute;
-  inset: 12% 8% 22%;
-  border-radius: 20px;
-  box-shadow: 0 0 0 2000px rgba(20, 48, 32, .28);
-}
-
-#viewfinder .fr::before, #viewfinder .fr::after {
-  content: "";
-  position: absolute;
-  inset: -4px;
-  border: 5px solid #fff;
-  border-radius: 22px;
-  -webkit-mask: linear-gradient(#000 0 0) top left/34px 34px no-repeat,
-                linear-gradient(#000 0 0) top right/34px 34px no-repeat,
-                linear-gradient(#000 0 0) bottom left/34px 34px no-repeat,
-                linear-gradient(#000 0 0) bottom right/34px 34px no-repeat;
-  mask: linear-gradient(#000 0 0) top left/34px 34px no-repeat,
-        linear-gradient(#000 0 0) top right/34px 34px no-repeat,
-        linear-gradient(#000 0 0) bottom left/34px 34px no-repeat,
-        linear-gradient(#000 0 0) bottom right/34px 34px no-repeat;
-}
-
-#viewfinder .cap {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(12% - 44px);
-  text-align: center;
-  font-family: var(--f-display);
-  font-weight: 800;
-  font-size: 20px;
-  color: #fff;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, .25);
-}
-
-#viewfinder .vf-btns {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(6% + env(safe-area-inset-bottom, 0px));
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 22px;
-  pointer-events: auto;
-}
-
-.shutter {
-  width: 76px;
-  height: 76px;
-  border-radius: 50%;
-  border: 6px solid #fff;
-  background: var(--coral);
-  cursor: pointer;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, .2);
-}
-
-.shutter:active {
-  transform: scale(.94);
-}
-
-.vf-small {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  border: 0;
-  background: #fff;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  color: var(--ink);
-}
-
-#flash {
-  position: absolute;
-  inset: 0;
-  background: #fff;
-  pointer-events: none;
-  animation: flash .5s forwards;
-  z-index: 40;
-}
-
-@keyframes flash {
-  to { opacity: 0; }
-}
-
-/* ---------- chữ nổi, thông báo ---------- */
-#fx {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.fxt {
-  position: absolute;
-  left: 0;
-  top: 0;
-  font-family: var(--f-display);
-  font-weight: 800;
-  font-size: 22px;
-  color: var(--sun);
-  -webkit-text-stroke: 5px #fff;
-  paint-order: stroke fill;
-  white-space: nowrap;
-  will-change: transform;
-}
-
-#toasts {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(76px + env(safe-area-inset-top, 0px));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  pointer-events: none;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  z-index: 45;
-}
-
-.toast {
-  background: var(--ink);
-  color: #fff;
-  font-weight: 800;
-  font-size: 14px;
-  padding: 9px 16px;
-  border-radius: 999px;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, .2);
-  animation: pop .3s cubic-bezier(.2, 1.4, .4, 1);
-  max-width: 100%;
-  text-align: center;
-}
-
-.toast.gold {
-  background: var(--sun);
-  color: #3D2A00;
-}
-</file>
-
-<file path="src/main.tsx">
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { App } from './App';
-import './index.css';
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
-</file>
-
-<file path="src/vite-env.d.ts">
-/// <reference types="vite/client" />
-</file>
-
-<file path=".env.example">
-# Cấu hình Firebase cho dự án TDC GO
-# Sao chép file này thành .env và điền thông số từ Firebase Console -> Project Settings.
-# Nếu để trống, ứng dụng tự động chạy ở chế độ Local Demo (LocalStorage + Simulated Realtime).
-
-VITE_FIREBASE_API_KEY=
-VITE_FIREBASE_AUTH_DOMAIN=
-VITE_FIREBASE_PROJECT_ID=
-VITE_FIREBASE_STORAGE_BUCKET=
-VITE_FIREBASE_MESSAGING_SENDER_ID=
-VITE_FIREBASE_APP_ID=
-</file>
-
-<file path=".firebaserc">
+<file path="firebase.json">
 {
-  "projects": {
-    "default": "tdc-go-2026"
-  }
-}
-</file>
-
-<file path=".gitignore">
-node_modules
-dist
-dist-ssr
-*.local
-.env
-.firebase
-firebase-debug.log
-firestore-debug.log
-ui-debug.log
-</file>
-
-<file path="firestore.indexes.json">
-{
-  "indexes": [
-    {
-      "collectionGroup": "users_public",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "facultyId", "order": "ASCENDING" },
-        { "fieldPath": "points", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "checkins",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "stationId", "order": "ASCENDING" },
-        { "fieldPath": "timestamp", "order": "DESCENDING" }
-      ]
+  "auth": {
+    "providers": {
+      "anonymous": true,
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "TDC Travel",
+        "supportEmail": "kuganagia@gmail.com"
+      }
     }
-  ],
-  "fieldOverrides": []
-}
-</file>
-
-<file path="firestore.rules">
-rules_version = '2';
-
-// ===============================================================
-// Assumed Data Model
-// ===============================================================
-//
-// This security rules file assumes the following data structures:
-//
-// Collection: users
-// Document ID: {userId} (matches request.auth.uid)
-// Fields:
-//   - uid: string (required, immutable, matches userId) - User ID
-//   - name: string (required, 1..50 chars) - Display name
-//   - mssv: string (required, 1..20 chars) - Student ID
-//   - email: string (required, valid email, max 100 chars) - Private student email
-//   - facultyId: string (required, enum of faculties) - Faculty ID
-//   - role: string (required, 'student' | 'admin') - RBAC role (cannot self-escalate)
-//   - avatar: number (required, 0..5) - Avatar index
-//   - points: number (required, >= 0, <= 1000000) - Total points
-//   - stars: number (required, >= 0, <= 100000) - Collected stars
-//   - quizOk: number (required, >= 0, <= 10000) - Correct quizzes
-//   - photos: number (required, >= 0, <= 10000) - Photos taken
-//   - done: map (required, max 50 keys) - Unlocked stations map
-//   - bonus: map (required, max 50 keys) - Completed quests map
-//   - partyId: string (optional, max 12 chars) - Active party room code
-//   - updatedAt: number (required, >= 0) - Epoch timestamp ms
-//
-// Collection: users_public
-// Document ID: {userId} (matches request.auth.uid)
-// Fields:
-//   - uid: string (required, immutable, matches userId) - User ID
-//   - name: string (required, 1..50 chars) - Display name (non-PII)
-//   - mssv: string (required, 1..20 chars) - Student ID
-//   - facultyId: string (required, enum of faculties) - Faculty ID
-//   - avatar: number (required, 0..5) - Avatar index
-//   - points: number (required, >= 0, <= 1000000) - Total points
-//   - unlockedCount: number (required, >= 0, <= 50) - Number of unlocked stations
-//   - partyId: string (optional, max 12 chars) - Active party code
-//   - updatedAt: number (required, >= 0) - Epoch timestamp ms
-//
-// Collection: stations
-// Document ID: {stationId}
-// Fields:
-//   - id: string (required, 1..30 chars)
-//   - name: string (required, 1..80 chars)
-//   - sub: string (required, 1..120 chars)
-//   - facultyId: string (required, 1..30 chars)
-//   - x: number (required, -500..500)
-//   - z: number (required, -500..500)
-//   - fogRadius: number (required, 5..120)
-//   - col: string (required, 4..16 chars)
-//   - type: string (required, enum)
-//   - pts: number (required, 10..2000)
-//   - badge: string (required, 1..60 chars)
-//   - info: string (required, 1..600 chars)
-//   - funFact: string (required, 1..600 chars)
-//   - directions: string (required, 1..400 chars)
-//   - qrSecretToken: string (required, 4..64 chars)
-//   - riddle: map (optional)
-//   - questions: list (optional, max 20 items)
-//   - active: bool (required)
-//
-// Collection: parties
-// Document ID: {partyCode}
-// Fields:
-//   - code: string (required, immutable, 6 chars)
-//   - hostUid: string (required, immutable, 1..64 chars)
-//   - name: string (required, 1..60 chars)
-//   - memberUids: list (required, 1..4 items)
-//   - members: list (required, 1..4 items)
-//   - isCrossFaculty: bool (required)
-//   - bonusMultiplier: number (required, 1..3)
-//   - totalPoints: number (required, >= 0, <= 4000000)
-//   - createdAt: number (required, immutable)
-//
-// Collection: events
-// Document ID: {eventId}
-// Fields:
-//   - id: string (required, 1..40 chars)
-//   - title: string (required, 1..100 chars)
-//   - description: string (required, 1..500 chars)
-//   - startDate: string (required, 1..30 chars)
-//   - endDate: string (required, 1..30 chars)
-//   - active: bool (required)
-//   - bonusMultiplier: number (required, 1..5)
-//
-// Collection: checkins
-// Document ID: {checkinId}
-// Fields:
-//   - uid: string (required, immutable, matches request.auth.uid)
-//   - userName: string (required, 1..50 chars)
-//   - stationId: string (required, 1..30 chars)
-//   - facultyId: string (required, 1..30 chars)
-//   - method: string (required, 'qr' | 'riddle' | 'demo')
-//   - pts: number (required, 0..5000)
-//   - timestamp: number (required, > 0)
-//
-// ===============================================================
-
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    function isDocOwner() {
-      return isAuthenticated() && request.auth.uid == resource.data.uid;
-    }
-
-    function uidUnchanged() {
-      return !('uid' in request.resource.data) ||
-        request.resource.data.uid == request.auth.uid;
-    }
-
-    function uidNotModified() {
-      return !('uid' in request.resource.data) ||
-        request.resource.data.uid == resource.data.uid;
-    }
-
-    function hasRequiredFields(fields) {
-      return request.resource.data.keys().hasAll(fields);
-    }
-
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
-    }
-
-    function validStringLength(field, minLen, maxLen) {
-      return request.resource.data[field] is string &&
-        request.resource.data[field].size() >= minLen &&
-        request.resource.data[field].size() <= maxLen;
-    }
-
-    function isValidOptionalString(field, minLen, maxLen) {
-      return !(field in request.resource.data) ||
-        (request.resource.data[field] is string &&
-         request.resource.data[field].size() >= minLen &&
-         request.resource.data[field].size() <= maxLen);
-    }
-
-    function isValidEmail(email) {
-      return email is string &&
-        email.size() <= 100 &&
-        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function isValidFaculty(facultyId) {
-      return facultyId in ['cntt', 'dien_dt', 'co_khi_oto', 'co_khi_ctm', 'kinh_te', 'ngoai_ngu', 'du_lich', 'khac'];
-    }
-
-    function isAdmin() {
-      return isAuthenticated() &&
-        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
-
-    function isValidUserPrivate(data) {
-      return hasRequiredFields(['uid', 'name', 'mssv', 'email', 'facultyId', 'role', 'avatar', 'points', 'stars', 'quizOk', 'photos', 'done', 'bonus', 'updatedAt']) &&
-        hasOnlyAllowedFields(['uid', 'name', 'mssv', 'email', 'facultyId', 'role', 'avatar', 'points', 'stars', 'quizOk', 'photos', 'done', 'bonus', 'partyId', 'updatedAt']) &&
-        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 64 &&
-        validStringLength('name', 1, 50) &&
-        validStringLength('mssv', 1, 20) &&
-        isValidEmail(data.email) &&
-        isValidFaculty(data.facultyId) &&
-        data.role in ['student', 'admin'] &&
-        data.avatar is number && data.avatar >= 0 && data.avatar <= 5 &&
-        data.points is number && data.points >= 0 && data.points <= 1000000 &&
-        data.stars is number && data.stars >= 0 && data.stars <= 100000 &&
-        data.quizOk is number && data.quizOk >= 0 && data.quizOk <= 10000 &&
-        data.photos is number && data.photos >= 0 && data.photos <= 10000 &&
-        data.done is map && data.done.size() <= 50 &&
-        data.bonus is map && data.bonus.size() <= 50 &&
-        isValidOptionalString('partyId', 0, 12) &&
-        data.updatedAt is number && data.updatedAt >= 0;
-    }
-
-    function isValidUserPublic(data) {
-      return hasRequiredFields(['uid', 'name', 'mssv', 'facultyId', 'avatar', 'points', 'unlockedCount', 'updatedAt']) &&
-        hasOnlyAllowedFields(['uid', 'name', 'mssv', 'facultyId', 'avatar', 'points', 'unlockedCount', 'partyId', 'updatedAt']) &&
-        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 64 &&
-        validStringLength('name', 1, 50) &&
-        validStringLength('mssv', 1, 20) &&
-        isValidFaculty(data.facultyId) &&
-        data.avatar is number && data.avatar >= 0 && data.avatar <= 5 &&
-        data.points is number && data.points >= 0 && data.points <= 1000000 &&
-        data.unlockedCount is number && data.unlockedCount >= 0 && data.unlockedCount <= 50 &&
-        isValidOptionalString('partyId', 0, 12) &&
-        data.updatedAt is number && data.updatedAt >= 0;
-    }
-
-    function isValidStation(data) {
-      return hasRequiredFields(['id', 'name', 'sub', 'facultyId', 'x', 'z', 'fogRadius', 'col', 'type', 'pts', 'badge', 'info', 'funFact', 'directions', 'qrSecretToken', 'active']) &&
-        hasOnlyAllowedFields(['id', 'name', 'sub', 'facultyId', 'x', 'z', 'fogRadius', 'col', 'type', 'pts', 'badge', 'info', 'funFact', 'directions', 'qrSecretToken', 'riddle', 'questions', 'active']) &&
-        validStringLength('id', 1, 30) &&
-        validStringLength('name', 1, 80) &&
-        validStringLength('sub', 1, 120) &&
-        validStringLength('facultyId', 1, 30) &&
-        data.x is number && data.x >= -500 && data.x <= 500 &&
-        data.z is number && data.z >= -500 && data.z <= 500 &&
-        data.fogRadius is number && data.fogRadius >= 5 && data.fogRadius <= 120 &&
-        validStringLength('col', 4, 16) &&
-        data.type in ['checkin', 'photo', 'quiz', 'kick', 'it_debug', 'electric_circuit', 'auto_engine'] &&
-        data.pts is number && data.pts >= 10 && data.pts <= 2000 &&
-        validStringLength('badge', 1, 60) &&
-        validStringLength('info', 1, 600) &&
-        validStringLength('funFact', 1, 600) &&
-        validStringLength('directions', 1, 400) &&
-        validStringLength('qrSecretToken', 4, 64) &&
-        (!('riddle' in data) || (data.riddle is map && data.riddle.keys().hasOnly(['prompt', 'answer', 'hint']))) &&
-        (!('questions' in data) || (data.questions is list && data.questions.size() <= 20)) &&
-        data.active is bool;
-    }
-
-    function isValidParty(data) {
-      return hasRequiredFields(['code', 'hostUid', 'name', 'memberUids', 'members', 'isCrossFaculty', 'bonusMultiplier', 'totalPoints', 'createdAt']) &&
-        hasOnlyAllowedFields(['code', 'hostUid', 'name', 'memberUids', 'members', 'isCrossFaculty', 'bonusMultiplier', 'totalPoints', 'createdAt']) &&
-        validStringLength('code', 6, 6) &&
-        validStringLength('hostUid', 1, 64) &&
-        validStringLength('name', 1, 60) &&
-        data.memberUids is list && data.memberUids.size() >= 1 && data.memberUids.size() <= 4 &&
-        data.members is list && data.members.size() >= 1 && data.members.size() <= 4 &&
-        data.isCrossFaculty is bool &&
-        data.bonusMultiplier is number && data.bonusMultiplier >= 1 && data.bonusMultiplier <= 3 &&
-        data.totalPoints is number && data.totalPoints >= 0 && data.totalPoints <= 4000000 &&
-        data.createdAt is number && data.createdAt >= 0;
-    }
-
-    function isValidEvent(data) {
-      return hasRequiredFields(['id', 'title', 'description', 'startDate', 'endDate', 'active', 'bonusMultiplier']) &&
-        hasOnlyAllowedFields(['id', 'title', 'description', 'startDate', 'endDate', 'active', 'bonusMultiplier']) &&
-        validStringLength('id', 1, 40) &&
-        validStringLength('title', 1, 100) &&
-        validStringLength('description', 1, 500) &&
-        validStringLength('startDate', 1, 30) &&
-        validStringLength('endDate', 1, 30) &&
-        data.active is bool &&
-        data.bonusMultiplier is number && data.bonusMultiplier >= 1 && data.bonusMultiplier <= 5;
-    }
-
-    function isValidCheckin(data) {
-      return hasRequiredFields(['uid', 'userName', 'stationId', 'facultyId', 'method', 'pts', 'timestamp']) &&
-        hasOnlyAllowedFields(['uid', 'userName', 'stationId', 'facultyId', 'method', 'pts', 'timestamp']) &&
-        data.uid == request.auth.uid &&
-        validStringLength('userName', 1, 50) &&
-        validStringLength('stationId', 1, 30) &&
-        isValidFaculty(data.facultyId) &&
-        data.method in ['qr', 'riddle', 'demo'] &&
-        data.pts is number && data.pts >= 0 && data.pts <= 5000 &&
-        data.timestamp is number && data.timestamp > 0;
-    }
-
-    // ===============================================================
-    // Collection Rules
-    // ===============================================================
-
-    // Private User Profile (contains PII email) -> strictly owner or admin
-    match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated() &&
-        isValidUserPrivate(request.resource.data) &&
-        uidUnchanged() &&
-        ((isOwner(userId) && request.resource.data.role == 'student') || isAdmin());
-      allow update: if isAuthenticated() &&
-        isValidUserPrivate(request.resource.data) &&
-        uidNotModified() &&
-        ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
-      allow delete: if isAdmin();
-    }
-
-    // Public Leaderboard Profile (No PII) -> readable by authenticated players
-    match /users_public/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isOwner(userId) &&
-        uidUnchanged() &&
-        isValidUserPublic(request.resource.data);
-      allow update: if (isOwner(userId) || isAdmin()) &&
-        uidNotModified() &&
-        isValidUserPublic(request.resource.data);
-      allow delete: if isAdmin();
-    }
-
-    // Campus 3D Stations -> readable by authenticated users, writable by admins only
-    match /stations/{stationId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isAdmin() && isValidStation(request.resource.data);
-      allow delete: if isAdmin();
-    }
-
-    // Co-op Party Rooms (2-4 students)
-    match /parties/{partyCode} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() &&
-        request.resource.data.hostUid == request.auth.uid &&
-        request.auth.uid in request.resource.data.memberUids &&
-        isValidParty(request.resource.data);
-      allow update: if isAuthenticated() &&
-        isValidParty(request.resource.data) &&
-        request.resource.data.code == resource.data.code &&
-        request.resource.data.hostUid == resource.data.hostUid &&
-        request.resource.data.createdAt == resource.data.createdAt &&
-        (request.auth.uid in resource.data.memberUids || request.auth.uid in request.resource.data.memberUids || isAdmin());
-      allow delete: if isAuthenticated() && (resource.data.hostUid == request.auth.uid || isAdmin());
-    }
-
-    // Campaign Events
-    match /events/{eventId} {
-      allow read: if isAuthenticated();
-      allow create, update: if isAdmin() && isValidEvent(request.resource.data);
-      allow delete: if isAdmin();
-    }
-
-    // O2O Check-in Logs (Anti-cheat & Analytics)
-    match /checkins/{checkinId} {
-      allow read: if isDocOwner() || isAdmin();
-      allow create: if isAuthenticated() && isValidCheckin(request.resource.data);
-      allow update: if false; // Check-in logs are immutable
-      allow delete: if isAdmin();
-    }
-  }
-}
-</file>
-
-<file path="index.html">
-<!doctype html>
-<html lang="vi">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>TDC GO · Khám phá Khuôn viên 3D Trường Cao đẳng Công nghệ Thủ Đức</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@500;700;800;900&display=swap"
-    />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
-</file>
-
-<file path="package.json">
-{
-  "name": "tdc-go",
-  "private": true,
-  "version": "1.0.0",
-  "description": "TDC GO - Web Game 3D Khám phá Khuôn viên Trường Cao đẳng Công nghệ Thủ Đức",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
   },
-  "dependencies": {
-    "firebase": "^11.3.1",
-    "html5-qrcode": "^2.3.8",
-    "lucide-react": "^0.475.0",
-    "qrcode": "^1.5.4",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "three": "^0.173.0"
+  "firestore": {
+    "database": "(default)",
+    "location": "asia-southeast1",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   },
-  "devDependencies": {
-    "@tailwindcss/vite": "^4.0.6",
-    "@types/node": "^22.13.4",
-    "@types/qrcode": "^1.5.5",
-    "@types/react": "^19.0.8",
-    "@types/react-dom": "^19.0.3",
-    "@types/three": "^0.173.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "tailwindcss": "^4.0.6",
-    "typescript": "~5.7.2",
-    "vite": "^6.1.0",
-    "vitest": "^3.0.5"
+  "hosting": {
+    "public": "dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
   }
-}
-</file>
-
-<file path="README.md">
-# TDC GO · Web Game 3D Khám phá Khuôn viên Trường Cao đẳng Công nghệ Thủ Đức
-
-Dự án triển khai từ Đề tài Nghiên cứu Khoa học Cấp Cơ sở năm học 2026–2027: **"Phát triển web game “TDC GO” khám phá khuôn viên Trường Cao đẳng Công nghệ Thủ Đức"**, kế thừa và mở rộng mô hình bản đồ 3D khuôn viên TDC từ [hoanghnguyen9109/tdc-go](https://github.com/hoanghnguyen9109/tdc-go).
-
-## Kiến trúc Công nghệ
-- **Frontend**: React 19 + TypeScript + Vite + TailwindCSS v4
-- **3D WebGL Engine**: Three.js (Mô hình 3D Khu A, Khu B, Hội trường H, Tòa C, KTX, Xưởng Cơ khí, Tòa D 11 tầng, 6 sân bóng mini, sân tennis, sân bóng chuyền, Cổng 1 & 2, đoàn tàu TDC Express, nhân vật Chibi & NPC)
-- **O2O Camera & QR**: `html5-qrcode` (WebRTC Camera Scanner) + `qrcode` (In Standee QR chống gian lận)
-- **Backend & Cloud**: Firebase Authentication + Cloud Firestore Realtime + Firebase Hosting (tích hợp chế độ **Dual-Mode Local Fallback** giúp chạy thử ngay không cần khóa `.env`)
-
-## 06 Phân hệ Cốt lõi đã Triển khai
-1. **Đăng nhập & Hồ sơ Thám hiểm (Explorer Profile)**: Đăng nhập Email SV (`@mail.tdc.edu.vn`) / Google / Demo nhanh, lưu MSSV, Khoa, Avatar Chibi, % mở khóa bản đồ, Bộ sưu tập Huy hiệu (TDC Stamp Collection) & Chứng nhận điện tử.
-2. **Bản đồ 3D Tương tác & Cơ chế Mở khóa Sương mù (Fog of War)**: Các khu vực chưa khám phá được phủ sương mù 3D (Volumetric Mist Clusters) và lớp tối trên Minimap; hiệu ứng tan sương mù kèm pháo giấy khi giải xong trạm.
-3. **Câu đố Thực địa & Check-in Hiện trường (O2O Verification + Anti-cheat)**: Xác thực kép tại trạm bằng Quét mã QR qua Camera hoặc Giải mật thư quan sát thực tế tại chỗ, kèm cơ chế chống gian lận (Cooldown thời gian di chuyển giữa các trạm & ngân hàng câu hỏi ngẫu nhiên).
-4. **Kho Mini-game Đặc trưng từng Khoa**:
-   - **Khoa CNTT (Tòa B)**: *Debug Terminal* – Tìm và vá 3 lỗi logic code dưới áp lực thời gian.
-   - **Khoa Điện – Điện tử (Tòa B)**: *Circuit Connector* – Xoay linh kiện khép kín mạch điện tự động hóa PLC 24V.
-   - **Khoa Cơ khí – Ô tô (Xưởng cơ khí)**: *4-Stroke Engine Assembly* – Lắp ráp chu trình động cơ đốt trong 4 kỳ (Nạp – Nén – Nổ – Xả).
-   - **Khu Thể thao (6 sân bóng mini)**: *Mini-game Sút bóng 3 lượt*.
-   - **Bồn cây tròn**: *Chụp ảnh Polaroid 3D trực tiếp từ cảnh WebGL*.
-5. **Tổ đội (Co-op Party 2–4 SV) & Bảng xếp hạng (Leaderboard)**: Tạo/vào phòng bằng mã 6 ký tự, tự động kích hoạt **+20% điểm thưởng Liên khoa (Cross-Faculty Bonus)** khi tổ đội có từ 2 khoa trở lên; BXH theo Cá nhân, Tổ đội và Khoa.
-6. **Quản trị Hệ thống (Admin CMS)**: Thêm/sửa/xóa điểm trạm 3D & mật thư, xuất bảng Standee QR Code chuẩn in ấn, quản lý Chiến dịch Sự kiện, xem biểu đồ thống kê và xuất báo cáo `.CSV`.
-
-## Hướng dẫn Chạy Dự án
-```bash
-# 1. Cài đặt thư viện
-npm install
-
-# 2. Chạy môi trường phát triển (http://localhost:5173)
-npm run dev
-
-# 3. Kiểm thử Unit Tests (Vitest)
-npm test
-
-# 4. Build Production
-npm run build
-```
-</file>
-
-<file path="tsconfig.json">
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-    "jsx": "react-jsx",
-    "strict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
-  },
-  "include": ["src"]
 }
 </file>
 
 <file path="tsconfig.tsbuildinfo">
 {"root":["./src/app.tsx","./src/game.test.ts","./src/main.tsx","./src/vite-env.d.ts","./src/components/gamehud.tsx","./src/components/minimap.tsx","./src/components/qrscannermodal.tsx","./src/components/startscreen.tsx","./src/components/stationmodal.tsx","./src/components/stationsticker.tsx","./src/components/minigames/autoenginegame.tsx","./src/components/minigames/electriccircuitgame.tsx","./src/components/minigames/itdebuggame.tsx","./src/components/minigames/kickgame.tsx","./src/components/minigames/viewfinder.tsx","./src/components/modals/certificatemodal.tsx","./src/components/modals/helpmodal.tsx","./src/components/modals/leaderboardmodal.tsx","./src/components/modals/partymodal.tsx","./src/components/modals/profilebadgesmodal.tsx","./src/components/modals/questsmodal.tsx","./src/data/campusbuildings.ts","./src/data/campuslayout.ts","./src/data/faculties.ts","./src/data/stations.ts","./src/engine/tdccampusengine.ts","./src/engine/audiosfx.ts","./src/engine/campusbuilder.ts","./src/engine/chibibuilder.ts","./src/engine/fogofwar.ts","./src/engine/natureandtrain.ts","./src/engine/threehelpers.ts","./src/pages/admindashboard.tsx","./src/services/adminservice.ts","./src/services/authservice.ts","./src/services/firebase.ts","./src/services/gameservice.ts","./src/services/gpsservice.ts","./src/services/partyservice.ts","./src/types/game.ts"],"version":"5.7.3"}
-</file>
-
-<file path="vite.config.ts">
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
-
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  server: {
-    port: 5173,
-    host: true,
-  },
-});
 </file>
 
 <file path="src/engine/TdcCampusEngine.ts">
@@ -11911,757 +12667,6 @@ export class TdcCampusEngine {
 }
 </file>
 
-<file path="src/services/gameService.ts">
-import { addDoc, collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
-import { QUESTS } from '../data/campusLayout';
-import { DEFAULT_EVENTS } from '../data/stations';
-import {
-  CampaignEvent,
-  CheckinLog,
-  PartyRoom,
-  PublicLeaderboardUser,
-  Station,
-  UnlockedStationRecord,
-  UserProfile,
-  VerificationMethod,
-} from '../types/game';
-import { getLocalPublicUsers, syncProfileToCloud } from './authService';
-import { db, isFirebaseConfigured } from './firebase';
-import { loadLocalParties, syncMemberPointsInParty } from './partyService';
-
-const LOCAL_CHECKINS_KEY = 'tdc_go_checkins_v2';
-const LOCAL_EVENTS_KEY = 'tdc_go_events_v2';
-
-// Minimum cooldown in ms between real-world QR/Riddle check-ins to prevent automated replay
-export const ANTI_CHEAT_COOLDOWN_MS = 4000;
-
-export function normalizeVietnameseAnswer(text: string): string {
-  return text
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ');
-}
-
-export function verifyStationRiddle(station: Station, userInput: string): boolean {
-  if (!station.riddle) return true;
-  const expected = normalizeVietnameseAnswer(station.riddle.answer);
-  const actual = normalizeVietnameseAnswer(userInput);
-  if (!actual) return false;
-  return actual === expected || actual.includes(expected);
-}
-
-export function verifyStationQrPayload(
-  station: Station,
-  scannedCode: string
-): { valid: boolean; matchedStationId?: string; message: string } {
-  const clean = scannedCode.trim();
-  if (!clean) {
-    return { valid: false, message: 'Mã QR trống hoặc không hợp lệ.' };
-  }
-
-  // Support either JSON payload `{"app":"TDC_GO","stationId":"...","token":"..."}` or direct token string
-  try {
-    if (clean.startsWith('{')) {
-      const obj = JSON.parse(clean) as {
-        app?: string;
-        stationId?: string;
-        token?: string;
-      };
-      if (obj.token === station.qrSecretToken || obj.stationId === station.id) {
-        return {
-          valid: true,
-          matchedStationId: station.id,
-          message: `Xác thực QR thành công tại ${station.name}!`,
-        };
-      }
-      return {
-        valid: false,
-        matchedStationId: obj.stationId,
-        message: 'Mã QR này thuộc về một trạm khác trong khuôn viên.',
-      };
-    }
-  } catch {
-    // Plain string check below
-  }
-
-  if (
-    clean.toUpperCase() === station.qrSecretToken.toUpperCase() ||
-    clean.toLowerCase() === station.id.toLowerCase()
-  ) {
-    return {
-      valid: true,
-      matchedStationId: station.id,
-      message: `Xác thực mã định danh trạm ${station.name} thành công!`,
-    };
-  }
-
-  return {
-    valid: false,
-    message: 'Mã QR không khớp với trạm hiện tại. Hãy kiểm tra lại bảng QR tại trạm!',
-  };
-}
-
-export function checkAntiCheatCooldown(
-  profile: UserProfile,
-  method: VerificationMethod,
-  now = Date.now()
-): { allowed: boolean; waitSeconds: number } {
-  if (method === 'demo') return { allowed: true, waitSeconds: 0 };
-
-  const timestamps = Object.values(profile.done || {}).map((r) => r.unlockedAt || 0);
-  if (timestamps.length === 0) return { allowed: true, waitSeconds: 0 };
-
-  const lastUnlock = Math.max(...timestamps);
-  const elapsed = now - lastUnlock;
-  if (elapsed < ANTI_CHEAT_COOLDOWN_MS) {
-    return {
-      allowed: false,
-      waitSeconds: Math.ceil((ANTI_CHEAT_COOLDOWN_MS - elapsed) / 1000),
-    };
-  }
-  return { allowed: true, waitSeconds: 0 };
-}
-
-export function loadLocalEvents(): CampaignEvent[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_EVENTS_KEY);
-    if (!raw) {
-      localStorage.setItem(LOCAL_EVENTS_KEY, JSON.stringify(DEFAULT_EVENTS));
-      return [...DEFAULT_EVENTS];
-    }
-    const list = JSON.parse(raw) as CampaignEvent[];
-    return Array.isArray(list) ? list : [...DEFAULT_EVENTS];
-  } catch {
-    return [...DEFAULT_EVENTS];
-  }
-}
-
-export function getActiveEventMultiplier(): {
-  event: CampaignEvent | null;
-  multiplier: number;
-} {
-  const events = loadLocalEvents();
-  const active = events.find((e) => e.active);
-  return {
-    event: active || null,
-    multiplier: active ? active.bonusMultiplier : 1.0,
-  };
-}
-
-export function calculateStationRewardPoints(params: {
-  basePoints: number;
-  party: PartyRoom | null;
-  method: VerificationMethod;
-  eventMultiplier?: number;
-}): {
-  finalPoints: number;
-  crossFacultyBonus: number;
-  qrBonus: number;
-  eventBonus: number;
-  activeEventTitle?: string;
-} {
-  const qrBonus = params.method === 'qr' ? 15 : params.method === 'riddle' ? 10 : 0;
-  const crossMultiplier =
-    params.party && params.party.isCrossFaculty ? params.party.bonusMultiplier : 1.0;
-  const crossFacultyBonus =
-    crossMultiplier > 1 ? Math.round(params.basePoints * (crossMultiplier - 1)) : 0;
-
-  const activeEvt =
-    params.eventMultiplier !== undefined
-      ? { event: null, multiplier: params.eventMultiplier }
-      : getActiveEventMultiplier();
-  const evtMult = activeEvt.multiplier > 1 ? activeEvt.multiplier : 1.0;
-  const eventBonus =
-    evtMult > 1 ? Math.round(params.basePoints * (evtMult - 1)) : 0;
-
-  const finalPoints = params.basePoints + qrBonus + crossFacultyBonus + eventBonus;
-  return {
-    finalPoints,
-    crossFacultyBonus,
-    qrBonus,
-    eventBonus,
-    activeEventTitle: activeEvt.event?.title,
-  };
-}
-
-export function loadLocalCheckinLogs(): CheckinLog[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_CHECKINS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as CheckinLog[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-export async function recordStationUnlock(params: {
-  profile: UserProfile;
-  station: Station;
-  baseEarnedPoints: number;
-  method: VerificationMethod;
-  party: PartyRoom | null;
-  photoDataUrl?: string;
-  isQuizOrGameSuccess?: boolean;
-  totalStationsCount: number;
-}): Promise<{
-  updatedProfile: UserProfile;
-  finalPoints: number;
-  crossFacultyBonus: number;
-  qrBonus: number;
-  newlyCompletedQuests: { name: string; reward: number }[];
-}> {
-  const { finalPoints, crossFacultyBonus, qrBonus } = calculateStationRewardPoints({
-    basePoints: params.baseEarnedPoints,
-    party: params.party,
-    method: params.method,
-  });
-
-  const record: UnlockedStationRecord = {
-    pts: finalPoints,
-    unlockedAt: Date.now(),
-    method: params.method,
-    ...(params.photoDataUrl ? { photoDataUrl: params.photoDataUrl } : {}),
-  };
-
-  const nextDone = {
-    ...(params.profile.done || {}),
-    [params.station.id]: record,
-  };
-
-  let nextProfile: UserProfile = {
-    ...params.profile,
-    points: params.profile.points + finalPoints,
-    quizOk:
-      params.profile.quizOk + (params.isQuizOrGameSuccess ? 1 : 0),
-    photos:
-      params.profile.photos + (params.station.type === 'photo' ? 1 : 0),
-    done: nextDone,
-    updatedAt: Date.now(),
-  };
-
-  const newlyCompletedQuests: { name: string; reward: number }[] = [];
-  QUESTS.forEach((q) => {
-    if (!nextProfile.bonus[q.id] && q.getValue(nextProfile, params.totalStationsCount) >= q.need) {
-      nextProfile = {
-        ...nextProfile,
-        points: nextProfile.points + q.reward,
-        bonus: { ...nextProfile.bonus, [q.id]: true },
-      };
-      newlyCompletedQuests.push({ name: q.name, reward: q.reward });
-    }
-  });
-
-  // Save checkin log
-  const logEntry: CheckinLog = {
-    id: `chk_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-    uid: nextProfile.uid,
-    userName: nextProfile.name,
-    stationId: params.station.id,
-    facultyId: nextProfile.facultyId,
-    method: params.method,
-    pts: finalPoints,
-    timestamp: Date.now(),
-  };
-
-  try {
-    const logs = loadLocalCheckinLogs();
-    logs.unshift(logEntry);
-    localStorage.setItem(LOCAL_CHECKINS_KEY, JSON.stringify(logs.slice(0, 300)));
-  } catch {
-    // Ignore
-  }
-
-  if (isFirebaseConfigured && db) {
-    try {
-      await addDoc(collection(db, 'checkins'), {
-        uid: logEntry.uid,
-        userName: logEntry.userName,
-        stationId: logEntry.stationId,
-        facultyId: logEntry.facultyId,
-        method: logEntry.method,
-        pts: logEntry.pts,
-        timestamp: logEntry.timestamp,
-      });
-    } catch {
-      // Fallback local
-    }
-  }
-
-  await syncProfileToCloud(nextProfile);
-  await syncMemberPointsInParty(nextProfile);
-
-  return {
-    updatedProfile: nextProfile,
-    finalPoints,
-    crossFacultyBonus,
-    qrBonus,
-    newlyCompletedQuests,
-  };
-}
-
-export async function recordStarPickup(
-  profile: UserProfile,
-  totalStationsCount: number
-): Promise<{
-  updatedProfile: UserProfile;
-  newlyCompletedQuests: { name: string; reward: number }[];
-}> {
-  let nextProfile: UserProfile = {
-    ...profile,
-    stars: (profile.stars || 0) + 1,
-    points: profile.points + 10,
-    updatedAt: Date.now(),
-  };
-
-  const newlyCompletedQuests: { name: string; reward: number }[] = [];
-  QUESTS.forEach((q) => {
-    if (!nextProfile.bonus[q.id] && q.getValue(nextProfile, totalStationsCount) >= q.need) {
-      nextProfile = {
-        ...nextProfile,
-        points: nextProfile.points + q.reward,
-        bonus: { ...nextProfile.bonus, [q.id]: true },
-      };
-      newlyCompletedQuests.push({ name: q.name, reward: q.reward });
-    }
-  });
-
-  await syncProfileToCloud(nextProfile);
-  return { updatedProfile: nextProfile, newlyCompletedQuests };
-}
-
-export async function fetchLeaderboardData(
-  currentProfile: UserProfile
-): Promise<{
-  individuals: PublicLeaderboardUser[];
-  parties: PartyRoom[];
-}> {
-  let individuals = getLocalPublicUsers();
-
-  if (isFirebaseConfigured && db) {
-    try {
-      const q = query(
-        collection(db, 'users_public'),
-        orderBy('points', 'desc'),
-        limit(30)
-      );
-      const snap = await getDocs(q);
-      if (!snap.empty) {
-        individuals = snap.docs.map((d) => d.data() as PublicLeaderboardUser);
-      }
-    } catch {
-      // Fallback local
-    }
-  }
-
-  // Ensure current player is always up-to-date in leaderboard list
-  const meEntry: PublicLeaderboardUser = {
-    uid: currentProfile.uid,
-    name: currentProfile.name,
-    mssv: currentProfile.mssv,
-    facultyId: currentProfile.facultyId,
-    avatar: currentProfile.avatar,
-    points: currentProfile.points,
-    unlockedCount: Object.keys(currentProfile.done || {}).length,
-    partyId: currentProfile.partyId,
-    updatedAt: Date.now(),
-  };
-  const filtered = individuals.filter((u) => u.uid !== currentProfile.uid);
-  const mergedIndividuals = [...filtered, meEntry].sort((a, b) => b.points - a.points);
-
-  const parties = loadLocalParties().sort((a, b) => b.totalPoints - a.totalPoints);
-  return { individuals: mergedIndividuals, parties };
-}
-</file>
-
-<file path="src/services/partyService.ts">
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { FACULTIES } from '../data/faculties';
-import { FacultyId, PartyMember, PartyRoom, UserProfile } from '../types/game';
-import { syncProfileToCloud } from './authService';
-import { db, isFirebaseConfigured } from './firebase';
-
-const LOCAL_PARTIES_KEY = 'tdc_go_parties_v2';
-
-const SAMPLE_PARTIES: PartyRoom[] = [
-  {
-    code: 'TDC26A',
-    hostUid: 'sample_1',
-    name: 'Biệt đội Liên Khoa TDC',
-    memberUids: ['sample_1', 'sample_2', 'sample_3'],
-    members: [
-      {
-        uid: 'sample_1',
-        name: 'Minh Anh',
-        mssv: '24211TT0124',
-        facultyId: 'cntt',
-        avatar: 0,
-        points: 1420,
-      },
-      {
-        uid: 'sample_2',
-        name: 'Gia Huy',
-        mssv: '24211DD0089',
-        facultyId: 'dien_dt',
-        avatar: 1,
-        points: 1280,
-      },
-      {
-        uid: 'sample_3',
-        name: 'Thảo Vy',
-        mssv: '24211KT0215',
-        facultyId: 'kinh_te',
-        avatar: 2,
-        points: 1150,
-      },
-    ],
-    isCrossFaculty: true,
-    bonusMultiplier: 1.2,
-    totalPoints: 3850,
-    createdAt: Date.now() - 7200000,
-  },
-  {
-    code: 'CNTT99',
-    hostUid: 'sample_4',
-    name: 'Chiến thần Code & Cơ khí',
-    memberUids: ['sample_4', 'sample_6'],
-    members: [
-      {
-        uid: 'sample_4',
-        name: 'Quốc Bảo',
-        mssv: '24211OT0042',
-        facultyId: 'co_khi_oto',
-        avatar: 0,
-        points: 990,
-      },
-      {
-        uid: 'sample_6',
-        name: 'Tuấn Kiệt',
-        mssv: '24211CK0071',
-        facultyId: 'co_khi_ctm',
-        avatar: 1,
-        points: 740,
-      },
-    ],
-    isCrossFaculty: true,
-    bonusMultiplier: 1.2,
-    totalPoints: 1730,
-    createdAt: Date.now() - 5400000,
-  },
-];
-
-export function evaluateCrossFacultyBonus(members: PartyMember[]): {
-  isCrossFaculty: boolean;
-  bonusMultiplier: number;
-} {
-  const uniqueFaculties = new Set(members.map((m) => m.facultyId));
-  const isCross = uniqueFaculties.size >= 2;
-  return {
-    isCrossFaculty: isCross,
-    bonusMultiplier: isCross ? 1.2 : 1.0,
-  };
-}
-
-export function loadLocalParties(): PartyRoom[] {
-  try {
-    const raw = localStorage.getItem(LOCAL_PARTIES_KEY);
-    if (!raw) {
-      localStorage.setItem(LOCAL_PARTIES_KEY, JSON.stringify(SAMPLE_PARTIES));
-      return [...SAMPLE_PARTIES];
-    }
-    const parsed = JSON.parse(raw) as PartyRoom[];
-    return Array.isArray(parsed) ? parsed : [...SAMPLE_PARTIES];
-  } catch {
-    return [...SAMPLE_PARTIES];
-  }
-}
-
-export function saveLocalParties(parties: PartyRoom[]): void {
-  try {
-    localStorage.setItem(LOCAL_PARTIES_KEY, JSON.stringify(parties));
-  } catch {
-    // Ignore
-  }
-}
-
-function generateRoomCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let out = '';
-  for (let i = 0; i < 6; i++) {
-    out += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return out;
-}
-
-export async function getPartyByCode(code: string): Promise<PartyRoom | null> {
-  const cleanCode = code.trim().toUpperCase();
-  if (!cleanCode) return null;
-
-  if (isFirebaseConfigured && db) {
-    try {
-      const snap = await getDoc(doc(db, 'parties', cleanCode));
-      if (snap.exists()) return snap.data() as PartyRoom;
-    } catch {
-      // Fallback local
-    }
-  }
-  const parties = loadLocalParties();
-  return parties.find((p) => p.code === cleanCode) || null;
-}
-
-export async function createPartyRoom(
-  profile: UserProfile,
-  partyName: string
-): Promise<{ room: PartyRoom; updatedProfile: UserProfile }> {
-  const code = generateRoomCode();
-  const hostMember: PartyMember = {
-    uid: profile.uid,
-    name: profile.name,
-    mssv: profile.mssv,
-    facultyId: profile.facultyId,
-    avatar: profile.avatar,
-    points: profile.points,
-  };
-
-  const room: PartyRoom = {
-    code,
-    hostUid: profile.uid,
-    name: partyName.trim().slice(0, 45) || `Tổ đội của ${profile.name}`,
-    memberUids: [profile.uid],
-    members: [hostMember],
-    isCrossFaculty: false,
-    bonusMultiplier: 1.0,
-    totalPoints: profile.points,
-    createdAt: Date.now(),
-  };
-
-  if (isFirebaseConfigured && db) {
-    try {
-      await setDoc(doc(db, 'parties', code), room);
-    } catch {
-      // Fallback local
-    }
-  }
-
-  const parties = loadLocalParties().filter((p) => p.code !== code);
-  parties.unshift(room);
-  saveLocalParties(parties);
-
-  const updatedProfile: UserProfile = {
-    ...profile,
-    partyId: code,
-    updatedAt: Date.now(),
-  };
-  await syncProfileToCloud(updatedProfile);
-  return { room, updatedProfile };
-}
-
-export async function joinPartyRoom(
-  profile: UserProfile,
-  codeInput: string
-): Promise<{ room: PartyRoom; updatedProfile: UserProfile }> {
-  const code = codeInput.trim().toUpperCase();
-  const room = await getPartyByCode(code);
-  if (!room) {
-    throw new Error(`Không tìm thấy phòng Tổ đội với mã "${code}".`);
-  }
-  if (!room.memberUids.includes(profile.uid) && room.members.length >= 4) {
-    throw new Error('Phòng Tổ đội này đã đủ tối đa 4 thành viên.');
-  }
-
-  const me: PartyMember = {
-    uid: profile.uid,
-    name: profile.name,
-    mssv: profile.mssv,
-    facultyId: profile.facultyId,
-    avatar: profile.avatar,
-    points: profile.points,
-  };
-
-  const filteredMembers = room.members.filter((m) => m.uid !== profile.uid);
-  const nextMembers = [...filteredMembers, me];
-  const nextUids = nextMembers.map((m) => m.uid);
-  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
-  const totalPoints = nextMembers.reduce((sum, m) => sum + m.points, 0);
-
-  const updatedRoom: PartyRoom = {
-    ...room,
-    memberUids: nextUids,
-    members: nextMembers,
-    isCrossFaculty,
-    bonusMultiplier,
-    totalPoints,
-  };
-
-  if (isFirebaseConfigured && db) {
-    try {
-      await setDoc(doc(db, 'parties', code), updatedRoom);
-    } catch {
-      // Fallback local
-    }
-  }
-
-  const parties = loadLocalParties();
-  const idx = parties.findIndex((p) => p.code === code);
-  if (idx >= 0) parties[idx] = updatedRoom;
-  else parties.unshift(updatedRoom);
-  saveLocalParties(parties);
-
-  const updatedProfile: UserProfile = {
-    ...profile,
-    partyId: code,
-    updatedAt: Date.now(),
-  };
-  await syncProfileToCloud(updatedProfile);
-
-  return { room: updatedRoom, updatedProfile };
-}
-
-export async function simulateTeammateJoin(
-  roomCode: string,
-  currentFacultyId: FacultyId
-): Promise<PartyRoom> {
-  const room = await getPartyByCode(roomCode);
-  if (!room) throw new Error('Không tìm thấy phòng tổ đội.');
-  if (room.members.length >= 4) {
-    throw new Error('Tổ đội đã đủ 4 thành viên.');
-  }
-
-  const otherFaculties = FACULTIES.filter((f) => f.id !== currentFacultyId);
-  const pickedFaculty =
-    otherFaculties[room.members.length % otherFaculties.length] || FACULTIES[1];
-  const sampleNames = ['Hoàng Nam', 'Khánh Linh', 'Đức Trọng', 'Phương Thảo'];
-  const idx = room.members.length;
-  const teammate: PartyMember = {
-    uid: `coop_ally_${Date.now()}`,
-    name: sampleNames[idx % sampleNames.length],
-    mssv: `25211${pickedFaculty.id.slice(0, 2).toUpperCase()}0${10 + idx}`,
-    facultyId: pickedFaculty.id,
-    avatar: idx % 3,
-    points: 240 + idx * 80,
-  };
-
-  const nextMembers = [...room.members, teammate];
-  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
-  const updatedRoom: PartyRoom = {
-    ...room,
-    memberUids: nextMembers.map((m) => m.uid),
-    members: nextMembers,
-    isCrossFaculty,
-    bonusMultiplier,
-    totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
-  };
-
-  if (isFirebaseConfigured && db) {
-    try {
-      await setDoc(doc(db, 'parties', room.code), updatedRoom);
-    } catch {
-      // Ignore
-    }
-  }
-
-  const parties = loadLocalParties();
-  const pIdx = parties.findIndex((p) => p.code === room.code);
-  if (pIdx >= 0) parties[pIdx] = updatedRoom;
-  else parties.unshift(updatedRoom);
-  saveLocalParties(parties);
-
-  return updatedRoom;
-}
-
-export async function syncMemberPointsInParty(profile: UserProfile): Promise<PartyRoom | null> {
-  if (!profile.partyId) return null;
-  const room = await getPartyByCode(profile.partyId);
-  if (!room) return null;
-
-  const nextMembers = room.members.map((m) =>
-    m.uid === profile.uid
-      ? {
-          ...m,
-          name: profile.name,
-          facultyId: profile.facultyId,
-          avatar: profile.avatar,
-          points: profile.points,
-        }
-      : m
-  );
-  const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
-  const updatedRoom: PartyRoom = {
-    ...room,
-    members: nextMembers,
-    isCrossFaculty,
-    bonusMultiplier,
-    totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
-  };
-
-  if (isFirebaseConfigured && db) {
-    try {
-      await setDoc(doc(db, 'parties', room.code), updatedRoom);
-    } catch {
-      // Ignore
-    }
-  }
-
-  const parties = loadLocalParties();
-  const idx = parties.findIndex((p) => p.code === room.code);
-  if (idx >= 0) parties[idx] = updatedRoom;
-  saveLocalParties(parties);
-  return updatedRoom;
-}
-
-export async function leavePartyRoom(profile: UserProfile): Promise<UserProfile> {
-  if (profile.partyId) {
-    const code = profile.partyId.trim().toUpperCase();
-    const room = await getPartyByCode(code);
-    if (room) {
-      const nextMembers = room.members.filter((m) => m.uid !== profile.uid);
-      const nextUids = nextMembers.map((m) => m.uid);
-      const { isCrossFaculty, bonusMultiplier } = evaluateCrossFacultyBonus(nextMembers);
-      const updatedRoom: PartyRoom = {
-        ...room,
-        hostUid: nextMembers[0]?.uid || room.hostUid,
-        memberUids: nextUids,
-        members: nextMembers,
-        isCrossFaculty,
-        bonusMultiplier,
-        totalPoints: nextMembers.reduce((s, m) => s + m.points, 0),
-      };
-
-      if (isFirebaseConfigured && db && nextMembers.length > 0) {
-        try {
-          await setDoc(doc(db, 'parties', room.code), updatedRoom);
-        } catch {
-          // Ignore
-        }
-      }
-
-      const parties = loadLocalParties();
-      const idx = parties.findIndex((p) => p.code === room.code);
-      if (idx >= 0) {
-        if (nextMembers.length > 0) {
-          parties[idx] = updatedRoom;
-        } else {
-          parties.splice(idx, 1);
-        }
-        saveLocalParties(parties);
-      }
-    }
-  }
-
-  const updated: UserProfile = {
-    ...profile,
-    partyId: undefined,
-    updatedAt: Date.now(),
-  };
-  await syncProfileToCloud(updated);
-  return updated;
-}
-</file>
-
 <file path="src/App.tsx">
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { GameHud } from './components/GameHud';
@@ -13305,7 +13310,7 @@ import {
 import { TDC_GEO_ANCHORS } from './data/campusBuildings';
 import { PartyMember, PartyRoom, UserProfile } from './types/game';
 
-describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
+describe('TDC Travel Core Business Logic & Anti-Cheat Tests', () => {
   it('1. Normalizes Vietnamese riddle answers accurately (case, accents, punctuation)', () => {
     expect(normalizeVietnameseAnswer('  Kỹ Năng! ')).toBe('ky nang');
     expect(normalizeVietnameseAnswer('Đạo đức - Tri thức')).toBe('dao duc tri thuc');
@@ -13431,7 +13436,7 @@ describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
     expect(summary.facultyStats.length).toBeGreaterThan(0);
 
     const csv = generateAnalyticsCsv(summary);
-    expect(csv).toContain('BAO CAO THONG KE HE THONG TDC GO');
+    expect(csv).toContain('BAO CAO THONG KE HE THONG TDC TRAVEL');
     expect(csv).toContain('Tòa D');
   });
 
@@ -13578,41 +13583,6 @@ describe('TDC GO Core Business Logic & Anti-Cheat Tests', () => {
     expect(telemetryAtC.y).toBe(0);
   });
 });
-</file>
-
-<file path="firebase.json">
-{
-  "auth": {
-    "providers": {
-      "anonymous": true,
-      "emailPassword": true,
-      "googleSignIn": {
-        "oAuthBrandDisplayName": "TDC GO",
-        "supportEmail": "kuganagia@gmail.com"
-      }
-    }
-  },
-  "firestore": {
-    "database": "(default)",
-    "location": "asia-southeast1",
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  },
-  "hosting": {
-    "public": "dist",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
-  }
-}
 </file>
 
 </files>

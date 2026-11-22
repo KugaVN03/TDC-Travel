@@ -18,7 +18,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
             <HelpCircle className="w-7 h-7" />
           </span>
           <div>
-            <h2>Hướng Dẫn Khám Phá TDC GO</h2>
+            <h2>Hướng Dẫn Khám Phá TDC Travel</h2>
             <p>Web Game 3D Tương tác Thực tế (O2O Gamification)</p>
           </div>
           <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">

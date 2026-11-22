@@ -31,7 +31,7 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
           </span>
           <div>
             <h2>Chinh Phục 100% Khuôn Viên!</h2>
-            <p>Chứng nhận Nhà Thám Hiểm TDC GO 2026–2027</p>
+            <p>Chứng nhận Nhà Thám Hiểm TDC Travel 2026–2027</p>
           </div>
           <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
             <X className="w-5 h-5" />
@@ -40,7 +40,7 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
 
         <div className="sh-body">
           <div className="cert">
-            <small>GIẤY CHỨNG NHẬN ĐIỆN TỬ · TDC GO</small>
+            <small>GIẤY CHỨNG NHẬN ĐIỆN TỬ · TDC TRAVEL</small>
             <h3>{profile.name}</h3>
             <div className="text-xs font-extrabold text-slate-600">
               MSSV: {profile.mssv} · {fac.name}
@@ -66,7 +66,7 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
                   <StationSticker key={st.id} col={st.col} type={st.type} size={32} />
                 ))}
             </div>
-            <p className="note">Cấp ngày {today} · Ban Tổ chức Sự kiện TDC GO</p>
+            <p className="note">Cấp ngày {today} · Ban Tổ chức Sự kiện TDC Travel</p>
           </div>
 
           <p className="note text-center">

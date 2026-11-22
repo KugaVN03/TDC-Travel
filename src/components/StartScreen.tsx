@@ -80,7 +80,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
               </svg>
             </div>
             <h1>
-              TDC<span>GO</span>
+              TDC<span>Travel</span>
             </h1>
           </div>
 

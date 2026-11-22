@@ -48,7 +48,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({
             <Trophy className="w-7 h-7" />
           </span>
           <div>
-            <h2>Bảng Xếp Hạng TDC GO</h2>
+            <h2>Bảng Xếp Hạng TDC Travel</h2>
             <p>Học kỳ I · Năm học 2026–2027</p>
           </div>
           <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">

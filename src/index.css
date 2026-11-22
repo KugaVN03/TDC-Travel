@@ -176,7 +176,7 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   margin: 0;
   font-family: var(--f-display);
   font-weight: 800;
-  font-size: 56px;
+  font-size: 42px;
   line-height: .9;
   letter-spacing: -.01em;
   color: var(--ink);
@@ -186,10 +186,10 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   display: inline-block;
   background: var(--sun);
   color: #3D2A00;
-  border-radius: 18px;
-  padding: 2px 14px 0;
+  border-radius: 16px;
+  padding: 2px 12px 0;
   margin-left: 4px;
-  transform: rotate(-4deg);
+  transform: rotate(-3deg);
   box-shadow: 0 5px 0 var(--sun-d);
 }
 
@@ -574,42 +574,12 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   font-family: var(--f-display);
 }
 
-#joy {
-  display: none;
-  pointer-events: auto;
-  position: absolute;
-  left: max(20px, env(safe-area-inset-left, 0px));
-  bottom: calc(22px + env(safe-area-inset-bottom, 0px));
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, .55);
-  border: 3px solid rgba(255, 255, 255, .9);
-  touch-action: none;
-}
-
-#joy i {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 54px;
-  height: 54px;
-  margin: -27px 0 0 -27px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 4px 0 var(--drop);
-}
-
 @media (pointer: coarse) {
-  #joy { display: block; }
   .keys { display: none; }
-  .hud-bot { align-items: flex-end; }
-  .act { margin-bottom: 96px; align-self: center; }
-  .guide { margin-left: 140px; max-width: calc(100% - 140px); }
 }
 
 @media (max-width: 520px) {
-  .logo h1 { font-size: 46px; }
+  .logo h1 { font-size: 32px; }
   #mini { width: 96px; height: 96px; }
   .pill { height: 36px; font-size: 16px; padding: 0 11px 0 6px; }
   .pill .ic { width: 24px; height: 24px; }

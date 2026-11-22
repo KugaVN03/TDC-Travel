@@ -49,7 +49,7 @@ export function verifyStationQrPayload(
     return { valid: false, message: 'Mã QR trống hoặc không hợp lệ.' };
   }
 
-  // Support either JSON payload `{"app":"TDC_GO","stationId":"...","token":"..."}` or direct token string
+  // Support either JSON payload `{"app":"TDC_TRAVEL","stationId":"...","token":"..."}` or direct token string
   try {
     if (clean.startsWith('{')) {
       const obj = JSON.parse(clean) as {

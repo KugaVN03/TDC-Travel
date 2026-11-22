@@ -89,7 +89,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             <p>
               {targetStation
                 ? `Xác thực O2O tại: ${targetStation.name}`
-                : 'Hệ thống Check-in WebRTC Camera TDC GO'}
+                : 'Hệ thống Check-in WebRTC Camera TDC Travel'}
             </p>
           </div>
           <button type="button" className="sh-x" onClick={onClose} aria-label="Đóng">
